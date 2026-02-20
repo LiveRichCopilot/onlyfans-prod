@@ -232,11 +232,19 @@ bot.command("report", async (ctx) => {
             getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null)
         ]);
 
-        const gross1h = parseFloat(summary1h?.data?.total_gross || "0").toFixed(2);
-        const gross24h = parseFloat(summary24h?.data?.total_gross || "0").toFixed(2);
-
         const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
+
+        // The OF Analytics summary endpoint ignores hours and rounds to days.
+        // To get true 1-hour velocity, we manually sum the raw ledger events from the last 60 mins.
+        const txs1h = allTx.filter((t: any) => new Date(t.createdAt) >= start1h);
+        const manualGross1h = txs1h.reduce((sum: number, t: any) => {
+            return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
+        }, 0);
+
+        const gross1h = manualGross1h.toFixed(2);
+        const gross24h = parseFloat(summary24h?.data?.total_gross || "0").toFixed(2);
+
         const topFans = calculateTopFans(rawTxs, 0);
 
         const validSpenders = topFans.filter(f => f.spend > 0);
