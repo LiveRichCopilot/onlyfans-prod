@@ -65,22 +65,22 @@ export default function InboxPage() {
         fetch(`/api/inbox/chats?creatorId=${selectedCreatorId}`)
             .then(res => res.json())
             .then(data => {
-                const rawArray = data.chats || [];
-                const mappedChats: Chat[] = rawArray.map((c: any) => ({
+                const rawArray = Array.isArray(data.chats) ? data.chats : (data.chats?.list || []);
+                const mappedChats: Chat[] = typeof rawArray.map === 'function' ? rawArray.map((c: any) => ({
                     id: c.chat_id || c.id || Math.random().toString(),
                     withUser: {
-                        id: c.withUser?.id || c.user?.id || "unknown",
-                        username: c.withUser?.username || c.user?.username || "Fan",
-                        name: c.withUser?.name || c.user?.name || "Anonymous",
-                        avatar: c.withUser?.avatar || c.user?.avatar || ""
+                        id: c.fan?.id || c.withUser?.id || "unknown",
+                        username: c.fan?.username || c.withUser?.username || "Fan",
+                        name: c.fan?.name || c.withUser?.name || "Anonymous",
+                        avatar: c.fan?.avatar || c.withUser?.avatar || ""
                     },
                     lastMessage: {
                         text: c.lastMessage?.text || "No message",
                         createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
-                        isRead: c.lastMessage?.isRead ?? true
+                        isRead: c.lastMessage?.isOpened ?? true
                     },
                     totalSpend: c.totalSpend || 0
-                }));
+                })) : [];
                 // Sort by recent messages
                 mappedChats.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
                 setChats(mappedChats);
@@ -100,12 +100,12 @@ export default function InboxPage() {
         fetch(`/api/inbox/messages?creatorId=${selectedCreatorId}&chatId=${activeChat.id}`)
             .then(res => res.json())
             .then(data => {
-                const rawMsgs = Array.isArray(data.messages) ? data.messages : [];
+                const rawMsgs = Array.isArray(data.messages) ? data.messages : (data.messages?.list || []);
 
                 // Usually messages arrive in reverse chronological order from OFAPI, we need chronological for chat view
                 const sortedRaw = [...rawMsgs].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-                const mappedMsgs: Message[] = sortedRaw.map((m: any) => {
+                const mappedMsgs: Message[] = typeof sortedRaw.map === 'function' ? sortedRaw.map((m: any) => {
                     const fromId = m.fromUser?.id || m.author?.id || "unknown";
                     const isCreator = fromId !== activeChat.withUser.id;
 
@@ -116,7 +116,7 @@ export default function InboxPage() {
                         fromUser: { id: fromId },
                         isFromCreator: isCreator
                     };
-                });
+                }) : [];
 
                 setMessages(mappedMsgs);
                 setMsgsLoading(false);
