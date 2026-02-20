@@ -34,6 +34,7 @@ type Message = {
         id: string;
     };
     isFromCreator: boolean;
+    senderName: string;
 };
 
 export default function InboxPage() {
@@ -128,7 +129,8 @@ export default function InboxPage() {
                         })) : [],
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
-                        isFromCreator: isCreator
+                        isFromCreator: isCreator,
+                        senderName: m.author?.name || "Human Chatter"
                     };
                 }) : [];
 
@@ -159,7 +161,8 @@ export default function InboxPage() {
             text: inputText,
             createdAt: new Date().toISOString(),
             fromUser: { id: selectedCreatorId },
-            isFromCreator: true
+            isFromCreator: true,
+            senderName: "Sending..."
         };
         setMessages([...messages, optimisticMsg]);
         const textToSend = inputText;
@@ -342,8 +345,11 @@ export default function InboxPage() {
                                                 />
                                             )}
                                             {isSelf && (
-                                                <div className="flex justify-end mt-1">
-                                                    <CheckCheck size={12} className="text-white/60" />
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <span className="text-[10px] text-white/50 bg-black/20 px-2 py-0.5 rounded-full border border-white/5">
+                                                        Sent by {msg.senderName}
+                                                    </span>
+                                                    <CheckCheck size={12} className="text-[#14b8a6]" />
                                                 </div>
                                             )}
                                         </div>
