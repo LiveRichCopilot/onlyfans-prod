@@ -123,8 +123,8 @@ export default function InboxPage() {
                             id: med.id?.toString() || Math.random().toString(),
                             type: med.type || 'photo',
                             canView: med.canView !== false,
-                            preview: med.preview || med.thumb || med.squarePreview || "",
-                            src: med.full || med.source?.source || med.preview || ""
+                            preview: med.preview || med.thumb || med.squarePreview || med.source?.source || med.full || "",
+                            src: med.full || med.source?.source || med.preview || med.video?.url || med.audio?.url || ""
                         })) : [],
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
@@ -303,23 +303,36 @@ export default function InboxPage() {
                                             : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
                                             }`}>
                                             {msg.media && msg.media.length > 0 && (
-                                                <div className="flex flex-col gap-2 mb-2">
-                                                    {msg.media.map(med => (
-                                                        <div key={med.id} className="relative rounded-lg overflow-hidden bg-black/20 flex flex-col items-center justify-center min-w-[120px]">
-                                                            {med.type === 'video' ? (
-                                                                <video src={med.canView ? med.src : ''} poster={med.preview} controls className={`max-h-64 rounded-lg object-contain bg-black/50 ${!med.canView ? 'blur-md' : ''}`} />
-                                                            ) : med.type === 'audio' ? (
-                                                                <audio src={med.canView ? med.src : ''} controls className={`w-full ${!med.canView ? 'blur-md' : ''}`} />
-                                                            ) : (
-                                                                <img src={med.canView ? med.src : med.preview} alt="Media" className={`max-h-64 rounded-lg object-contain bg-black/50 ${!med.canView ? 'blur-md' : ''}`} />
-                                                            )}
-                                                            {!med.canView && (
-                                                                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-                                                                    <span className="bg-black/80 text-white text-xs px-3 py-1 rounded-full font-medium border border-white/20 whitespace-nowrap">🔒 Locked PPV</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                <div className={`grid gap-1.5 mb-2 ${msg.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                                    {msg.media.map(med => {
+                                                        const mediaUrl = med.canView ? med.src : med.preview;
+                                                        return (
+                                                            <div key={med.id} className="relative rounded-xl overflow-hidden bg-black/40 flex items-center justify-center min-h-[150px] border border-white/5">
+                                                                {med.type === 'video' ? (
+                                                                    <video src={mediaUrl} poster={med.preview} controls controlsList="nodownload" className={`w-full h-full max-h-[320px] object-cover ${!med.canView ? 'blur-xl scale-110' : ''}`} />
+                                                                ) : med.type === 'audio' ? (
+                                                                    <audio src={mediaUrl} controls className={`w-full max-w-[220px] m-4 ${!med.canView ? 'blur-md' : ''}`} />
+                                                                ) : (
+                                                                    <img
+                                                                        src={mediaUrl}
+                                                                        alt="Media Attachment"
+                                                                        className={`w-full h-full max-h-[320px] object-cover ${!med.canView ? 'blur-xl scale-110' : ''}`}
+                                                                        onError={(e) => {
+                                                                            e.currentTarget.style.display = 'none';
+                                                                            e.currentTarget.parentElement!.innerHTML += '<div class="absolute inset-0 flex flex-col items-center justify-center text-[10px] text-white/50 bg-[#16161a]"><span>Expired Media</span><span class="text-[8px] opacity-50 mt-1">API URL revoked</span></div>';
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                                {!med.canView && (
+                                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10 pointer-events-none">
+                                                                        <div className="bg-black/60 backdrop-blur-md shadow-xl text-white text-[11px] px-3 py-1.5 rounded-full font-medium border border-white/10 flex items-center gap-1.5">
+                                                                            <span>🔒</span> Locked PPV
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </div>
                                             )}
                                             {msg.text && (
