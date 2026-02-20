@@ -13,6 +13,7 @@ import {
   X
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 // @ts-ignore: Next relies on Vercel install
 import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
@@ -131,130 +132,133 @@ export default function AgencyDashboard() {
             {creators.map((c) => {
               const isUnderperforming = c.active && c.hourlyRev < c.target;
               return (
-                <div key={c.id} className="glass-panel p-5 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 relative overflow-hidden group">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="text-white font-medium">{c.name || 'Unknown'}</div>
-                      <div className="text-xs text-white/50 mb-3">{c.ofapiCreatorId || c.telegramId}</div>
-                    </div>
+                <Link href={`/creators/${c.id}`} key={c.id} className="block cursor-pointer">
+                  <div className="glass-panel p-5 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 relative overflow-hidden group hover:bg-white/5 transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="text-white font-medium group-hover:text-teal-400 transition-colors">{c.name || 'Unknown'}</div>
+                        <div className="text-xs text-white/50 mb-3">{c.ofapiCreatorId || c.telegramId}</div>
+                      </div>
 
-                    <div className="flex gap-2 items-center">
-                      {!c.ofapiToken || c.ofapiToken === "unlinked" ? (
-                        <button
-                          onClick={async () => {
-                            setIsAuthenticatingId(c.id);
-                            try {
-                              const sessionRes = await fetch("/api/client-session", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ displayName: c.name || "Agency Pipeline" }),
-                              });
-                              const { token } = await sessionRes.json();
+                      <div className="flex gap-2 items-center">
+                        {!c.ofapiToken || c.ofapiToken === "unlinked" ? (
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault(); // Prevent link navigation when clicking connect
+                              setIsAuthenticatingId(c.id);
+                              try {
+                                const sessionRes = await fetch("/api/client-session", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ displayName: c.name || "Agency Pipeline" }),
+                                });
+                                const { token } = await sessionRes.json();
 
-                              startOnlyFansAuthentication(token, {
-                                theme: {
-                                  brandName: "HQ Security",
-                                },
-                                onSuccess: async (data: any) => {
-                                  await fetch("/api/accounts", {
-                                    method: "PUT",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      id: c.id,
-                                      ofapiToken: "linked_via_auth_module"
-                                    }),
-                                  });
-                                  setIsAuthenticatingId(null);
-                                  window.location.reload();
-                                },
-                                onError: (error: any) => {
-                                  console.error("Auth failed:", error);
-                                  setIsAuthenticatingId(null);
-                                }
-                              });
-                            } catch (err) {
-                              console.error("Session fetch failed", err);
-                              setIsAuthenticatingId(null);
-                            }
-                          }}
-                          disabled={isAuthenticatingId === c.id}
-                          className="glass-button px-3 py-1.5 rounded-xl text-xs font-medium text-purple-400 border border-purple-500/30 hover:bg-purple-500/10 flex items-center gap-2"
-                        >
-                          {isAuthenticatingId === c.id ? "Connecting..." : "Connect OF"}
-                        </button>
-                      ) : (
-                        <div className="flex flex-col items-end gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
-                              Authenticated
-                            </span>
-                            <div className="glass-button p-1 rounded-lg">
-                              {isUnderperforming ? (
-                                <AlertCircle size={16} className="text-red-400" />
-                              ) : c.active ? (
-                                <div className="text-emerald-400">✓</div>
-                              ) : (
-                                <Activity size={16} className="text-white/30" />
-                              )}
+                                startOnlyFansAuthentication(token, {
+                                  theme: {
+                                    brandName: "HQ Security",
+                                  },
+                                  onSuccess: async (data: any) => {
+                                    await fetch("/api/accounts", {
+                                      method: "PUT",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        id: c.id,
+                                        ofapiToken: "linked_via_auth_module"
+                                      }),
+                                    });
+                                    setIsAuthenticatingId(null);
+                                    window.location.reload();
+                                  },
+                                  onError: (error: any) => {
+                                    console.error("Auth failed:", error);
+                                    setIsAuthenticatingId(null);
+                                  }
+                                });
+                              } catch (err) {
+                                console.error("Session fetch failed", err);
+                                setIsAuthenticatingId(null);
+                              }
+                            }}
+                            disabled={isAuthenticatingId === c.id}
+                            className="glass-button px-3 py-1.5 rounded-xl text-xs font-medium text-purple-400 border border-purple-500/30 hover:bg-purple-500/10 flex items-center gap-2 relative z-10"
+                          >
+                            {isAuthenticatingId === c.id ? "Connecting..." : "Connect OF"}
+                          </button>
+                        ) : (
+                          <div className="flex flex-col items-end gap-1.5 relative z-10">
+                            <div className="flex items-center gap-2">
+                              <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+                                Authenticated
+                              </span>
+                              <div className="glass-button p-1 rounded-lg">
+                                {isUnderperforming ? (
+                                  <AlertCircle size={16} className="text-red-400" />
+                                ) : c.active ? (
+                                  <div className="text-emerald-400">✓</div>
+                                ) : (
+                                  <Activity size={16} className="text-white/30" />
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-white/40 font-mono bg-black/40 border border-white/10 px-2 py-1 rounded flex items-center gap-2 cursor-pointer hover:bg-white/5 transition">
+                              <span>acct_{c.id.substring(0, 16)}...</span>
+                              <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                             </div>
                           </div>
-                          <div className="text-[9px] text-white/40 font-mono bg-black/40 border border-white/10 px-2 py-1 rounded flex items-center gap-2 cursor-pointer hover:bg-white/5 transition">
-                            <span>acct_{c.id.substring(0, 16)}...</span>
-                            <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-baseline space-x-2 relative z-0">
+                      <span className={`text-3xl font-bold tracking-tighter ${isUnderperforming ? 'text-red-400' : 'text-white'}`}>
+                        ${c.hourlyRev}
+                      </span>
+                      <span className="text-sm text-white/40">/ hr</span>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-white/10 relative z-10">
+                      <div className="flex justify-between text-xs text-white/60 mb-2">
+                        <span>Target: ${c.target}/hr</span>
+                        <span>{c.active ? 'Active' : 'Offline'}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-4">
+                        <div
+                          className={`h-full rounded-full ${isUnderperforming ? 'bg-red-500' : 'bg-teal-500'}`}
+                          style={{ width: `${Math.min(((c.hourlyRev || 0) / (c.target || 100)) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <div className="pt-2 border-t border-white/10 border-dashed" onClick={(e) => e.preventDefault()}>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Hourly Revenue Target</label>
+                          <span className="text-xs text-teal-400 font-medium">${c.hourlyTarget || 100}/hr</span>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="500"
+                          step="10"
+                          defaultValue={c.hourlyTarget || 100}
+                          className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-500 mb-4"
+                        />
 
-                  <div className="flex items-baseline space-x-2">
-                    <span className={`text-3xl font-bold tracking-tighter ${isUnderperforming ? 'text-red-400' : 'text-white'}`}>
-                      ${c.hourlyRev}
-                    </span>
-                    <span className="text-sm text-white/40">/ hr</span>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <div className="flex justify-between text-xs text-white/60 mb-2">
-                      <span>Target: ${c.target}/hr</span>
-                      <span>{c.active ? 'Active' : 'Offline'}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-4">
-                      <div
-                        className={`h-full rounded-full ${isUnderperforming ? 'bg-red-500' : 'bg-teal-500'}`}
-                        style={{ width: `${Math.min(((c.hourlyRev || 0) / (c.target || 100)) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <div className="pt-2 border-t border-white/10 border-dashed">
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Hourly Revenue Target</label>
-                        <span className="text-xs text-teal-400 font-medium">${c.hourlyTarget || 100}/hr</span>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Daily Whale Alert Threshold</label>
+                          <span className="text-xs text-teal-600 font-medium">${c.whaleAlertTarget || 200}/day</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1000"
+                          step="50"
+                          defaultValue={c.whaleAlertTarget || 200}
+                          className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                        />
                       </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="500"
-                        step="10"
-                        defaultValue={c.hourlyTarget || 100}
-                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-500 mb-4"
-                      />
-
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Daily Whale Alert Threshold</label>
-                        <span className="text-xs text-teal-600 font-medium">${c.whaleAlertTarget || 200}/day</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1000"
-                        step="50"
-                        defaultValue={c.whaleAlertTarget || 200}
-                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-600"
-                      />
                     </div>
                   </div>
-                </div>
+                </Link>
               )
             })}
 
