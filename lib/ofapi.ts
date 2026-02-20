@@ -200,3 +200,33 @@ export async function getPeriodComparison(apiKey: string, payload: any) {
         body: payload
     });
 }
+
+/**
+ * UTILITY: Calculate top spending fans from a raw transaction array.
+ * Filters out standard OF platform fees/taxes to isolate gross spend per user.
+ */
+export function calculateTopFans(transactions: any[], threshold: number = 0) {
+    if (!transactions || !Array.isArray(transactions)) return [];
+
+    const fanTotals: Record<string, { username: string; spend: number }> = {};
+
+    transactions.forEach(tx => {
+        // Skip platform fees or non-user entities if they appear in the raw ledger
+        if (!tx.user || !tx.user.username) return;
+
+        const fanId = tx.user.id;
+        const amount = Number(tx.amount) || 0;
+
+        if (!fanTotals[fanId]) {
+            fanTotals[fanId] = { username: tx.user.username, spend: 0 };
+        }
+        fanTotals[fanId].spend += amount;
+    });
+
+    // Convert to array, filter by threshold, sort cleanly
+    const sorted = Object.values(fanTotals)
+        .filter(fan => fan.spend >= threshold)
+        .sort((a, b) => b.spend - a.spend);
+
+    return sorted;
+}

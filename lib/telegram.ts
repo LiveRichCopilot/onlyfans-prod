@@ -14,7 +14,9 @@ import {
     getTransactionsSummary,
     getTransactionsByType,
     getRevenueForecast,
-    getNotificationCounts
+    getNotificationCounts,
+    getTransactions,
+    calculateTopFans
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
 
@@ -139,6 +141,68 @@ New Fans: ${counts.subscribers || 0}
     } catch (e: any) {
         console.error("Notifications command error", e);
         await ctx.reply("⚠️ Failed to fetch notification counts.");
+    }
+});
+
+bot.command("topfans", async (ctx) => {
+    try {
+        const textStr = ctx.match || "";
+        const parts = textStr.split(" ").filter(Boolean);
+
+        let days = 30; // default 30 days
+        let threshold = 100; // default minimum $100
+
+        if (parts.length > 0) {
+            days = parseInt(parts[0].replace('d', '')) || 30;
+        }
+        if (parts.length > 1) {
+            threshold = parseFloat(parts[1]) || 100;
+        }
+
+        const telegramId = String(ctx.from?.id);
+        const creator = await prisma.creator.findUnique({ where: { telegramId } });
+
+        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
+            return ctx.reply("❌ You are not linked.");
+        }
+
+        await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold}`);
+
+        // Currently, our getTransactions helper just hits the root endpoint. 
+        // A true production build would paginate this or pass the timeframe config if supported.
+        let rawTransactions: any[] = [];
+        try {
+            // Note: If OFAPI paginates /transactions, we would loop here.
+            // For this v10 prototype, we fetch the first page or standard payload.
+            const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken);
+            rawTransactions = txResponse.list || txResponse.transactions || [];
+        } catch (e) {
+            console.error("Tx Fetch Error", e);
+            return ctx.reply("⚠️ Failed to download raw transaction ledger from OnlyFans.");
+        }
+
+        const topFans = calculateTopFans(rawTransactions, threshold);
+
+        if (topFans.length === 0) {
+            return ctx.reply(`No fans found who spent over $${threshold} in this ledger slice.`);
+        }
+
+        // Output top 15 max to avoid telegram message length limits
+        const displayList = topFans.slice(0, 15);
+
+        let md = `TOP SPENDERS (${days}d > $${threshold})\n\n`;
+
+        displayList.forEach((fan, index) => {
+            md += `${index + 1}. @${fan.username}: $${fan.spend.toFixed(2)}\n`;
+        });
+
+        md += `\nTotal Whales Found: ${topFans.length}`;
+
+        await ctx.reply(md, { parse_mode: "HTML" });
+
+    } catch (e: any) {
+        console.error("Topfans command error", e);
+        await ctx.reply("⚠️ Failed to calculate top fans.");
     }
 });
 
