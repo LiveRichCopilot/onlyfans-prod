@@ -178,3 +178,25 @@ export async function getNotificationCounts(account: string, apiKey: string) {
 export async function listMessageBuyers(account: string, messageId: string, apiKey: string) {
     return ofapiRequest(`/api/${account}/engagement/messages/${messageId}/buyers`, apiKey);
 }
+
+/**
+ * Get historical earnings chart data for the team.
+ * POST /api/analytics/summary/historical
+ */
+export async function getHistoricalPerformance(apiKey: string, payload: any) {
+    return ofapiRequest("/api/analytics/summary/historical", apiKey, {
+        method: "POST",
+        body: payload
+    });
+}
+
+/**
+ * Compare two time periods to analyze performance changes.
+ * POST /api/analytics/summary/comparison
+ */
+export async function getPeriodComparison(apiKey: string, payload: any) {
+    return ofapiRequest("/api/analytics/summary/comparison", apiKey, {
+        method: "POST",
+        body: payload
+    });
+}

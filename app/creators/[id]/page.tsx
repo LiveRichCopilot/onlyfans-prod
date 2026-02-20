@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Activity, ArrowLeft, BarChart, Settings, Users, MessageSquare, AlertCircle, ShieldCheck } from "lucide-react";
+import { Activity, ArrowLeft, BarChart, Settings, Users, MessageSquare, AlertCircle, ShieldCheck, TrendingUp } from "lucide-react";
 
 export default function CreatorAnalyticsHub() {
     const params = useParams();
@@ -14,6 +14,7 @@ export default function CreatorAnalyticsHub() {
         totalRevenue: 0,
         activeFans: 0,
         messagesSent: 0,
+        growthPercentage: "+0%",
         recentPurchases: []
     });
     const [loading, setLoading] = useState(true);
@@ -91,7 +92,9 @@ export default function CreatorAnalyticsHub() {
                 <div className="glass-panel p-6 rounded-3xl border-white/5 bg-black/20">
                     <div className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-2">Total Monthly Revenue</div>
                     <div className="text-4xl font-bold text-white">${stats.totalRevenue.toLocaleString()}</div>
-                    <div className="text-xs text-emerald-400 mt-2 flex items-center gap-1">↑ 12% from last week</div>
+                    <div className={`text-xs mt-2 flex items-center ${stats.growthPercentage?.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
+                        <TrendingUp size={14} className="mr-1" /> {stats.growthPercentage} vs Last Month
+                    </div>
                 </div>
                 <div className="glass-panel p-6 rounded-3xl border-white/5 bg-black/20">
                     <div className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-2">Active Subscribers</div>

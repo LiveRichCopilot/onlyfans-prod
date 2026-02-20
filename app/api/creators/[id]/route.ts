@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getEarningsOverview } from "@/lib/ofapi";
+import { getEarningsOverview, getPeriodComparison } from "@/lib/ofapi";
 
 export async function GET(
     request: Request,
@@ -27,11 +27,9 @@ export async function GET(
 
         if (creator.ofapiToken && creator.ofapiToken !== "unlinked") {
             try {
-                // Fetch live Earnings via OFAPI Helper
-                // For a true "monthly" view, you'd pass the start/end of the current month.
-                // We'll pass an arbitrary 30-day window here for the prototype dashboard.
                 const now = new Date();
                 const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+                const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
 
                 const earningsPayload = {
                     accounts: [creator.ofapiCreatorId || creator.telegramId],
@@ -41,18 +39,34 @@ export async function GET(
                     }
                 };
 
-                // Note: The structure of this response depends entirely on OnlyFansAPI's exact JSON shape.
-                // We wrap this in a try/catch so the UI still loads the module config even if the API stats fail.
-                const earningsObj = await getEarningsOverview(creator.ofapiToken, earningsPayload);
+                const comparisonPayload = {
+                    accounts: [creator.ofapiCreatorId || creator.telegramId],
+                    current_period: {
+                        start: thirtyDaysAgo.toISOString(),
+                        end: now.toISOString()
+                    },
+                    previous_period: {
+                        start: sixtyDaysAgo.toISOString(),
+                        end: thirtyDaysAgo.toISOString()
+                    }
+                };
 
-                // This is a "best guess" mapping based on standard analytics payloads. 
-                // Actual mapping depends on their precise response shape.
-                liveStats.totalRevenue = earningsObj?.net || earningsObj?.total || 0;
+                const [earningsObj, comparisonObj] = await Promise.all([
+                    getEarningsOverview(creator.ofapiToken, earningsPayload).catch(() => null),
+                    getPeriodComparison(creator.ofapiToken, comparisonPayload).catch(() => null)
+                ]);
 
-                // For now, these are mocked as OFAPI doesn't have a documented simple 'fan count' endpoint 
-                // exposed in our helper lib yet, but we provide the structure so the UI knows where it will go.
-                liveStats.activeFans = 1420; // Placeholder until real /fans/active endpoint is mapped
-                liveStats.messagesSent = 8532;
+                // OFAPI comparison payload usually returns a summary with percent_change
+                const growthStr = comparisonObj?.summary?.metrics?.revenue?.percent_change || "+0%";
+
+                liveStats = {
+                    ...liveStats,
+                    totalRevenue: earningsObj?.net || earningsObj?.total || 0,
+                    // @ts-ignore - appending dynamic key for the frontend
+                    growthPercentage: growthStr,
+                    activeFans: 1420, // Placeholder
+                    messagesSent: 8532  // Placeholder
+                };
 
             } catch (ofapiError) {
                 console.error(`Failed to fetch live OFAPI stats for ${creator.name}:`, ofapiError);
