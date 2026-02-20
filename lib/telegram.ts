@@ -6,7 +6,17 @@ if (!token) {
     throw new Error("TELEGRAM_BOT_TOKEN environment variable is not defined");
 }
 
-export const bot = new Bot(token);
+export const bot = new Bot(token, {
+    botInfo: {
+        id: 8554732867,
+        is_bot: true,
+        first_name: "OnlyFans Essentials",
+        username: "OFessentialsbot",
+        can_join_groups: true,
+        can_read_all_group_messages: false,
+        supports_inline_queries: false
+    }
+});
 
 import { prisma } from "./prisma";
 import {
