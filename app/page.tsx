@@ -96,6 +96,12 @@ export default function AgencyDashboard() {
             <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">Management</div>
             <ul className="space-y-1">
               <li className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/10 text-white shadow-sm border border-white/10"><LayoutGrid size={16} /> Dashboard</li>
+              <Link href="/inbox">
+                <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
+                  <MessageSquare size={16} /> Live Inbox
+                  <span className="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-purple-500/30 font-bold tracking-wider">NEW</span>
+                </li>
+              </Link>
               <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Activity size={16} /> Real-time Feed</li>
               <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Users size={16} /> Team & Chatters</li>
             </ul>

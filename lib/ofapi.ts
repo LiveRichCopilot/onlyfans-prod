@@ -230,3 +230,45 @@ export function calculateTopFans(transactions: any[], threshold: number = 0) {
 
     return sorted;
 }
+
+// ==========================================
+// V11: Chat & Inbox Integration Endpoints
+// ==========================================
+
+/**
+ * Get the list of chats for an Account.
+ * GET /api/{account}/chats
+ */
+export async function listChats(accountName: string, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/chats`, apiKey);
+}
+
+/**
+ * Search messages in a specific chat.
+ * GET /api/{account}/chats/{chat_id}/messages/search
+ */
+export async function searchChatMessages(accountName: string, chatId: string | number, apiKey: string) {
+    // Note: Scribe docs say GET /search. We'll return the raw array.
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages/search`, apiKey);
+}
+
+/**
+ * Send a new message to a chat.
+ * POST /api/{account}/chats/{chat_id}/messages
+ */
+export async function sendChatMessage(accountName: string, chatId: string | number, apiKey: string, payload: { text: string; price?: number }) {
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages`, apiKey, {
+        method: "POST",
+        body: payload
+    });
+}
+
+/**
+ * Trigger the "Model is typing..." indicator.
+ * POST /api/{account}/chats/{chat_id}/typing
+ */
+export async function startTypingIndicator(accountName: string, chatId: string | number, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/typing`, apiKey, {
+        method: "POST"
+    });
+}
