@@ -225,36 +225,31 @@ bot.command("report", async (ctx) => {
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
         const topFans = calculateTopFans(rawTxs, 0);
 
+        const validSpenders = topFans.filter(f => f.spend > 0);
+
         let md = `🔥 **DAILY BRIEF**: ${creator.name}\n\n`;
         md += `⏱ **1-Hour Velocity:** $${gross1h}\n`;
         md += `📅 **24-Hour Total:** $${gross24h}\n\n`;
         md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
 
-        let topSpenderId = null;
-        let topSpenderName = "";
-
-        if (topFans.length === 0) {
-            md += "No spenders found.\n";
+        if (validSpenders.length === 0) {
+            md += "No spenders found in the last 24h.\n";
+            await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
         } else {
-            topSpenderId = topFans[0].username;
-            topSpenderName = topFans[0].name;
-            const displayList = topFans.slice(0, 3);
+            const displayList = validSpenders.slice(0, 3);
             displayList.forEach((fan, i) => {
                 md += `${i + 1}. ${fan.name} (@${fan.username}) — $${fan.spend.toFixed(2)}\n`;
             });
-        }
 
-        if (topSpenderId && topFans[0].spend > 0) {
-            md += `\n🎯 **Action Required:** Your #1 whale right now is ${topSpenderName}. Would you like to send them a private reward or voice note to their inbox?`;
+            const topWhale = validSpenders[0];
+            md += `\n🎯 **Action Required:** Your #1 whale right now is ${topWhale.name}. Would you like to send them a private reward or voice note to their inbox?`;
 
             const keyboard = new InlineKeyboard()
-                .text("🎤 Voice Note", `alert_reply_voice_${topSpenderId}`).row()
-                .text("📹 Send Video", `alert_reply_video_${topSpenderId}`).row()
+                .text("🎤 Voice Note", `alert_reply_voice_${topWhale.username}`).row()
+                .text("📹 Send Video", `alert_reply_video_${topWhale.username}`).row()
                 .text("Skip / Dismiss", "action_skip");
 
             await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const, reply_markup: keyboard }));
-        } else {
-            await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
         }
 
     } catch (e: any) {
