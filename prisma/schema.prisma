@@ -14,6 +14,7 @@ model Creator {
   ofapiToken     String?
   ofapiCreatorId String?       @unique
   lastSyncCursor String?
+  telegramGroupId String?      // Optional: Routes this specific creator's alerts to a specific Group ID
   
   hourlyTarget   Float         @default(100.0)
   whaleAlertTarget Float       @default(200.0)
@@ -21,6 +22,7 @@ model Creator {
   
   fans           Fan[]
   mediaAssets    MediaAsset[]
+  assignedUsers  CreatorAssignment[]
   
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -29,8 +31,19 @@ model Creator {
 enum Role {
   UNASSIGNED
   AGENCY
-  CREATOR
   CFO
+  EMPLOYEE
+}
+
+model CreatorAssignment {
+  id        String   @id @default(cuid())
+  userId    String
+  creatorId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, creatorId])
 }
 
 model Account {
@@ -69,6 +82,7 @@ model User {
   role          Role      @default(UNASSIGNED)
   accounts      Account[]
   sessions      Session[]
+  assignments   CreatorAssignment[]
 }
 
 model VerificationToken {

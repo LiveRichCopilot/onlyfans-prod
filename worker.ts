@@ -22,7 +22,7 @@ async function processCreators() {
     for (const creator of creators) {
         if (!creator.ofapiToken) continue;
         const handle = creator.ofapiCreatorId || 'default';
-        await processChatterPerformance(handle, creator.ofapiToken, creator.telegramId, 100);
+        await processChatterPerformance(handle, creator.ofapiToken, creator.telegramId, creator.telegramGroupId, 100);
         await processWhaleAlerts(handle, creator.ofapiToken, creator.telegramId);
     }
 }
@@ -86,7 +86,7 @@ How would you like to respond via Vault?`;
  * Chatter Monitoring Core Logic (STF-01)
  * Checks revenue for the last hour and alerts if they missed the target.
  */
-async function processChatterPerformance(accountName: string, apiKey: string, telegramId: string | null, targetPerHour: number) {
+async function processChatterPerformance(accountName: string, apiKey: string, telegramId: string | null, telegramGroupId: string | null, targetPerHour: number) {
     try {
         // 1. Calculate the time window for the last 1 hour
         const now = new Date();
@@ -116,7 +116,9 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
 
         if (hourlyRevenue < targetPerHour) {
             const centralGroupId = process.env.TELEGRAM_GROUP_ID;
-            const targetId = centralGroupId || telegramId;
+
+            // Priority: 1. Specific Creator Group -> 2. Global Group -> 3. Creator's Personal DM
+            const targetId = telegramGroupId || centralGroupId || telegramId;
 
             if (targetId) {
                 await sendChatterWarningAlert(targetId, {
