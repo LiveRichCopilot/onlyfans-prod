@@ -64,8 +64,9 @@ bot.command("stats", async (ctx) => {
         const startWindow = new Date(now.getTime() - (hours * 60 * 60 * 1000));
 
         const payload = {
-            accounts: [creator.ofapiCreatorId || creator.telegramId],
-            date_range: { start: startWindow.toISOString(), end: now.toISOString() }
+            account_ids: [creator.ofapiCreatorId || creator.telegramId],
+            start_date: startWindow.toISOString(),
+            end_date: now.toISOString()
         };
 
         const [summary, byType] = await Promise.all([
@@ -75,13 +76,15 @@ bot.command("stats", async (ctx) => {
 
         if (!summary) return ctx.reply("❌ API Error: Could not fetch transaction summary at this time.");
 
+        const summaryData = summary?.data || {};
+
         const md = `
 PERFORMANCE REPORT: ${creator.name}
 Window: Last ${args}
 
-Gross Revenue: $${(summary.gross || 0).toFixed(2)}
-Net Profit: $${(summary.net || 0).toFixed(2)}
-Platform Fees: $${(summary.fees || 0).toFixed(2)}
+Gross Revenue: $${parseFloat(summaryData.total_gross || "0").toFixed(2)}
+Net Profit: $${parseFloat(summaryData.total_net || "0").toFixed(2)}
+Platform Fees: $${parseFloat(summaryData.total_fees || "0").toFixed(2)}
 
 Breakdown:
 - Subscriptions: $${(byType?.subscriptions || 0).toFixed(2)}
@@ -119,9 +122,10 @@ bot.command("forecast", async (ctx) => {
         const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
 
         const payload = {
-            accounts: [creator.ofapiCreatorId || creator.telegramId],
+            account_ids: [creator.ofapiCreatorId || creator.telegramId],
             model: "ARIMA",
-            date_range: { start: thirtyDaysAgo.toISOString(), end: now.toISOString() }
+            start_date: thirtyDaysAgo.toISOString(),
+            end_date: now.toISOString()
         };
 
         const forecast = await getRevenueForecast(creator.ofapiToken, payload);
