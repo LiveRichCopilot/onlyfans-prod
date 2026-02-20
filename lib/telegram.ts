@@ -38,6 +38,20 @@ bot.catch((err) => {
     console.error("Global Grammy Error:", err);
 });
 
+// Configure the native Telegram Slash Command menu
+bot.api.setMyCommands([
+    { command: "start", description: "Initialize Bot" },
+    { command: "report", description: "Get the live 1H/24H Revenue Brief & Top Spenders" },
+    { command: "stats", description: "Get comprehensive performance report (e.g. /stats 24h)" },
+    { command: "topfans", description: "Find highest spenders (e.g. /topfans 1d 1000)" },
+    { command: "forecast", description: "Generate AI revenue projection" },
+    { command: "notifications", description: "Check unread priority alerts" },
+    { command: "testwhale", description: "Trigger Mock Whale Alert" },
+    { command: "testchatter", description: "Trigger Mock Chatter Warning" },
+    { command: "list", description: "List connected accounts" },
+    { command: "ping", description: "Check system latency and group ID" }
+]).catch(err => console.error("Failed to set commands", err));
+
 bot.command("testbot", async (ctx) => {
     await ctx.reply("System Status: Bot is awake but database is bypassed.");
 });
