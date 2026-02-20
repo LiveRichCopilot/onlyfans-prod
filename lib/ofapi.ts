@@ -124,7 +124,7 @@ export async function uploadToVault(account: string, apiKey: string, mediaBuffer
     if (!response.ok) {
         const err = await response.text();
         console.error(`OFAPI Upload Error: ${response.status}`, err);
-        throw new Error(`Media Upload failed: ${response.status}`);
+        throw new Error(`Media Upload failed: HTTP ${response.status} | Details: ${err}`);
     }
 
     return response.json(); // { prefixed_id, file_name, thumbs... }
