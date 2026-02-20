@@ -14,7 +14,11 @@ export const bot = new Bot(token, {
         username: "OFessentialsbot",
         can_join_groups: true,
         can_read_all_group_messages: false,
-        supports_inline_queries: false
+        supports_inline_queries: false,
+        can_connect_to_business: false,
+        has_main_web_app: false,
+        has_topics_enabled: true,
+        allows_users_to_create_topics: false
     }
 });
 
@@ -29,6 +33,14 @@ import {
     calculateTopFans
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
+
+bot.catch((err) => {
+    console.error("Global Grammy Error:", err);
+});
+
+bot.command("testbot", async (ctx) => {
+    await ctx.reply("System Status: Bot is awake but database is bypassed.");
+});
 
 bot.command("start", async (ctx) => {
     await ctx.reply("Welcome to OnlyFans Essentials. Your account is connected. Waiting for alerts...");
