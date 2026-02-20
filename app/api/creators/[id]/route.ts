@@ -4,10 +4,10 @@ import { getEarningsOverview, getPeriodComparison } from "@/lib/ofapi";
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const creatorId = params.id;
+        const creatorId = (await params).id;
 
         // 1. Fetch from our Database to get the Token and Configuration rules
         const creator = await prisma.creator.findUnique({
