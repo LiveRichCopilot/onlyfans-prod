@@ -14,20 +14,9 @@ async function processCreators() {
         where: { ofapiToken: { not: null } }
     });
 
-    // If no creators exist yet, run a mocked safety check for testing purposes
-    if (creators.length === 0 && process.env.TEST_OFAPI_KEY) {
-        console.log("No creators found. Using TEST_OFAPI_KEY for a direct API call...");
-        await processChatterPerformance(
-            'madison420ivy',
-            process.env.TEST_OFAPI_KEY,
-            process.env.TELEGRAM_BOT_TOKEN ? 'liverichmedia' : null,
-            100
-        );
-        await processWhaleAlerts(
-            'madison420ivy',
-            process.env.TEST_OFAPI_KEY,
-            process.env.TELEGRAM_BOT_TOKEN ? 'liverichmedia' : null
-        );
+    if (creators.length === 0) {
+        console.log("No active creators found with API tokens. Waiting for onboarding...");
+        return;
     }
 
     for (const creator of creators) {
