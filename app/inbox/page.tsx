@@ -67,7 +67,7 @@ export default function InboxPage() {
             .then(data => {
                 const rawArray = Array.isArray(data.chats) ? data.chats : (data.chats?.data || []);
                 const mappedChats: Chat[] = typeof rawArray.map === 'function' ? rawArray.map((c: any) => ({
-                    id: c.chat_id || c.id || Math.random().toString(),
+                    id: c.fan?.id || c.chat_id || c.id || Math.random().toString(),
                     withUser: {
                         id: c.fan?.id || c.withUser?.id || "unknown",
                         username: c.fan?.username || c.withUser?.username || "Fan",
