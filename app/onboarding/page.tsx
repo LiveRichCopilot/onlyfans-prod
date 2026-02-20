@@ -47,7 +47,7 @@ export default function Onboarding() {
                     <div
                         onClick={() => setSelectedRole("AGENCY")}
                         className={`cursor-pointer p-6 rounded-2xl glass-panel border transition-all duration-300 flex flex-col items-center justify-center gap-4 group
-              ${selectedRole === "AGENCY" ? "border-blue-500 bg-white/10 shadow-[0_0_20px_rgba(59,130,246,0.3)]" : "border-white/5 hover:border-white/20"}
+              ${selectedRole === "AGENCY" ? "border-blue-500 bg-white/10 shadow-lg shadow-blue-500/30" : "border-white/5 hover:border-white/20"}
             `}
                     >
                         <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
@@ -62,7 +62,7 @@ export default function Onboarding() {
                     <div
                         onClick={() => setSelectedRole("CREATOR")}
                         className={`cursor-pointer p-6 rounded-2xl glass-panel border transition-all duration-300 flex flex-col items-center justify-center gap-4 group
-              ${selectedRole === "CREATOR" ? "border-purple-500 bg-white/10 shadow-[0_0_20px_rgba(168,85,247,0.3)]" : "border-white/5 hover:border-white/20"}
+              ${selectedRole === "CREATOR" ? "border-purple-500 bg-white/10 shadow-lg shadow-purple-500/30" : "border-white/5 hover:border-white/20"}
             `}
                     >
                         <div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
