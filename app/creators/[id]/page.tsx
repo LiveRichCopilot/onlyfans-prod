@@ -15,6 +15,8 @@ export default function CreatorAnalyticsHub() {
         activeFans: 0,
         messagesSent: 0,
         growthPercentage: "+0%",
+        topPercentage: "N/A",
+        startDate: "Unknown",
         recentPurchases: []
     });
     const [loading, setLoading] = useState(true);
@@ -88,13 +90,21 @@ export default function CreatorAnalyticsHub() {
             <h2 className="text-xl font-semibold mb-4 px-2 flex items-center gap-2">
                 <BarChart size={20} className="text-teal-400" /> Live API Statistics
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-10">
                 <div className="glass-panel p-6 rounded-3xl border-white/5 bg-black/20">
                     <div className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-2">Total Monthly Revenue</div>
                     <div className="text-4xl font-bold text-white">${stats.totalRevenue.toLocaleString()}</div>
                     <div className={`text-xs mt-2 flex items-center ${stats.growthPercentage?.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}`}>
                         <TrendingUp size={14} className="mr-1" /> {stats.growthPercentage} vs Last Month
                     </div>
+                </div>
+                <div className="glass-panel p-6 rounded-3xl border-white/5 bg-black/20">
+                    <div className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-2">Top Percentage</div>
+                    <div className="text-4xl font-bold text-teal-400">{stats.topPercentage}%</div>
+                </div>
+                <div className="glass-panel p-6 rounded-3xl border-white/5 bg-black/20">
+                    <div className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-2">Account Created</div>
+                    <div className="text-3xl font-bold text-white mt-2">{stats.startDate !== "Unknown" ? new Date(stats.startDate).toLocaleDateString() : "Unknown"}</div>
                 </div>
                 <div className="glass-panel p-6 rounded-3xl border-white/5 bg-black/20">
                     <div className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-2">Active Subscribers</div>

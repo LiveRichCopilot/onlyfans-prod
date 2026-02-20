@@ -272,3 +272,31 @@ export async function startTypingIndicator(accountName: string, chatId: string |
         method: "POST"
     });
 }
+
+// ==========================================
+// V12: Advanced Profile Metrics
+// ==========================================
+
+/**
+ * Get OnlyFans Profile details for the currently used Account
+ * GET /api/{account}/me
+ */
+export async function getOFProfile(accountName: string, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/me`, apiKey);
+}
+
+/**
+ * Get the start date of the model (monetization enabled)
+ * GET /api/{account}/me/model-start-date
+ */
+export async function getModelStartDate(accountName: string, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/me/model-start-date`, apiKey);
+}
+
+/**
+ * Get the top percentage of the model (e.g., 0.02%)
+ * GET /api/{account}/me/top-percentage
+ */
+export async function getTopPercentage(accountName: string, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/me/top-percentage`, apiKey);
+}

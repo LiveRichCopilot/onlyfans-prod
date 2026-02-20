@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getEarningsOverview, getPeriodComparison } from "@/lib/ofapi";
+import { getEarningsOverview, getPeriodComparison, getTopPercentage, getModelStartDate } from "@/lib/ofapi";
 
 export async function GET(
     request: Request,
@@ -51,19 +51,25 @@ export async function GET(
                     }
                 };
 
-                const [earningsObj, comparisonObj] = await Promise.all([
+                const [earningsObj, comparisonObj, topPercentObj, startDateObj] = await Promise.all([
                     getEarningsOverview(creator.ofapiToken, earningsPayload).catch(() => null),
-                    getPeriodComparison(creator.ofapiToken, comparisonPayload).catch(() => null)
+                    getPeriodComparison(creator.ofapiToken, comparisonPayload).catch(() => null),
+                    getTopPercentage(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null),
+                    getModelStartDate(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null)
                 ]);
 
                 // OFAPI comparison payload usually returns a summary with percent_change
                 const growthStr = comparisonObj?.summary?.metrics?.revenue?.percent_change || "+0%";
+                const topPercentage = topPercentObj?.percentage || "N/A";
+                const startDate = startDateObj?.start_date || "Unknown";
 
                 liveStats = {
                     ...liveStats,
                     totalRevenue: earningsObj?.net || earningsObj?.total || 0,
                     // @ts-ignore - appending dynamic key for the frontend
                     growthPercentage: growthStr,
+                    topPercentage: topPercentage,
+                    startDate: startDate,
                     activeFans: 1420, // Placeholder
                     messagesSent: 8532  // Placeholder
                 };
