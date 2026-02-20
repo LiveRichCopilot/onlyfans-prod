@@ -34,6 +34,25 @@ bot.command("start", async (ctx) => {
     await ctx.reply("Welcome to OnlyFans Essentials. Your account is connected. Waiting for alerts...");
 });
 
+bot.command("ping", async (ctx) => {
+    try {
+        const telegramId = String(ctx.from?.id);
+        const telegramGroupId = String(ctx.chat?.id);
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
+        await ctx.reply(`Pong! 🏓\nGroup ID: ${telegramGroupId}\nUser ID: ${telegramId}\nCreator Found: ${creator ? creator.name : 'NO'}`);
+    } catch (e) {
+        console.error(e);
+        await ctx.reply("Ping failed internally.");
+    }
+});
+
 // V7 Reporting Commands
 bot.command("stats", async (ctx) => {
     try {
@@ -238,7 +257,7 @@ bot.command("topfans", async (ctx) => {
         let md = `TOP SPENDERS (${days}d > $${threshold})\n\n`;
 
         displayList.forEach((fan, index) => {
-            md += `${index + 1}. @${fan.username}: $${fan.spend.toFixed(2)}\n`;
+            md += `${index + 1}. ${fan.name} (@${fan.username}): $${fan.spend.toFixed(2)}\n`;
         });
 
         md += `\nTotal Whales Found: ${topFans.length}`;

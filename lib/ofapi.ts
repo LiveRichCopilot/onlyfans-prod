@@ -208,7 +208,7 @@ export async function getPeriodComparison(apiKey: string, payload: any) {
 export function calculateTopFans(transactions: any[], threshold: number = 0) {
     if (!transactions || !Array.isArray(transactions)) return [];
 
-    const fanTotals: Record<string, { username: string; spend: number }> = {};
+    const fanTotals: Record<string, { username: string; name: string; spend: number }> = {};
 
     transactions.forEach(tx => {
         // Skip platform fees or non-user entities if they appear in the raw ledger
@@ -218,7 +218,7 @@ export function calculateTopFans(transactions: any[], threshold: number = 0) {
         const amount = Number(tx.amount) || 0;
 
         if (!fanTotals[fanId]) {
-            fanTotals[fanId] = { username: tx.user.username, spend: 0 };
+            fanTotals[fanId] = { username: tx.user.username, name: tx.user.name || tx.user.displayName || "Unknown", spend: 0 };
         }
         fanTotals[fanId].spend += amount;
     });
