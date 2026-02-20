@@ -347,13 +347,9 @@ bot.command("topfans", async (ctx) => {
         const parts = textStr.split(" ").filter(Boolean);
 
         let days = 1; // default 1 day
-        let threshold = 1000; // default minimum $1000
 
         if (parts.length > 0) {
             days = parseInt(parts[0].replace('d', '')) || 1;
-        }
-        if (parts.length > 1) {
-            threshold = parseFloat(parts[1]) || 200;
         }
 
         const creator = await getOrBindCreator(ctx);
@@ -362,7 +358,12 @@ bot.command("topfans", async (ctx) => {
             return ctx.reply("❌ You are not linked to an OnlyFans account.", replyOpt);
         }
 
-        await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold}`, replyOpt);
+        let threshold = creator.whaleAlertTarget || 500; // default minimum
+        if (parts.length > 1) {
+            threshold = parseFloat(parts[1]) || threshold;
+        }
+
+        await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold} (from module)`, replyOpt);
 
         let rawTransactions: any[] = [];
         try {
