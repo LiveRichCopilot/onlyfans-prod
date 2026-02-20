@@ -169,7 +169,7 @@ export default function AgencyDashboard() {
                                         id: c.id,
                                         ofapiToken: "linked_via_auth_module",
                                         ofapiCreatorId: data.accountId || data.username || c.ofapiCreatorId,
-                                        name: data.username || c.name || "Unknown"
+                                        // explicitly not sending the name parameter so the database is never overwritten by Scribe
                                       }),
                                     });
                                     setIsAuthenticatingId(null);
