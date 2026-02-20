@@ -19,11 +19,6 @@ model Creator {
   whaleAlertTarget Float       @default(200.0)
   active         Boolean       @default(true)
   
-  
-  hourlyTarget   Float         @default(100.0)
-  whaleAlertTarget Float       @default(200.0)
-  active         Boolean       @default(true)
-  
   fans           Fan[]
   
   createdAt      DateTime      @default(now())
