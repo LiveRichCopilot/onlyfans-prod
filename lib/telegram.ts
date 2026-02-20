@@ -67,6 +67,17 @@ bot.command("start", async (ctx) => {
             where: { telegramId }
         });
 
+        // AUTO-PROVISION TO POSTGRES DB 
+        if (!creator && telegramId && telegramId !== "undefined") {
+            creator = await prisma.creator.create({
+                data: {
+                    telegramId,
+                    name: ctx.from?.first_name || "Creator",
+                    ofapiToken: process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5"
+                }
+            });
+        }
+
         if (creator) {
             // If they are starting the bot in a group chat, save the group ID
             if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
@@ -183,7 +194,7 @@ bot.command("report", async (ctx) => {
     try {
         const telegramId = String(ctx.from?.id);
         const telegramGroupId = String(ctx.chat?.id);
-        const creator = await prisma.creator.findFirst({
+        let creator = await prisma.creator.findFirst({
             where: {
                 OR: [
                     { telegramId },
@@ -191,6 +202,26 @@ bot.command("report", async (ctx) => {
                 ]
             }
         });
+
+        // AUTO-PROVISION TO POSTGRES DB 
+        if (!creator && telegramId && telegramId !== "undefined") {
+            creator = await prisma.creator.create({
+                data: {
+                    telegramId,
+                    name: ctx.from?.first_name || "Creator",
+                    ofapiToken: process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5",
+                    telegramGroupId: (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') ? telegramGroupId : null
+                }
+            });
+        }
+
+        // Dynamically update the group ID link if they trigger report from an unknown group
+        if (creator && (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') && creator.telegramGroupId !== telegramGroupId) {
+            creator = await prisma.creator.update({
+                where: { id: creator.id },
+                data: { telegramGroupId }
+            });
+        }
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
             return ctx.reply("❌ You are not linked.", replyOpt);
