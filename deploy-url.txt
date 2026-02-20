@@ -1,0 +1,5 @@
+npm warn deprecated tar@7.5.7: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+Vercel CLI 50.22.0
+Retrieving project…
+Deploying liverichs-projects/onlyfans-prod
+Error: EPERM: operation not permitted, lstat '/Users/liverichmedia/.gemini/antigravity/scratch/onlyfans-prod/.vercel'
