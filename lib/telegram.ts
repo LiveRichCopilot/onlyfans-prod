@@ -35,6 +35,9 @@ bot.command("start", async (ctx) => {
 });
 
 bot.command("ping", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
     try {
         const telegramId = String(ctx.from?.id);
         const telegramGroupId = String(ctx.chat?.id);
@@ -46,15 +49,18 @@ bot.command("ping", async (ctx) => {
                 ]
             }
         });
-        await ctx.reply(`Pong! 🏓\nGroup ID: ${telegramGroupId}\nUser ID: ${telegramId}\nCreator Found: ${creator ? creator.name : 'NO'}`);
+        await ctx.reply(`Pong! 🏓\nGroup ID: ${telegramGroupId}\nThread ID: ${threadId || 'None'}\nUser ID: ${telegramId}\nCreator Found: ${creator ? creator.name : 'NO'}`, replyOpt);
     } catch (e) {
         console.error(e);
-        await ctx.reply("Ping failed internally.");
+        await ctx.reply("Ping failed internally.", replyOpt);
     }
 });
 
 // V7 Reporting Commands
 bot.command("stats", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
     try {
         // Ex: /stats 24h or /stats 7d
         const args = ctx.match || "24h";
@@ -74,10 +80,10 @@ bot.command("stats", async (ctx) => {
         });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("❌ You are not linked to an OnlyFans account.");
+            return ctx.reply("❌ You are not linked to an OnlyFans account.", replyOpt);
         }
 
-        await ctx.reply(`📊 Fetching performance data for the last ${args}...`);
+        await ctx.reply(`📊 Fetching performance data for the last ${args}...`, replyOpt);
 
         const now = new Date();
         const startWindow = new Date(now.getTime() - (hours * 60 * 60 * 1000));
@@ -111,15 +117,106 @@ Breakdown:
 - Messages: $${(byType?.messages || 0).toFixed(2)}
         `;
 
-        await ctx.reply(md, { parse_mode: "Markdown" });
+        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
 
     } catch (e: any) {
         console.error("Stats command error", e);
-        await ctx.reply("⚠️ Failed to generate report.");
+        await ctx.reply("⚠️ Failed to generate report.", replyOpt);
+    }
+});
+
+bot.command("report", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
+    try {
+        const telegramId = String(ctx.from?.id);
+        const telegramGroupId = String(ctx.chat?.id);
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
+
+        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
+            return ctx.reply("❌ You are not linked.", replyOpt);
+        }
+
+        await ctx.reply(`📊 Compiling Live Daily Brief for ${creator.name}...`, replyOpt);
+
+        const now = new Date();
+        const start1h = new Date(now.getTime() - (1 * 60 * 60 * 1000));
+        const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
+        const payload1h = {
+            account_ids: [creator.ofapiCreatorId || creator.telegramId],
+            start_date: start1h.toISOString(),
+            end_date: now.toISOString()
+        };
+        const payload24h = {
+            account_ids: [creator.ofapiCreatorId || creator.telegramId],
+            start_date: start24h.toISOString(),
+            end_date: now.toISOString()
+        };
+
+        const [summary1h, summary24h, txResponse] = await Promise.all([
+            getTransactionsSummary(creator.ofapiToken, payload1h).catch(() => null),
+            getTransactionsSummary(creator.ofapiToken, payload24h).catch(() => null),
+            getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null)
+        ]);
+
+        const gross1h = parseFloat(summary1h?.data?.total_gross || "0").toFixed(2);
+        const gross24h = parseFloat(summary24h?.data?.total_gross || "0").toFixed(2);
+
+        const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
+        const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
+        const topFans = calculateTopFans(rawTxs, 0);
+
+        let md = `🔥 **DAILY BRIEF**: ${creator.name}\n\n`;
+        md += `⏱ **1-Hour Velocity:** $${gross1h}\n`;
+        md += `📅 **24-Hour Total:** $${gross24h}\n\n`;
+        md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
+
+        let topSpenderId = null;
+        let topSpenderName = "";
+
+        if (topFans.length === 0) {
+            md += "No spenders found.\n";
+        } else {
+            topSpenderId = topFans[0].username;
+            topSpenderName = topFans[0].name;
+            const displayList = topFans.slice(0, 3);
+            displayList.forEach((fan, i) => {
+                md += `${i + 1}. ${fan.name} (@${fan.username}) — $${fan.spend.toFixed(2)}\n`;
+            });
+        }
+
+        if (topSpenderId && topFans[0].spend > 0) {
+            md += `\n🎯 **Action Required:** Your #1 whale right now is ${topSpenderName}. Would you like to send them a private reward or voice note to their inbox?`;
+
+            const keyboard = new InlineKeyboard()
+                .text("🎤 Voice Note", `alert_reply_voice_${topSpenderId}`).row()
+                .text("📹 Send Video", `alert_reply_video_${topSpenderId}`).row()
+                .text("Skip / Dismiss", "action_skip");
+
+            await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const, reply_markup: keyboard }));
+        } else {
+            await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
+        }
+
+    } catch (e: any) {
+        console.error("Report command error", e);
+        await ctx.reply("⚠️ Failed to generate comprehensive report.", replyOpt);
     }
 });
 
 bot.command("forecast", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
     try {
         const telegramId = String(ctx.from?.id);
         const telegramGroupId = String(ctx.chat?.id);
@@ -134,7 +231,7 @@ bot.command("forecast", async (ctx) => {
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") return;
 
-        await ctx.reply(`📈 Booting statistical modeling engine for ${creator.name}...`);
+        await ctx.reply(`📈 Booting statistical modeling engine for ${creator.name}...`, replyOpt);
 
         // We look at the last 30 days to project the next 7
         const now = new Date();
@@ -159,15 +256,18 @@ Confidence Interval: +/- $${(forecast.interval_variance || 0).toFixed(2)}
 Note: This projection is based purely on the velocity of your last 30 days of standard transactions.
         `;
 
-        await ctx.reply(md, { parse_mode: "Markdown" });
+        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
 
     } catch (e: any) {
         console.error("Forecast command error", e);
-        await ctx.reply("⚠️ Failed to generate forecast.");
+        await ctx.reply("⚠️ Failed to generate forecast.", replyOpt);
     }
 });
 
 bot.command("notifications", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
     try {
         const telegramId = String(ctx.from?.id);
         const telegramGroupId = String(ctx.chat?.id);
@@ -181,7 +281,7 @@ bot.command("notifications", async (ctx) => {
         });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("❌ You are not linked.");
+            return ctx.reply("❌ You are not linked.", replyOpt);
         }
 
         const counts = await getNotificationCounts(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken);
@@ -194,14 +294,17 @@ Tips: ${counts.tips || 0}
 New Fans: ${counts.subscribers || 0}
          `;
 
-        await ctx.reply(md, { parse_mode: "Markdown" });
+        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
     } catch (e: any) {
         console.error("Notifications command error", e);
-        await ctx.reply("⚠️ Failed to fetch notification counts.");
+        await ctx.reply("⚠️ Failed to fetch notification counts.", replyOpt);
     }
 });
 
 bot.command("topfans", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
     try {
         const textStr = ctx.match || "";
         const parts = textStr.split(" ").filter(Boolean);
@@ -228,10 +331,10 @@ bot.command("topfans", async (ctx) => {
         });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("❌ You are not linked to an OnlyFans account.");
+            return ctx.reply("❌ You are not linked to an OnlyFans account.", replyOpt);
         }
 
-        await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold}`);
+        await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold}`, replyOpt);
 
         let rawTransactions: any[] = [];
         try {
@@ -242,13 +345,13 @@ bot.command("topfans", async (ctx) => {
             rawTransactions = allTx.filter((t: any) => new Date(t.createdAt) >= cutoffDate);
         } catch (e) {
             console.error("Tx Fetch Error", e);
-            return ctx.reply("⚠️ Failed to download raw transaction ledger from OnlyFans.");
+            return ctx.reply("⚠️ Failed to download raw transaction ledger from OnlyFans.", replyOpt);
         }
 
         const topFans = calculateTopFans(rawTransactions, threshold);
 
         if (topFans.length === 0) {
-            return ctx.reply(`No fans found who spent over $${threshold} in this ledger slice.`);
+            return ctx.reply(`No fans found who spent over $${threshold} in this ledger slice.`, replyOpt);
         }
 
         // Output top 15 max to avoid telegram message length limits
@@ -262,11 +365,11 @@ bot.command("topfans", async (ctx) => {
 
         md += `\nTotal Whales Found: ${topFans.length}`;
 
-        await ctx.reply(md, { parse_mode: "HTML" });
+        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "HTML" as const }));
 
     } catch (e: any) {
         console.error("Topfans command error", e);
-        await ctx.reply("⚠️ Failed to calculate top fans.");
+        await ctx.reply("⚠️ Failed to calculate top fans.", replyOpt);
     }
 });
 
@@ -415,6 +518,9 @@ Your file is now securely stored in your Vault.
 
 // Handle Interactive Button Clicks from Alerts
 bot.on("callback_query:data", async (ctx) => {
+    const threadId = ctx.callbackQuery.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
     const data = ctx.callbackQuery.data;
 
     if (data === "action_skip" || data === "action_ack") {
@@ -436,7 +542,7 @@ bot.on("callback_query:data", async (ctx) => {
         if (type === "video") promptStr = "📹 Please upload your Video now. Our AI will auto-tag it and push it directly into your OnlyFans Vault.";
         if (type === "text") promptStr = "✍️ Please type your Text message now. (It will be automatically sent via the chat engine).";
 
-        await ctx.reply(promptStr);
+        await ctx.reply(promptStr, replyOpt);
         await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     }
 });
