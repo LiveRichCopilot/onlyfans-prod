@@ -297,6 +297,26 @@ export async function getModelStartDate(accountName: string, apiKey: string) {
  * Get the top percentage of the model (e.g., 0.02%)
  * GET /api/{account}/me/top-percentage
  */
-export async function getTopPercentage(accountName: string, apiKey: string) {
-    return ofapiRequest(`/api/${accountName}/me/top-percentage`, apiKey);
+export async function getTopPercentage(account: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/me/top-percentage`, apiKey);
+}
+
+// ----------------------------------------------------------------------------
+// CHAT UTILITIES
+// ----------------------------------------------------------------------------
+
+export async function sendTypingIndicator(account: string, chatId: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/chats/${chatId}/typing`, apiKey, { method: "POST" });
+}
+
+export async function getChatMedia(account: string, chatId: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/chats/${chatId}/media`, apiKey);
+}
+
+export async function markChatAsRead(account: string, chatId: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/chats/${chatId}/mark-as-read`, apiKey, { method: "POST" });
+}
+
+export async function hideChat(account: string, chatId: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/chats/${chatId}/hide`, apiKey, { method: "POST" });
 }

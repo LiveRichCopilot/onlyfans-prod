@@ -17,7 +17,15 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
         }
 
-        const rawMessages = await searchChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, creator.ofapiToken);
+        const account = await prisma.account.findFirst({
+            where: { providerAccountId: creator.telegramId }
+        });
+
+        if (!account || !account.access_token) {
+            return NextResponse.json({ error: "No physical OnlyFans access token found." }, { status: 401 });
+        }
+
+        const rawMessages = await searchChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token);
 
         return NextResponse.json({ messages: rawMessages.list || rawMessages || [] });
     } catch (e: any) {
@@ -39,7 +47,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
         }
 
-        const response = await sendChatMessage(creator.ofapiCreatorId || creator.telegramId, chatId, creator.ofapiToken, { text });
+        const account = await prisma.account.findFirst({
+            where: { providerAccountId: creator.telegramId }
+        });
+
+        if (!account || !account.access_token) {
+            return NextResponse.json({ error: "No physical OnlyFans access token found." }, { status: 401 });
+        }
+
+        // Call user's requested Typing Indicator before sending the message! (Simulates "Model is typing...")
+        try {
+            await fetch(`https://onlyfans-prod.vercel.app/api/inbox/typing`, { method: 'POST', body: JSON.stringify({ creatorId, chatId }) }).catch();
+        } catch (e) { }
+
+        const response = await sendChatMessage(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token, { text });
 
         return NextResponse.json({ success: true, message: response });
     } catch (e: any) {
