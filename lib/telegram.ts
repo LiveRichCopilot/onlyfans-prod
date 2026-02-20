@@ -34,7 +34,15 @@ bot.command("stats", async (ctx) => {
         if (args.includes('d')) hours = parseInt(args) * 24;
 
         const telegramId = String(ctx.from?.id);
-        const creator = await prisma.creator.findUnique({ where: { telegramId } });
+        const telegramGroupId = String(ctx.chat?.id);
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
             return ctx.reply("❌ You are not linked to an OnlyFans account.");
@@ -82,7 +90,15 @@ Breakdown:
 bot.command("forecast", async (ctx) => {
     try {
         const telegramId = String(ctx.from?.id);
-        const creator = await prisma.creator.findUnique({ where: { telegramId } });
+        const telegramGroupId = String(ctx.chat?.id);
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") return;
 
@@ -121,7 +137,15 @@ Note: This projection is based purely on the velocity of your last 30 days of st
 bot.command("notifications", async (ctx) => {
     try {
         const telegramId = String(ctx.from?.id);
-        const creator = await prisma.creator.findUnique({ where: { telegramId } });
+        const telegramGroupId = String(ctx.chat?.id);
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
             return ctx.reply("❌ You are not linked.");
