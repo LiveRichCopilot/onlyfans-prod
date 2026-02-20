@@ -14,9 +14,6 @@ export async function GET(request: Request) {
                         creator: true
                     }
                 }
-            },
-            orderBy: {
-                createdAt: "desc"
             }
         });
 
@@ -57,8 +54,7 @@ export async function POST(request: Request) {
             await prisma.creatorAssignment.create({
                 data: {
                     userId,
-                    creatorId,
-                    role: "CHATTER"
+                    creatorId
                 }
             });
         } else if (action === "REVOKE") {
