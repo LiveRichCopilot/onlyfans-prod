@@ -115,14 +115,17 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
         console.log(`[${accountName}] Hourly Revenue: $${hourlyRevenue} | Target: $${targetPerHour}`);
 
         if (hourlyRevenue < targetPerHour) {
-            if (telegramId) {
-                await sendChatterWarningAlert(telegramId, {
+            const centralGroupId = process.env.TELEGRAM_GROUP_ID;
+            const targetId = centralGroupId || telegramId;
+
+            if (targetId) {
+                await sendChatterWarningAlert(targetId, {
                     accountName,
                     hourlyRevenue,
                     targetPerHour
                 });
             } else {
-                console.log(`[${accountName}] Missed target ($${hourlyRevenue}) but no Telegram ID configured.`);
+                console.log(`[${accountName}] Missed target ($${hourlyRevenue}) but no Group ID or individual Telegram ID configured.`);
             }
         }
     } catch (err: any) {
