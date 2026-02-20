@@ -22,6 +22,13 @@ type Chat = {
 type Message = {
     id: string;
     text: string;
+    media?: {
+        id: string;
+        type: string;
+        canView: boolean;
+        preview: string;
+        src: string;
+    }[];
     createdAt: string;
     fromUser: {
         id: string;
@@ -111,7 +118,14 @@ export default function InboxPage() {
 
                     return {
                         id: m.id || m.message_id || Math.random().toString(),
-                        text: m.text || (m.media?.length > 0 || m.hasMedia ? "📸 [Media Attachment]" : ""),
+                        text: m.text || "",
+                        media: Array.isArray(m.media) ? m.media.map((med: any) => ({
+                            id: med.id?.toString() || Math.random().toString(),
+                            type: med.type || 'photo',
+                            canView: med.canView !== false,
+                            preview: med.preview || med.thumb || med.squarePreview || "",
+                            src: med.full || med.source?.source || med.preview || ""
+                        })) : [],
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
                         isFromCreator: isCreator
@@ -288,10 +302,32 @@ export default function InboxPage() {
                                             ? 'bg-[#14b8a6] text-white rounded-br-sm'
                                             : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
                                             }`}>
-                                            <div
-                                                dangerouslySetInnerHTML={{ __html: msg.text }}
-                                                className="break-words whitespace-pre-wrap [&>p]:m-0 [&>p]:inline"
-                                            />
+                                            {msg.media && msg.media.length > 0 && (
+                                                <div className="flex flex-col gap-2 mb-2">
+                                                    {msg.media.map(med => (
+                                                        <div key={med.id} className="relative rounded-lg overflow-hidden bg-black/20 flex flex-col items-center justify-center min-w-[120px]">
+                                                            {med.type === 'video' ? (
+                                                                <video src={med.canView ? med.src : ''} poster={med.preview} controls className={`max-h-64 rounded-lg object-contain bg-black/50 ${!med.canView ? 'blur-md' : ''}`} />
+                                                            ) : med.type === 'audio' ? (
+                                                                <audio src={med.canView ? med.src : ''} controls className={`w-full ${!med.canView ? 'blur-md' : ''}`} />
+                                                            ) : (
+                                                                <img src={med.canView ? med.src : med.preview} alt="Media" className={`max-h-64 rounded-lg object-contain bg-black/50 ${!med.canView ? 'blur-md' : ''}`} />
+                                                            )}
+                                                            {!med.canView && (
+                                                                <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+                                                                    <span className="bg-black/80 text-white text-xs px-3 py-1 rounded-full font-medium border border-white/20 whitespace-nowrap">🔒 Locked PPV</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {msg.text && (
+                                                <div
+                                                    dangerouslySetInnerHTML={{ __html: msg.text }}
+                                                    className="break-words whitespace-pre-wrap [&>p]:m-0 [&>p]:inline"
+                                                />
+                                            )}
                                             {isSelf && (
                                                 <div className="flex justify-end mt-1">
                                                     <CheckCheck size={12} className="text-white/60" />
