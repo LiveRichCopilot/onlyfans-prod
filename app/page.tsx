@@ -69,12 +69,16 @@ export default function AgencyDashboard() {
                 <li key={c.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/10 transition cursor-pointer group">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs border border-white/20">
-                        {c.name ? c.name.charAt(0) : '?'}
-                      </div>
+                      {c.avatarUrl ? (
+                        <img src={c.avatarUrl} alt={c.name} className="w-8 h-8 rounded-full border border-white/20 object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs border border-white/20">
+                          {c.name ? c.name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      )}
                       <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-black ${c.active ? 'bg-teal-500' : 'bg-gray-500'}`} />
                     </div>
-                    <span className="text-sm font-medium text-white/80 group-hover:text-white">{c.name || 'Unknown'}</span>
+                    <span className="text-sm font-medium text-white/80 group-hover:text-white truncate max-w-[120px]">{c.name || 'Unknown Profile'}</span>
                   </div>
                 </li>
               ))}
