@@ -152,6 +152,9 @@ export default function AgencyDashboard() {
                               const { token } = await sessionRes.json();
 
                               startOnlyFansAuthentication(token, {
+                                theme: {
+                                  brandName: "HQ Security",
+                                },
                                 onSuccess: async (data: any) => {
                                   await fetch("/api/accounts", {
                                     method: "PUT",
