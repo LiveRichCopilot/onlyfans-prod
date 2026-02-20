@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
     try {
-        const { accountId, username, displayName, name, avatar } = await request.json();
+        const { accountId, username, telegramGroupId } = await request.json();
 
         if (!accountId || !username) {
             return NextResponse.json(
@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
             data: {
                 ofapiCreatorId: username,
                 telegramId: accountId, // fallback for now to ensure uniqueness
+                telegramGroupId: telegramGroupId || null,
                 ofapiToken: "unlinked"
             },
         });

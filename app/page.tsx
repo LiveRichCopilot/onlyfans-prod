@@ -20,6 +20,7 @@ export default function AgencyDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newTelegramId, setNewTelegramId] = useState("");
+  const [newTelegramGroupId, setNewTelegramGroupId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthenticatingId, setIsAuthenticatingId] = useState<string | null>(null);
 
@@ -301,7 +302,7 @@ export default function AgencyDashboard() {
             </button>
             <h2 className="text-xl font-bold text-white mb-2">Add Creator Account</h2>
             <p className="text-sm text-white/60 mb-6">
-              Enter the creator's username to register them. Once added, you can click "Connect OF" to authenticate their account.
+              Register a new OnlyFans account to your agency. You can route their specific alerts to a custom Telegram Group.
             </p>
 
             <div className="space-y-4 mb-6">
@@ -320,15 +321,29 @@ export default function AgencyDashboard() {
 
               <div>
                 <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">
-                  Telegram Chat ID
+                  Creator Telegram ID (Personal DM)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 123456789 (for bot alerts)"
+                  placeholder="e.g. 123456789"
                   value={newTelegramId}
                   onChange={(e) => setNewTelegramId(e.target.value)}
-                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-teal-500"
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-teal-500 mb-4"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">
+                  Alert Group ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. -100987654321"
+                  value={newTelegramGroupId}
+                  onChange={(e) => setNewTelegramGroupId(e.target.value)}
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500"
+                />
+                <p className="text-[10px] text-white/40 mt-1">If set, chatter performance alerts for this model will route exclusively to this group instead of the global agency feed.</p>
               </div>
             </div>
 
@@ -343,6 +358,7 @@ export default function AgencyDashboard() {
                     body: JSON.stringify({
                       accountId: newTelegramId,
                       username: newUsername,
+                      telegramGroupId: newTelegramGroupId || undefined
                     }),
                   });
                   window.location.reload();
