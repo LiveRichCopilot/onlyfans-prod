@@ -65,7 +65,7 @@ export default function InboxPage() {
         fetch(`/api/inbox/chats?creatorId=${selectedCreatorId}`)
             .then(res => res.json())
             .then(data => {
-                const rawArray = Array.isArray(data.chats) ? data.chats : (data.chats?.list || []);
+                const rawArray = Array.isArray(data.chats) ? data.chats : (data.chats?.data || []);
                 const mappedChats: Chat[] = typeof rawArray.map === 'function' ? rawArray.map((c: any) => ({
                     id: c.chat_id || c.id || Math.random().toString(),
                     withUser: {
@@ -100,7 +100,7 @@ export default function InboxPage() {
         fetch(`/api/inbox/messages?creatorId=${selectedCreatorId}&chatId=${activeChat.id}`)
             .then(res => res.json())
             .then(data => {
-                const rawMsgs = Array.isArray(data.messages) ? data.messages : (data.messages?.list || []);
+                const rawMsgs = Array.isArray(data.messages) ? data.messages : (data.messages?.data || []);
 
                 // Usually messages arrive in reverse chronological order from OFAPI, we need chronological for chat view
                 const sortedRaw = [...rawMsgs].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
