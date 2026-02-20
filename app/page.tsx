@@ -183,14 +183,26 @@ export default function AgencyDashboard() {
                           {isAuthenticatingId === c.id ? "Connecting..." : "Connect OF"}
                         </button>
                       ) : (
-                        <div className="glass-button p-2 rounded-xl">
-                          {isUnderperforming ? (
-                            <AlertCircle size={20} className="text-red-400" />
-                          ) : c.active ? (
-                            <CheckCircle2 size={20} className="text-teal-400" />
-                          ) : (
-                            <Activity size={20} className="text-white/30" />
-                          )}
+                        <div className="flex flex-col items-end gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+                              Authenticated
+                            </span>
+                            <div className="glass-button p-1 rounded-lg">
+                              {isUnderperforming ? (
+                                <AlertCircle size={16} className="text-red-400" />
+                              ) : c.active ? (
+                                <div className="text-emerald-400">✓</div>
+                              ) : (
+                                <Activity size={16} className="text-white/30" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-[9px] text-white/40 font-mono bg-black/40 border border-white/10 px-2 py-1 rounded flex items-center gap-2 cursor-pointer hover:bg-white/5 transition">
+                            <span>acct_{c.id.substring(0, 16)}...</span>
+                            <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                          </div>
                         </div>
                       )}
                     </div>
