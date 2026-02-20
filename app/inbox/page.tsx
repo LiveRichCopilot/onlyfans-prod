@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useRef } from "react";
 import { Send, Image as ImageIcon, Search, CheckCheck, MoreHorizontal, UserCircle, Activity } from "lucide-react";
 
@@ -204,8 +206,8 @@ export default function InboxPage() {
                                 return (
                                     <div key={msg.id} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${isSelf
-                                                ? 'bg-[#b459f6] text-white rounded-br-sm'
-                                                : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
+                                            ? 'bg-[#b459f6] text-white rounded-br-sm'
+                                            : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
                                             }`}>
                                             {msg.text}
                                             {isSelf && (
