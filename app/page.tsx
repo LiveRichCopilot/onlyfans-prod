@@ -35,7 +35,7 @@ export default function AgencyDashboard() {
       {/* Apple Glass Main Sidebar */}
       <aside className="w-72 glass-panel m-4 rounded-3xl p-6 hidden md:flex flex-col z-10 border-white/10">
         <div className="flex items-center gap-3 mb-10">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center font-bold text-lg shadow-[0_0_15px_rgba(168,85,247,0.5)]">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center font-bold text-lg shadow-lg shadow-purple-500/50">
             OF
           </div>
           <div>
@@ -221,7 +221,7 @@ export default function AgencyDashboard() {
                 key={mod.id}
                 className={`p-6 rounded-3xl backdrop-blur-3xl border-t border-t-white/20 border-l border-l-white/10 flex flex-col justify-between transition-all duration-500
                     ${mod.active
-                    ? 'bg-gradient-to-br from-white/10 to-white/5 shadow-[0_8px_32px_0_rgba(255,255,255,0.05)]'
+                    ? 'bg-gradient-to-br from-white/10 to-white/5 shadow-2xl shadow-blue-500/10'
                     : 'bg-black/20 border border-white/5 opacity-70'}`}
               >
                 <div>
@@ -229,7 +229,7 @@ export default function AgencyDashboard() {
                     <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-lg bg-white/10 text-white/90 shadow-inner">
                       {mod.id}
                     </span>
-                    <div className={`h-2.5 w-2.5 rounded-full ${mod.active ? 'bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,0.8)]' : 'bg-white/20'}`} />
+                    <div className={`h-2.5 w-2.5 rounded-full ${mod.active ? 'bg-blue-400 shadow-md shadow-blue-500/80' : 'bg-white/20'}`} />
                   </div>
                   <h3 className="text-xl font-semibold tracking-tight text-white mb-2">{mod.title}</h3>
                   <p className="text-sm text-white/50 leading-relaxed font-medium">
