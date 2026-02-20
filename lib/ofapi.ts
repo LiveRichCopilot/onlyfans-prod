@@ -83,17 +83,20 @@ export async function getActiveFans(account: string, apiKey: string) {
 }
 
 /**
- * Upload Media to API
- * Uses POST /api/{account}/media/upload
+ * Upload Media to Vault
+ * Uses POST /api/{account}/media/vault
  */
-export async function uploadToVault(account: string, apiKey: string, mediaBuffer: Buffer, fileName: string) {
+export async function uploadToVault(account: string, apiKey: string, mediaBuffer: Buffer, fileName: string, title?: string, description?: string) {
     console.log(`Uploading ${fileName} to OnlyFans Vault via OFAPI...`);
 
     const formData = new FormData();
     // @ts-ignore - FormData accepts Blob/Buffer depending on Node version
     formData.append("file", new Blob([mediaBuffer]), fileName);
 
-    const url = `${OFAPI_BASE}/api/${account}/media/upload`;
+    if (title) formData.append("title", title);
+    if (description) formData.append("text", description); // Or 'notes' depending on OFAPI exact schema
+
+    const url = `${OFAPI_BASE}/api/${account}/media/vault`;
 
     const response = await fetch(url, {
         method: "POST",

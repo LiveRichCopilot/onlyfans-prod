@@ -56,14 +56,14 @@ bot.command("stats", async (ctx) => {
         if (!summary) return ctx.reply("❌ API Error: Could not fetch transaction summary at this time.");
 
         const md = `
-📊 **PERFORMANCE REPORT**: ${creator.name}
-⏱ Window: Last ${args}
+PERFORMANCE REPORT: ${creator.name}
+Window: Last ${args}
 
-💰 **Gross Revenue**: $${(summary.gross || 0).toFixed(2)}
-💳 **Net Profit**: $${(summary.net || 0).toFixed(2)}
-💸 **Platform Fees**: $${(summary.fees || 0).toFixed(2)}
+Gross Revenue: $${(summary.gross || 0).toFixed(2)}
+Net Profit: $${(summary.net || 0).toFixed(2)}
+Platform Fees: $${(summary.fees || 0).toFixed(2)}
 
-**Breakdown**:
+Breakdown:
 - Subscriptions: $${(byType?.subscriptions || 0).toFixed(2)}
 - Tips: $${(byType?.tips || 0).toFixed(2)}
 - Messages: $${(byType?.messages || 0).toFixed(2)}
@@ -99,13 +99,13 @@ bot.command("forecast", async (ctx) => {
         const forecast = await getRevenueForecast(creator.ofapiToken, payload);
 
         const md = `
-📈 **7-DAY REVENUE FORECAST**:
-⚙️ Model: ARIMA (AutoRegressive Integrated Moving Avg)
+7-DAY REVENUE FORECAST:
+Model: ARIMA
 
-Forecasted Net: **$${(forecast.projected_net || 0).toFixed(2)}**
+Forecasted Net: $${(forecast.projected_net || 0).toFixed(2)}
 Confidence Interval: +/- $${(forecast.interval_variance || 0).toFixed(2)}
 
-*Note: This projection is based purely on the velocity of your last 30 days of standard transactions.*
+Note: This projection is based purely on the velocity of your last 30 days of standard transactions.
         `;
 
         await ctx.reply(md, { parse_mode: "Markdown" });
@@ -128,11 +128,11 @@ bot.command("notifications", async (ctx) => {
         const counts = await getNotificationCounts(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken);
 
         const md = `
-🔔 **UNREAD ALERTS**: ${creator.name}
+UNREAD ALERTS: ${creator.name}
 
-💬 Messages: **${counts.messages || 0}**
-💸 Tips: **${counts.tips || 0}**
-👥 New Fans: **${counts.subscribers || 0}**
+Messages: ${counts.messages || 0}
+Tips: ${counts.tips || 0}
+New Fans: ${counts.subscribers || 0}
          `;
 
         await ctx.reply(md, { parse_mode: "Markdown" });
@@ -196,28 +196,39 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             return;
         }
 
-        // 4. Upload to OnlyFans Vault
-        await ctx.reply("AI Scan Passed! Uploading to OnlyFans Vault...");
+        // 4. Upload to OnlyFans Vault with dynamic tags
+        await ctx.reply("AI Scan Passed! Uploading to OnlyFans Vault and attaching tags...");
 
         const uploadResponse = await uploadToVault(
             creator.ofapiCreatorId || creator.telegramId,
             creator.ofapiToken,
             buffer,
-            fileName
+            fileName,
+            safetyResult.title,
+            safetyResult.description
         );
 
         // 5. Create "Meta Pixel" tracking asset
         await prisma.mediaAsset.create({
             data: {
                 creatorId: creator.id,
-                ofapiMediaId: uploadResponse.prefixed_id,
+                ofapiMediaId: uploadResponse.id || uploadResponse.prefixed_id || "vault_" + Date.now(),
                 fileType: mimeType,
                 originalName: fileName,
                 totalRevenue: 0.00
             }
         });
 
-        await ctx.reply(`✅ Success! [Track ID: ${uploadResponse.prefixed_id}]\n\nYour file has been uploaded to the Vault. Any future PPV unlocks of this media will automatically track revenue back to this asset in your CFO Dashboard.`);
+        const successMd = `
+Upload Complete [Track ID: ${uploadResponse.id || uploadResponse.prefixed_id || 'N/A'}]
+
+Title: ${safetyResult.title}
+Tags: ${safetyResult.description}
+
+Your file is now securely stored in your Vault.
+        `;
+
+        await ctx.reply(successMd);
     } catch (e: any) {
         console.error("Direct Upload Handler Error:", e);
         await ctx.reply("Sorry, an error occurred while processing your vault upload: " + e.message);

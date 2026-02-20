@@ -4,7 +4,7 @@
  */
 
 // This represents the stub connecting to the safety checking LLM.
-export async function analyzeMediaSafety(mediaBuffer: Buffer, mimeType: string): Promise<{ isSafe: boolean; reason?: string }> {
+export async function analyzeMediaSafety(mediaBuffer: Buffer, mimeType: string): Promise<{ isSafe: boolean; reason?: string; title?: string; description?: string }> {
     console.log(`[AI Analyzer] Analyzing ${mimeType} with Gemini/Kimim 2.5 model...`);
 
     // In production, we would hit the AI Provider:
@@ -17,8 +17,10 @@ export async function analyzeMediaSafety(mediaBuffer: Buffer, mimeType: string):
       const data = await response.json();
     */
 
-    // For now, simulate a clean pass.
+    // For now, simulate a clean pass and an AI-generated tag payload.
     return {
-        isSafe: true
+        isSafe: true,
+        title: "Exclusive Behind the Scenes 🎬",
+        description: "Just a quick little update for you all! Make sure to unlock to see more. 💖 #bts #exclusive"
     };
 }
