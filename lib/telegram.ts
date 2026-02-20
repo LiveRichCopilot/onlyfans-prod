@@ -73,9 +73,25 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
         // 4. Upload to OnlyFans Vault
         await ctx.reply("AI Scan Passed! Uploading to OnlyFans Vault...");
 
-        await uploadToVault(creator.ofapiToken, buffer, fileName);
+        const uploadResponse = await uploadToVault(
+            creator.ofapiCreatorId || creator.telegramId,
+            creator.ofapiToken,
+            buffer,
+            fileName
+        );
 
-        await ctx.reply(`✅ Success! ${fileName} has been securely uploaded to your Vault.`);
+        // 5. Create "Meta Pixel" tracking asset
+        await prisma.mediaAsset.create({
+            data: {
+                creatorId: creator.id,
+                ofapiMediaId: uploadResponse.prefixed_id,
+                fileType: mimeType,
+                originalName: fileName,
+                totalRevenue: 0.00
+            }
+        });
+
+        await ctx.reply(`✅ Success! [Track ID: ${uploadResponse.prefixed_id}]\n\nYour file has been uploaded to the Vault. Any future PPV unlocks of this media will automatically track revenue back to this asset in your CFO Dashboard.`);
     } catch (e: any) {
         console.error("Direct Upload Handler Error:", e);
         await ctx.reply("Sorry, an error occurred while processing your vault upload: " + e.message);

@@ -83,20 +83,34 @@ export async function getActiveFans(account: string, apiKey: string) {
 }
 
 /**
- * Upload Media to Vault
- * Uses POST /api/vault/media (assumed endpoint based on user description)
+ * Upload Media to API
+ * Uses POST /api/{account}/media/upload
  */
-export async function uploadToVault(apiKey: string, mediaBuffer: Buffer, fileName: string) {
-    // In a real implementation this would likely be a multipart/form-data request
-    // For now we map the assumed JSON payload structure.
-    console.log(`Uploading ${fileName} to OnlyFans Vault...`);
-    return ofapiRequest(`/api/vault/media`, apiKey, {
+export async function uploadToVault(account: string, apiKey: string, mediaBuffer: Buffer, fileName: string) {
+    console.log(`Uploading ${fileName} to OnlyFans Vault via OFAPI...`);
+
+    const formData = new FormData();
+    // @ts-ignore - FormData accepts Blob/Buffer depending on Node version
+    formData.append("file", new Blob([mediaBuffer]), fileName);
+
+    const url = `${OFAPI_BASE}/api/${account}/media/upload`;
+
+    const response = await fetch(url, {
         method: "POST",
-        body: {
-            filename: fileName,
-            // media payload omitted for briefness
-        }
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            // Do NOT set Content-Type here, let fetch handle the multipart boundary
+        },
+        body: formData,
     });
+
+    if (!response.ok) {
+        const err = await response.text();
+        console.error(`OFAPI Upload Error: ${response.status}`, err);
+        throw new Error(`Media Upload failed: ${response.status}`);
+    }
+
+    return response.json(); // { prefixed_id, file_name, thumbs... }
 }
 
 /**
