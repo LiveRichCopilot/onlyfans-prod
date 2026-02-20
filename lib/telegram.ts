@@ -170,6 +170,8 @@ bot.command("stats", async (ctx) => {
 
         const summaryData = summary?.data || {};
 
+        const byTypeData = byType?.data || {};
+
         const md = `
 PERFORMANCE REPORT: ${creator.name}
 Window: Last ${args}
@@ -179,9 +181,9 @@ Net Profit: $${parseFloat(summaryData.total_net || "0").toFixed(2)}
 Platform Fees: $${parseFloat(summaryData.total_fees || "0").toFixed(2)}
 
 Breakdown:
-- Subscriptions: $${(byType?.subscriptions || 0).toFixed(2)}
-- Tips: $${(byType?.tips || 0).toFixed(2)}
-- Messages: $${(byType?.messages || 0).toFixed(2)}
+- Subscriptions: ${parseFloat(byTypeData.subscriptions || "0").toFixed(2)}
+- Tips: ${parseFloat(byTypeData.tips || "0").toFixed(2)}
+- Messages: ${parseFloat(byTypeData.messages || "0").toFixed(2)}
         `;
 
         await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
