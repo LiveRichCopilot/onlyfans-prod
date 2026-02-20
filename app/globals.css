@@ -23,7 +23,7 @@
 
 @layer utilities {
   .glass-panel {
-    @apply bg-[var(--color-glass)] backdrop-blur-3xl border border-[var(--color-glass-border)] shadow-[0_8px_32px_0_rgba(0, 0, 0, 0.37)];
+    @apply bg-[var(--color-glass)] backdrop-blur-3xl border border-[var(--color-glass-border)] shadow-[0_8px_32px_0_rgba(0_0_0_/_0.37)];
   }
 
   .glass-button {
