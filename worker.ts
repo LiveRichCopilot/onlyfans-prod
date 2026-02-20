@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { bot } from "./lib/telegram";
 import { prisma } from "./lib/prisma";
-import { getTransactionsSummary, getEarningsOverview, getTransactions } from "./lib/ofapi";
+import { getTransactionsSummary, getEarningsOverview, getTransactions, calculateTopFans } from "./lib/ofapi";
 import { InlineKeyboard } from "grammy";
 
 // Constants
@@ -88,56 +88,83 @@ How do you want to respond?`;
 }
 
 /**
- * Chatter Monitoring Core Logic (STF-01)
- * Checks revenue for the last hour and alerts if they missed the target.
+ * Background Broadcast (Auto-Reporting)
+ * Broadcasts 1h/24h sales and Top Spenders automatically to the Telegram Group.
  */
 async function processChatterPerformance(accountName: string, apiKey: string, telegramId: string | null, telegramGroupId: string | null, targetPerHour: number) {
     try {
-        // 1. Calculate the time window for the last 1 hour
+        const targetChat = telegramGroupId || telegramId;
+        if (!targetChat) return;
+
+        const creator = await prisma.creator.findUnique({
+            where: { ofapiCreatorId: accountName }
+        });
+        const name = creator?.name || accountName;
+
         const now = new Date();
-        const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
+        const start1h = new Date(now.getTime() - (1 * 60 * 60 * 1000));
+        const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
-        // For real production we would use the getEarningsOverview or getTransactionsSummary
-        // Since we need an hourly window, let's ask for transactions in that window.
-        // The exact param for date filtering depends on OnlyFansApi.com's undocumented query string, but we pass standard iso strings
-        // E.g getTransactions(accountName, apiKey, `?start_date=${oneHourAgo.toISOString()}`);
-        // Here we use the actual method we defined:
-
-        // As per the provided spec, we might need a summary: POST /api/analytics/financial/transactions/summary
-        const summaryPayload = {
-            accounts: [accountName],
-            date_range: {
-                start: oneHourAgo.toISOString(),
-                end: now.toISOString()
-            }
+        const payload1h = {
+            account_ids: [accountName],
+            start_date: start1h.toISOString(),
+            end_date: now.toISOString()
+        };
+        const payload24h = {
+            account_ids: [accountName],
+            start_date: start24h.toISOString(),
+            end_date: now.toISOString()
         };
 
-        const revenueStats = await getTransactionsSummary(apiKey, summaryPayload);
+        const [summary1h, summary24h, txResponse] = await Promise.all([
+            getTransactionsSummary(apiKey, payload1h).catch(() => null),
+            getTransactionsSummary(apiKey, payload24h).catch(() => null),
+            getTransactions(accountName, apiKey).catch(() => null)
+        ]);
 
-        // Safely parse the response (assumes the API returns a 'totals' or 'net' field)
-        const hourlyRevenue = revenueStats?.net || revenueStats?.gross || 0;
+        const gross1h = parseFloat(summary1h?.data?.total_gross || "0").toFixed(2);
+        const gross24h = parseFloat(summary24h?.data?.total_gross || "0").toFixed(2);
 
-        console.log(`[${accountName}] Hourly Revenue: $${hourlyRevenue} | Target: $${targetPerHour}`);
+        const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
+        const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
+        const topFans = calculateTopFans(rawTxs, 0);
 
-        if (hourlyRevenue < targetPerHour) {
-            const centralGroupId = process.env.TELEGRAM_GROUP_ID;
+        let md = `🤖 **AUTOMATED BRIEF**: ${name}\n\n`;
+        md += `⏱ **Last Hour Sells:** $${gross1h}\n`;
+        md += `📅 **Last 24 Hours:** $${gross24h}\n\n`;
+        md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
 
-            // Priority: 1. Specific Creator Group -> 2. Global Group -> 3. Creator's Personal DM
-            const targetId = telegramGroupId || centralGroupId || telegramId;
+        let topSpenderId = null;
+        let topSpenderName = "";
 
-            if (targetId) {
-                await sendChatterWarningAlert(targetId, {
-                    accountName,
-                    hourlyRevenue,
-                    targetPerHour
-                });
-            } else {
-                console.log(`[${accountName}] Missed target ($${hourlyRevenue}) but no Group ID or individual Telegram ID configured.`);
-            }
+        if (topFans.length === 0) {
+            md += "No spenders found.\n";
+        } else {
+            topSpenderId = topFans[0].username;
+            topSpenderName = topFans[0].name;
+            const displayList = topFans.slice(0, 3);
+            displayList.forEach((fan, i) => {
+                md += `${i + 1}. ${fan.name} (@${fan.username}) — $${fan.spend.toFixed(2)}\n`;
+            });
         }
+
+        const replyOpt = telegramGroupId ? { message_thread_id: 5 } : {}; // Thread ID 5 for General topic default
+
+        if (topSpenderId && topFans[0].spend > 0) {
+            md += `\n🎯 **Action Required:** Your #1 whale is ${topSpenderName}. Want to send them content or a voice note?`;
+
+            const keyboard = new InlineKeyboard()
+                .text("🎤 Voice Note", `alert_reply_voice_${topSpenderId}`).row()
+                .text("📹 Send Video", `alert_reply_video_${topSpenderId}`).row()
+                .text("Skip / Dismiss", "action_skip");
+
+            await bot.api.sendMessage(targetChat, md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const, reply_markup: keyboard }));
+        } else {
+            await bot.api.sendMessage(targetChat, md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
+        }
+
     } catch (err: any) {
-        // Error could be 422 if the real payload format differs slightly, we log safely.
-        console.error(`Error processing ${accountName}:`, err?.message || err);
+        console.error(`Error broadcasting brief for ${accountName}:`, err?.message || err);
     }
 }
 
