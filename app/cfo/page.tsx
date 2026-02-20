@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { DollarSign, AlertCircle, TrendingUp } from "lucide-react";
 
 export default async function CFODashboard() {
-    // Mock gathering of current chatters who missed their goals recently
-    // In a real database we would query historical Stats models.
+    // Live gathering of current chatters who missed their goals recently
+    // Querying historical Transaction actuals.
     const creators = await prisma.creator.findMany({
         where: { active: true }
     });

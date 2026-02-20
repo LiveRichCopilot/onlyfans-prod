@@ -7,12 +7,24 @@ export async function GET() {
             orderBy: { createdAt: "desc" },
         });
 
-        // For each creator, calculate their hourly revenue (mock calculation for now, but based on real creator models so the UI isn't mock users)
-        const enrichedCreators = creators.map(c => ({
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const hourlyTransactions = await prisma.transaction.findMany({
+            where: { date: { gte: oneHourAgo } },
+            include: { fan: true }
+        });
+
+        const hourlyRevMap: Record<string, number> = {};
+        hourlyTransactions.forEach((tx: any) => {
+            if (tx.fan && tx.fan.creatorId) {
+                hourlyRevMap[tx.fan.creatorId] = (hourlyRevMap[tx.fan.creatorId] || 0) + tx.amount;
+            }
+        });
+
+        const enrichedCreators = creators.map((c: any) => ({
             ...c,
             name: c.ofapiCreatorId || c.telegramId || "Unknown Creator",
             handle: `@${c.ofapiCreatorId || c.telegramId}`,
-            hourlyRev: 0, // Would be fetched from transactions
+            hourlyRev: hourlyRevMap[c.id] || 0,
             target: c.hourlyTarget || 100,
             whaleAlertTarget: c.whaleAlertTarget || 200,
         }));
