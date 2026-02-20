@@ -141,9 +141,18 @@ export default function AgencyDashboard() {
                 <Link href={`/creators/${c.id}`} key={c.id} className="block cursor-pointer">
                   <div className="glass-panel p-5 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 relative overflow-hidden group hover:bg-white/5 transition-all">
                     <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <div className="text-white font-medium group-hover:text-teal-400 transition-colors">{c.name || 'Unknown'}</div>
-                        <div className="text-xs text-white/50 mb-3">{c.ofapiCreatorId || c.telegramId}</div>
+                      <div className="flex items-center gap-4">
+                        {c.avatarUrl ? (
+                          <img src={c.avatarUrl} alt={c.name} className="w-12 h-12 rounded-full border-2 border-white/10" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-lg font-bold border border-white/20">
+                            {c.name ? c.name.charAt(0).toUpperCase() : '?'}
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-white font-medium text-lg leading-tight group-hover:text-teal-400 transition-colors">{c.name || 'Unknown Profile'}</div>
+                          <div className="text-xs text-teal-500 font-mono mt-0.5">@{c.ofapiCreatorId || 'unlinked'}</div>
+                        </div>
                       </div>
 
                       <div className="flex gap-2 items-center">

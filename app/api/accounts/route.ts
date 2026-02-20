@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getMe } from "@/lib/ofapi";
 
 export async function POST(request: NextRequest) {
     try {
@@ -12,11 +13,10 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Initialize the account in an unlinked state
         const account = await prisma.creator.create({
             data: {
                 ofapiCreatorId: username,
-                telegramId: accountId, // fallback for now to ensure uniqueness
+                telegramId: accountId,
                 telegramGroupId: telegramGroupId || null,
                 ofapiToken: "unlinked"
             },
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
     try {
-        const { id, ofapiToken, ofapiCreatorId, name } = await request.json();
+        let { id, ofapiToken, ofapiCreatorId, name } = await request.json();
 
         if (!id || !ofapiToken) {
             return NextResponse.json(
@@ -42,6 +42,19 @@ export async function PUT(request: NextRequest) {
         const dataToUpdate: any = { ofapiToken };
         if (ofapiCreatorId) dataToUpdate.ofapiCreatorId = ofapiCreatorId;
         if (name) dataToUpdate.name = name;
+
+        // Fetch authentic profile metadata directly from OnlyFans
+        try {
+            const me = await getMe(ofapiCreatorId, ofapiToken);
+            if (me && me.name) {
+                dataToUpdate.name = me.name;
+            }
+            if (me && me.avatar) {
+                dataToUpdate.avatarUrl = me.avatar;
+            }
+        } catch (e) {
+            console.log("Could not fetch authentic profile metadata:", e);
+        }
 
         const account = await prisma.creator.update({
             where: { id },

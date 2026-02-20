@@ -53,6 +53,14 @@ export async function getTransactions(account: string, apiKey: string, filterTyp
 }
 
 /**
+ * Fetch Authentic Creator Profile
+ * Uses GET /api/{account}/me
+ */
+export async function getMe(account: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/me`, apiKey);
+}
+
+/**
  * Fetch transaction summary (Gross, Net, Fees) 
  * Uses POST /api/analytics/financial/transactions/summary
  */
@@ -211,7 +219,7 @@ export function calculateTopFans(transactions: any[], threshold: number = 0) {
     const fanTotals: Record<string, { username: string; name: string; spend: number }> = {};
 
     transactions.forEach(tx => {
-        // Skip platform fees or non-user entities if they appear in the raw ledger
+        // Only sum revenue from actual OF Users, skip aggregate fee tags
         if (!tx.user || !tx.user.username) return;
 
         const fanId = tx.user.id;
@@ -220,10 +228,11 @@ export function calculateTopFans(transactions: any[], threshold: number = 0) {
         if (!fanTotals[fanId]) {
             fanTotals[fanId] = { username: tx.user.username, name: tx.user.name || tx.user.displayName || "Unknown", spend: 0 };
         }
+
+        // Sum gross amount spent by this specific user
         fanTotals[fanId].spend += amount;
     });
 
-    // Convert to array, filter by threshold, sort cleanly
     const sorted = Object.values(fanTotals)
         .filter(fan => fan.spend >= threshold)
         .sort((a, b) => b.spend - a.spend);
