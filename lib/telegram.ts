@@ -212,15 +212,15 @@ bot.command("topfans", async (ctx) => {
             return ctx.reply("❌ You are not linked to an OnlyFans account.");
         }
 
-        const apiKey = process.env.OFAPI_API_KEY;
-        if (!apiKey) return ctx.reply("❌ System API Key is missing.");
-
         await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold}`);
 
         let rawTransactions: any[] = [];
         try {
-            const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, apiKey);
-            rawTransactions = txResponse.list || txResponse.transactions || [];
+            const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken);
+            const allTx = txResponse.data?.list || txResponse.list || txResponse.transactions || [];
+
+            const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+            rawTransactions = allTx.filter((t: any) => new Date(t.createdAt) >= cutoffDate);
         } catch (e) {
             console.error("Tx Fetch Error", e);
             return ctx.reply("⚠️ Failed to download raw transaction ledger from OnlyFans.");
