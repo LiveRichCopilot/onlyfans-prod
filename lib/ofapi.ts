@@ -10,9 +10,15 @@ type RequestOptions = {
 async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOptions = {}) {
     const url = `${OFAPI_BASE}${endpoint}`;
 
+    // Resolve abstract database placeholder tokens to actual environment keys
+    let resolvedKey = apiKey;
+    if (apiKey === "linked_via_auth_module") {
+        resolvedKey = process.env.OFAPI_API_KEY || process.env.TEST_OFAPI_KEY || "";
+    }
+
     const headers = {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${resolvedKey}`,
     };
 
     const response = await fetch(url, {
