@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { getTransactionsByType } from "@/lib/ofapi";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../lib/prisma";
+import { getTransactionsByType } from "../../../../lib/ofapi";
 
-export const dynamic = "force-dynamic";
-
-export async function GET(req: Request) {
+export async function GET() {
     try {
         const creator = await prisma.creator.findFirst({
             where: { ofapiToken: "linked_via_auth_module" }
@@ -22,9 +20,8 @@ export async function GET(req: Request) {
         };
 
         const byType = await getTransactionsByType(creator.ofapiToken, payload);
-
-        return NextResponse.json({ ok: true, payload, byType });
+        return NextResponse.json({ rawData: byType });
     } catch (e: any) {
-        return NextResponse.json({ ok: false, error: e.message });
+        return NextResponse.json({ error: e.message });
     }
 }

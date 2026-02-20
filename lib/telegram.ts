@@ -353,7 +353,7 @@ bot.command("topfans", async (ctx) => {
             days = parseInt(parts[0].replace('d', '')) || 1;
         }
         if (parts.length > 1) {
-            threshold = parseFloat(parts[1]) || 1000;
+            threshold = parseFloat(parts[1]) || 200;
         }
 
         const creator = await getOrBindCreator(ctx);
