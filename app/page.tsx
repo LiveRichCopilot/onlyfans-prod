@@ -167,7 +167,8 @@ export default function AgencyDashboard() {
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({
                                         id: c.id,
-                                        ofapiToken: "linked_via_auth_module"
+                                        ofapiToken: "linked_via_auth_module",
+                                        ofapiCreatorId: data.accountId || data.username || "angiyang"
                                       }),
                                     });
                                     setIsAuthenticatingId(null);
