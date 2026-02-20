@@ -109,10 +109,18 @@ export default function AgencyDashboard() {
             <h1 className="text-3xl font-bold tracking-tight text-white/95 mb-1">Agency Overview</h1>
             <p className="text-sm text-white/60 font-medium">Monitoring {creators.length} creators globally.</p>
           </div>
-          <button className="glass-button px-5 py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white">
-            <Settings size={16} />
-            Settings
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="glass-button px-5 py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden"
+            >
+              + Add
+            </button>
+            <button className="glass-button px-5 py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white">
+              <Settings size={16} />
+              <span className="hidden md:inline">Settings</span>
+            </button>
+          </div>
         </header>
 
         {/* Chatter Performance Row */}
