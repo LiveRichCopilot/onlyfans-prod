@@ -31,7 +31,8 @@ import {
     getNotificationCounts,
     getTransactions,
     calculateTopFans,
-    sendVaultMediaToFan
+    sendVaultMediaToFan,
+    getMe
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
 
@@ -67,15 +68,32 @@ bot.command("start", async (ctx) => {
             where: { telegramId }
         });
 
-        // AUTO-PROVISION TO POSTGRES DB 
+        // SCRIPT: SMART BINDING to heal Dashboard <-> Telegram Desync
+        if (creator && creator.ofapiToken === (process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5")) {
+            await prisma.creator.delete({ where: { id: creator.id } });
+            creator = null;
+        }
+
         if (!creator && telegramId && telegramId !== "undefined") {
-            creator = await prisma.creator.create({
-                data: {
-                    telegramId,
-                    name: ctx.from?.first_name || "Creator",
-                    ofapiToken: process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5"
-                }
+            let realCreator = await prisma.creator.findFirst({
+                where: { ofapiToken: "linked_via_auth_module" }
             });
+
+            if (!realCreator) {
+                realCreator = await prisma.creator.findFirst({
+                    where: { ofapiToken: "unlinked" }
+                });
+            }
+
+            if (realCreator) {
+                creator = await prisma.creator.update({
+                    where: { id: realCreator.id },
+                    data: {
+                        telegramId,
+                        telegramGroupId: (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') ? telegramGroupId : realCreator.telegramGroupId
+                    }
+                });
+            }
         }
 
         if (creator) {
@@ -203,16 +221,32 @@ bot.command("report", async (ctx) => {
             }
         });
 
-        // AUTO-PROVISION TO POSTGRES DB 
+        // SCRIPT: SMART BINDING to heal Dashboard <-> Telegram Desync
+        if (creator && creator.ofapiToken === (process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5")) {
+            await prisma.creator.delete({ where: { id: creator.id } });
+            creator = null;
+        }
+
         if (!creator && telegramId && telegramId !== "undefined") {
-            creator = await prisma.creator.create({
-                data: {
-                    telegramId,
-                    name: ctx.from?.first_name || "Creator",
-                    ofapiToken: process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5",
-                    telegramGroupId: (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') ? telegramGroupId : null
-                }
+            let realCreator = await prisma.creator.findFirst({
+                where: { ofapiToken: "linked_via_auth_module" }
             });
+
+            if (!realCreator) {
+                realCreator = await prisma.creator.findFirst({
+                    where: { ofapiToken: "unlinked" }
+                });
+            }
+
+            if (realCreator) {
+                creator = await prisma.creator.update({
+                    where: { id: realCreator.id },
+                    data: {
+                        telegramId,
+                        telegramGroupId: (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') ? telegramGroupId : realCreator.telegramGroupId
+                    }
+                });
+            }
         }
 
         // Dynamically update the group ID link if they trigger report from an unknown group
