@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
     try {
-        const { id, ofapiToken, ofapiCreatorId } = await request.json();
+        const { id, ofapiToken, ofapiCreatorId, name } = await request.json();
 
         if (!id || !ofapiToken) {
             return NextResponse.json(
@@ -41,6 +41,7 @@ export async function PUT(request: NextRequest) {
 
         const dataToUpdate: any = { ofapiToken };
         if (ofapiCreatorId) dataToUpdate.ofapiCreatorId = ofapiCreatorId;
+        if (name) dataToUpdate.name = name;
 
         const account = await prisma.creator.update({
             where: { id },
