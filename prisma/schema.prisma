@@ -14,6 +14,7 @@ model Creator {
   lastSyncCursor String?
   
   hourlyTarget   Float         @default(100.0)
+  whaleAlertTarget Float       @default(200.0)
   active         Boolean       @default(true)
   
   fans           Fan[]

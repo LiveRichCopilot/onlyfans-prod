@@ -38,40 +38,55 @@ async function processCreators() {
     }
 }
 
-/**
- * Whale Monitoring Core Logic (NOT-01 & Vault Integration)
- * Checks for individual transactions over $200 and triggers the Vault flow.
- */
 async function processWhaleAlerts(accountName: string, apiKey: string, telegramId: string | null) {
     if (!telegramId) return;
 
     try {
-        // Fetch recent transactions (Ex: type=tip)
-        const response = await getTransactions(accountName, apiKey, "tip");
+        // Fetch recent transactions (Ex: type=tip) for the CURRENT day (cumulative)
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        // In real logic, we'd compare against lastSyncCursor. For this V3 production demo, we check if any are > $200
-        const whales = (response?.data || []).filter((tx: any) => tx.amount >= 200);
+        // This simulates requesting all transactions from today to calculate cumulative spend per fan
+        const response = await getTransactions(accountName, apiKey, `?type=tip&start_date=${startOfDay.toISOString()}`);
+        const transactions = response?.data || [];
 
-        for (const whale of whales) {
-            console.log(`[WHALE ALERT] ${accountName} got $${whale.amount} from Fan ${whale.fan_id}`);
+        // Aggregate totals by Fan ID for today
+        const fanTotals: Record<string, number> = {};
+        for (const tx of transactions) {
+            fanTotals[tx.fan_id] = (fanTotals[tx.fan_id] || 0) + tx.amount;
+        }
 
-            // Build interactive Telegram button group
-            const keyboard = new InlineKeyboard()
-                .text("🎙 Voice Note", `action_voice_${whale.fan_id}`)
-                .text("📷 Picture", `action_pic_${whale.fan_id}`)
-                .text("🎥 Video", `action_vid_${whale.fan_id}`)
-                .row()
-                .text("⏭ Skip", "action_skip");
+        // Fetch user's custom whale threshold from our database
+        // Defaulting to 1000 if not set yet via new Prisma schema
+        const creatorData = await prisma.creator.findUnique({
+            where: { ofapiCreatorId: accountName }
+        });
+        const whaleLimit = creatorData?.whaleAlertTarget || 1000;
 
-            const message = `
-🚨 WHALE ALERT: $${whale.amount} 🚨
+        for (const [fanId, totalSpend] of Object.entries(fanTotals)) {
+            if (totalSpend >= whaleLimit) {
+                // To avoid spamming, we should check a 'LastAlerted' date in the DB.
+                // For V3 mock logic, we'll log it and send the Interactive Alert immediately.
+                console.log(`[CUMULATIVE WHALE ALERT] ${accountName}: Fan ${fanId} hit $${totalSpend} today! (Limit: $${whaleLimit})`);
 
-Fan: ${whale.fan_id}
+                const keyboard = new InlineKeyboard()
+                    .text("🎙 Voice Note", `action_voice_${fanId}`)
+                    .text("📷 Picture", `action_pic_${fanId}`)
+                    .text("🎥 Video", `action_vid_${fanId}`)
+                    .row()
+                    .text("⏭ Skip", "action_skip");
+
+                const message = `
+🌟 CUMULATIVE WHALE ALERT: $${totalSpend} 🌟
+
+Fan: ${fanId}
 Module: ${accountName}
+Status: Exceeded $${whaleLimit} daily threshold.
 
-How would you like to respond? (Media goes through AI Safety filter and straight to Vault)`;
+How would you like to respond via Vault?`;
 
-            await bot.api.sendMessage(telegramId, message, { reply_markup: keyboard });
+                await bot.api.sendMessage(telegramId, message, { reply_markup: keyboard });
+            }
         }
     } catch (e: any) {
         console.error(`Whale processing error for ${accountName}: ${e.message}`);

@@ -13,9 +13,9 @@ import {
 export default function AgencyDashboard() {
   // Mock data for the Agency view showing multiple creators/chatters
   const creators = [
-    { id: '1', name: "Madison Ivy", handle: "@madison420ivy", active: true, hourlyRev: 450, target: 100 },
-    { id: '2', name: "Lexi Belle", handle: "@lexibelle", active: true, hourlyRev: 85, target: 100 },
-    { id: '3', name: "Riley Reid", handle: "@rileyreid", active: false, hourlyRev: 0, target: 100 },
+    { id: '1', name: "Madison Ivy", handle: "@madison420ivy", active: true, hourlyRev: 450, target: 100, whaleAlertTarget: 200 },
+    { id: '2', name: "Lexi Belle", handle: "@lexibelle", active: true, hourlyRev: 85, target: 100, whaleAlertTarget: 500 },
+    { id: '3', name: "Riley Reid", handle: "@rileyreid", active: false, hourlyRev: 0, target: 100, whaleAlertTarget: 1000 },
   ];
 
   const modules = [
@@ -132,7 +132,7 @@ export default function AgencyDashboard() {
                     </div>
                     <div className="pt-2 border-t border-white/10 border-dashed">
                       <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Alert Threshold</label>
+                        <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Hourly Revenue Target</label>
                         <span className="text-xs text-blue-400 font-medium">${c.target}/hr</span>
                       </div>
                       <input
@@ -141,7 +141,20 @@ export default function AgencyDashboard() {
                         max="500"
                         step="10"
                         defaultValue={c.target}
-                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 mb-4"
+                      />
+
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Daily Whale Alert Threshold</label>
+                        <span className="text-xs text-purple-400 font-medium">${c.whaleAlertTarget || 200}/day</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1000"
+                        step="50"
+                        defaultValue={c.whaleAlertTarget || 200}
+                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
                       />
                     </div>
                   </div>
