@@ -40,7 +40,7 @@ import { analyzeMediaSafety } from "./ai-analyzer";
 async function getOrBindCreator(ctx: any) {
     const telegramId = String(ctx.from?.id);
     const telegramGroupId = String(ctx.chat?.id);
-    
+
     let creator = await prisma.creator.findFirst({
         where: {
             OR: [
