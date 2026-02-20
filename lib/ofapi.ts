@@ -126,3 +126,52 @@ export async function sendVaultMediaToFan(fanId: string, vaultMediaId: string, a
         }
     });
 }
+
+/**
+ * Get transaction totals grouped by transaction type (subscriptions, tips, messages, etc.).
+ * POST /api/analytics/financial/transactions/by-type
+ */
+export async function getTransactionsByType(apiKey: string, payload: any) {
+    return ofapiRequest("/api/analytics/financial/transactions/by-type", apiKey, {
+        method: "POST",
+        body: payload
+    });
+}
+
+/**
+ * Generate revenue or churn forecasts using statistical models.
+ * POST /api/analytics/financial/forecast
+ */
+export async function getRevenueForecast(apiKey: string, payload: any) {
+    return ofapiRequest("/api/analytics/financial/forecast", apiKey, {
+        method: "POST",
+        body: payload
+    });
+}
+
+/**
+ * Calculate profitability for creators including revenue, costs, commissions, and margins.
+ * POST /api/analytics/financial/profitability
+ */
+export async function getProfitability(apiKey: string, payload: any) {
+    return ofapiRequest("/api/analytics/financial/profitability", apiKey, {
+        method: "POST",
+        body: payload
+    });
+}
+
+/**
+ * Get a quick overview of all unread notification types for an account.
+ * GET /api/{account}/notifications/counts
+ */
+export async function getNotificationCounts(account: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/notifications/counts`, apiKey);
+}
+
+/**
+ * List buyers for a specific message.
+ * GET /api/{account}/engagement/messages/{message_id}/buyers
+ */
+export async function listMessageBuyers(account: string, messageId: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/engagement/messages/${messageId}/buyers`, apiKey);
+}
