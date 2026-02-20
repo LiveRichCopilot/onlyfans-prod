@@ -9,14 +9,17 @@ import {
   Users,
   Activity,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  X
 } from "lucide-react";
 import { useState, useEffect } from "react";
-// @ts-ignore: Next relies on Vercel install
-import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
 export default function AgencyDashboard() {
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newTelegramId, setNewTelegramId] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [creators, setCreators] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,49 +78,10 @@ export default function AgencyDashboard() {
               )}
               <li className="mt-2 text-center">
                 <button
-                  onClick={async () => {
-                    setIsAuthenticating(true);
-                    try {
-                      // 1. Get client session token from our backend
-                      const sessionRes = await fetch("/api/client-session", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ displayName: "Agency Main Pipeline" }),
-                      });
-                      const { token } = await sessionRes.json();
-
-                      // 2. Start authentication with the official token
-                      startOnlyFansAuthentication(token, {
-                        onSuccess: async (data: any) => {
-                          // 3. Save account to database
-                          await fetch("/api/accounts", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              accountId: data.accountId,
-                              username: data.username,
-                              displayName: "Main Pipeline",
-                              name: data.onlyfansData?.name,
-                              avatar: data.onlyfansData?.avatar_url,
-                            }),
-                          });
-                          setIsAuthenticating(false);
-                          window.location.reload();
-                        },
-                        onError: (error: any) => {
-                          console.error("Auth failed:", error);
-                          setIsAuthenticating(false);
-                        },
-                      });
-                    } catch (err) {
-                      console.error("Session fetch failed", err);
-                      setIsAuthenticating(false);
-                    }
-                  }}
-                  disabled={isAuthenticating}
+                  onClick={() => setShowAddModal(true)}
                   className="text-xs text-teal-400 font-medium hover:text-teal-300 transition"
                 >
-                  {isAuthenticating ? "Connecting..." : "+ Add Account"}
+                  + Add Account
                 </button>
               </li>
             </ul>
@@ -268,6 +232,76 @@ export default function AgencyDashboard() {
         </div>
 
       </main>
+
+      {/* Add Account Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="glass-panel p-6 rounded-3xl border-white/20 w-full max-w-md bg-gray-900/90 relative">
+            <button
+              onClick={() => setShowAddModal(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold text-white mb-2">Link OnlyFans Account</h2>
+            <p className="text-sm text-white/60 mb-6">
+              Connect an account that you have already authenticated inside your OnlyFansAPI.com console.
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">
+                  OnlyFans Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. liverichmedia"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 block">
+                  Telegram Chat ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 123456789 (for bot alerts)"
+                  value={newTelegramId}
+                  onChange={(e) => setNewTelegramId(e.target.value)}
+                  className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            <button
+              disabled={isSubmitting || !newUsername || !newTelegramId}
+              onClick={async () => {
+                setIsSubmitting(true);
+                try {
+                  await fetch("/api/accounts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      accountId: newTelegramId,
+                      username: newUsername,
+                    }),
+                  });
+                  window.location.reload();
+                } catch (e) {
+                  console.error(e);
+                  setIsSubmitting(false);
+                }
+              }}
+              className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold transition disabled:opacity-50"
+            >
+              {isSubmitting ? "Linking..." : "Link Account"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
