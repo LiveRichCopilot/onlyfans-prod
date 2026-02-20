@@ -10,6 +10,7 @@ datasource db {
 
 model Creator {
   id             String        @id @default(cuid())
+  name           String?
   telegramId     String        @unique
   ofapiToken     String?
   ofapiCreatorId String?       @unique
