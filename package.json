@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
+    "@onlyfansapi/auth": "latest",
     "@prisma/client": "^7.4.1",
     "grammy": "^1.40.0",
     "lucide-react": "^0.575.0",

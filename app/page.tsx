@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Home,
   LayoutGrid,
@@ -9,8 +11,12 @@ import {
   AlertCircle,
   CheckCircle2
 } from "lucide-react";
+import { useState } from "react";
+// @ts-ignore: Next relies on Vercel install
+import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
 export default function AgencyDashboard() {
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   // Mock data for the Agency view showing multiple creators/chatters
   const creators = [
     { id: '1', name: "Madison Ivy", handle: "@madison420ivy", active: true, hourlyRev: 450, target: 100, whaleAlertTarget: 200 },
@@ -56,8 +62,50 @@ export default function AgencyDashboard() {
                 </li>
               ))}
               <li className="mt-2 text-center">
-                <button className="text-xs text-blue-400 font-medium hover:text-blue-300 transition">
-                  + Add Account
+                <button
+                  onClick={async () => {
+                    setIsAuthenticating(true);
+                    try {
+                      // 1. Get client session token from our backend
+                      const sessionRes = await fetch("/api/client-session", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ displayName: "Agency Main Pipeline" }),
+                      });
+                      const { token } = await sessionRes.json();
+
+                      // 2. Start authentication with the official token
+                      startOnlyFansAuthentication(token, {
+                        onSuccess: async (data: any) => {
+                          // 3. Save account to database
+                          await fetch("/api/accounts", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              accountId: data.accountId,
+                              username: data.username,
+                              displayName: "Main Pipeline",
+                              name: data.onlyfansData?.name,
+                              avatar: data.onlyfansData?.avatar_url,
+                            }),
+                          });
+                          setIsAuthenticating(false);
+                          window.location.reload();
+                        },
+                        onError: (error: any) => {
+                          console.error("Auth failed:", error);
+                          setIsAuthenticating(false);
+                        },
+                      });
+                    } catch (err) {
+                      console.error("Session fetch failed", err);
+                      setIsAuthenticating(false);
+                    }
+                  }}
+                  disabled={isAuthenticating}
+                  className="text-xs text-blue-400 font-medium hover:text-blue-300 transition"
+                >
+                  {isAuthenticating ? "Connecting..." : "+ Add Account"}
                 </button>
               </li>
             </ul>
