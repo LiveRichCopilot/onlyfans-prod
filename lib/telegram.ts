@@ -213,6 +213,37 @@ bot.command("topfans", async (ctx) => {
     }
 });
 
+bot.command("list", async (ctx) => {
+    try {
+        const telegramId = String(ctx.from?.id);
+        const telegramGroupId = String(ctx.chat?.id);
+
+        const creators = await prisma.creator.findMany({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
+
+        if (creators.length === 0) {
+            return ctx.reply("❌ No Connected Accounts found in this channel scope.");
+        }
+
+        let msg = "🔗 <b>Connected Accounts:</b>\n\n";
+        creators.forEach((c: any) => {
+            const statusStr = (c.ofapiToken && c.ofapiToken !== "unlinked") ? "Linked ✅" : "Unlinked ❌";
+            msg += `- ${c.name || 'Unknown'} (@${c.ofapiCreatorId || '?'})\n  Status: ${statusStr}\n\n`;
+        });
+
+        await ctx.reply(msg, { parse_mode: "HTML" });
+    } catch (e: any) {
+        console.error("List command error", e);
+        await ctx.reply("⚠️ Failed to list accounts.");
+    }
+});
+
 // ==========================================
 // V11: On-Demand Demo Triggers
 // ==========================================
