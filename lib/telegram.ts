@@ -172,6 +172,10 @@ bot.command("stats", async (ctx) => {
 
         const byTypeData = byType?.data || {};
 
+        console.log("=== BY TYPE JSON REVENUE DUMP ===");
+        console.log(JSON.stringify(byTypeData));
+        console.log("=================================");
+
         const md = `
 PERFORMANCE REPORT: ${creator.name}
 Window: Last ${args}
