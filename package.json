@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint": "next lint",
     "worker": "ts-node --project tsconfig.json worker.ts",
-    "bot": "ts-node --project tsconfig.json bot-poller.ts"
+    "bot": "ts-node --project tsconfig.json bot-poller.ts",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} prisma/seed.ts"
