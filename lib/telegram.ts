@@ -160,21 +160,28 @@ bot.command("topfans", async (ctx) => {
         }
 
         const telegramId = String(ctx.from?.id);
-        const creator = await prisma.creator.findUnique({ where: { telegramId } });
+        const telegramGroupId = String(ctx.chat?.id);
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
+        });
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("❌ You are not linked.");
+            return ctx.reply("❌ You are not linked to an OnlyFans account.");
         }
+
+        const apiKey = process.env.OFAPI_API_KEY;
+        if (!apiKey) return ctx.reply("❌ System API Key is missing.");
 
         await ctx.reply(`🔍 Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold}`);
 
-        // Currently, our getTransactions helper just hits the root endpoint. 
-        // A true production build would paginate this or pass the timeframe config if supported.
         let rawTransactions: any[] = [];
         try {
-            // Note: If OFAPI paginates /transactions, we would loop here.
-            // For this v10 prototype, we fetch the first page or standard payload.
-            const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken);
+            const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, apiKey);
             rawTransactions = txResponse.list || txResponse.transactions || [];
         } catch (e) {
             console.error("Tx Fetch Error", e);
@@ -265,15 +272,28 @@ Chatters are currently falling behind the hourly revenue goal. Check the feed an
 bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
     try {
         const telegramId = String(ctx.from?.id);
+        const telegramGroupId = String(ctx.chat?.id);
+
         if (!telegramId) return;
 
-        // Verify sender is a registered creator
-        const creator = await prisma.creator.findUnique({
-            where: { telegramId }
+        // Verify sender is a registered creator by mapping their DM or Group ID
+        const creator = await prisma.creator.findFirst({
+            where: {
+                OR: [
+                    { telegramId },
+                    { telegramGroupId }
+                ]
+            }
         });
 
-        if (!creator || !creator.ofapiToken) {
-            await ctx.reply("You are not registered or your OnlyFans API Token is missing.");
+        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
+            await ctx.reply("❌ You are not registered or your OnlyFans Account is not linked.");
+            return;
+        }
+
+        const apiKey = process.env.OFAPI_API_KEY;
+        if (!apiKey) {
+            await ctx.reply("❌ System API Key is missing in Vercel settings.");
             return;
         }
 
@@ -320,7 +340,7 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
 
         const uploadResponse = await uploadToVault(
             creator.ofapiCreatorId || creator.telegramId,
-            creator.ofapiToken,
+            apiKey,
             buffer,
             fileName,
             safetyResult.title,
