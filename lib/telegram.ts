@@ -149,14 +149,14 @@ bot.command("topfans", async (ctx) => {
         const textStr = ctx.match || "";
         const parts = textStr.split(" ").filter(Boolean);
 
-        let days = 30; // default 30 days
-        let threshold = 100; // default minimum $100
+        let days = 1; // default 1 day
+        let threshold = 1000; // default minimum $1000
 
         if (parts.length > 0) {
-            days = parseInt(parts[0].replace('d', '')) || 30;
+            days = parseInt(parts[0].replace('d', '')) || 1;
         }
         if (parts.length > 1) {
-            threshold = parseFloat(parts[1]) || 100;
+            threshold = parseFloat(parts[1]) || 1000;
         }
 
         const telegramId = String(ctx.from?.id);

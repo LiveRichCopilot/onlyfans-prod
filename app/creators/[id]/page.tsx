@@ -21,12 +21,20 @@ export default function CreatorAnalyticsHub() {
     });
     const [loading, setLoading] = useState(true);
 
+    // UI Sliders state
+    const [whaleTarget, setWhaleTarget] = useState(200);
+    const [chatterTarget, setChatterTarget] = useState(100);
+
     useEffect(() => {
         // 1. Fetch Creator Profile Data
         fetch(`/api/creators/${creatorId}`)
             .then(res => res.json())
             .then(data => {
                 setCreator(data.creator);
+                if (data.creator) {
+                    setWhaleTarget(data.creator.whaleAlertTarget || 200);
+                    setChatterTarget(data.creator.hourlyTarget || 100);
+                }
                 if (data.stats) {
                     setStats(data.stats);
                 }
@@ -37,6 +45,18 @@ export default function CreatorAnalyticsHub() {
                 setLoading(false);
             });
     }, [creatorId]);
+
+    const updateThresholds = async (field: 'whaleAlertTarget' | 'hourlyTarget', value: number) => {
+        try {
+            await fetch(`/api/creators/${creatorId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ [field]: value })
+            });
+        } catch (e) {
+            console.error("Failed to update thresholds:", e);
+        }
+    };
 
     if (loading) return (
         <div className="flex min-h-screen items-center justify-center text-white">
@@ -136,9 +156,16 @@ export default function CreatorAnalyticsHub() {
                     <div className="bg-black/30 w-full sm:w-80 rounded-xl p-4 border border-white/5">
                         <div className="flex justify-between items-center mb-2">
                             <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Current Trigger Threshold</label>
-                            <span className="text-xs text-teal-400 font-medium">${creator.whaleAlertTarget || 200}/day</span>
+                            <span className="text-xs text-teal-400 font-medium">${whaleTarget}/day</span>
                         </div>
-                        <input type="range" min="0" max="1000" step="50" defaultValue={creator.whaleAlertTarget || 200} className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-500" disabled />
+                        <input
+                            type="range" min="0" max="1000" step="50"
+                            value={whaleTarget}
+                            onChange={(e) => setWhaleTarget(Number(e.target.value))}
+                            onMouseUp={() => updateThresholds('whaleAlertTarget', whaleTarget)}
+                            onTouchEnd={() => updateThresholds('whaleAlertTarget', whaleTarget)}
+                            className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                        />
                     </div>
                 </div>
 
@@ -156,9 +183,16 @@ export default function CreatorAnalyticsHub() {
                     <div className="bg-black/30 w-full sm:w-80 rounded-xl p-4 border border-white/5">
                         <div className="flex justify-between items-center mb-2">
                             <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Hourly Minimum Target</label>
-                            <span className="text-xs text-purple-400 font-medium">${creator.hourlyTarget || 100}/hr</span>
+                            <span className="text-xs text-purple-400 font-medium">${chatterTarget}/hr</span>
                         </div>
-                        <input type="range" min="10" max="500" step="10" defaultValue={creator.hourlyTarget || 100} className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled />
+                        <input
+                            type="range" min="10" max="500" step="10"
+                            value={chatterTarget}
+                            onChange={(e) => setChatterTarget(Number(e.target.value))}
+                            onMouseUp={() => updateThresholds('hourlyTarget', chatterTarget)}
+                            onTouchEnd={() => updateThresholds('hourlyTarget', chatterTarget)}
+                            className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                        />
                     </div>
                 </div>
 

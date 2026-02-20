@@ -88,3 +88,27 @@ export async function GET(
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+export async function PATCH(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const creatorId = (await params).id;
+        const body = await request.json();
+        const { whaleAlertTarget, hourlyTarget } = body;
+
+        const updateData: any = {};
+        if (whaleAlertTarget !== undefined) updateData.whaleAlertTarget = Number(whaleAlertTarget);
+        if (hourlyTarget !== undefined) updateData.hourlyTarget = Number(hourlyTarget);
+
+        const updatedCreator = await prisma.creator.update({
+            where: { id: creatorId },
+            data: updateData
+        });
+
+        return NextResponse.json({ success: true, creator: updatedCreator });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
