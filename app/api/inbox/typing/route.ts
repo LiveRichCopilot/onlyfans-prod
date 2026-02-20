@@ -14,16 +14,13 @@ export async function POST(request: Request) {
         const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
         if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 
-        const account = await prisma.account.findFirst({
-            where: { providerAccountId: creator.telegramId }
-        });
-
-        if (!account || !account.access_token) {
-            return NextResponse.json({ error: "No physical OnlyFans access token found." }, { status: 401 });
+        const apiKey = process.env.OFAPI_API_KEY;
+        if (!apiKey) {
+            return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
         }
 
         // Fire and forget to OFAPI
-        await sendTypingIndicator(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token);
+        await sendTypingIndicator(creator.ofapiCreatorId || creator.telegramId, chatId, apiKey);
 
         return NextResponse.json({ success: true });
     } catch (e: any) {

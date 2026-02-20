@@ -17,15 +17,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
         }
 
-        const account = await prisma.account.findFirst({
-            where: { providerAccountId: creator.telegramId }
-        });
-
-        if (!account || !account.access_token) {
-            return NextResponse.json({ error: "No physical OnlyFans access token found." }, { status: 401 });
+        const apiKey = process.env.OFAPI_API_KEY;
+        if (!apiKey) {
+            return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
         }
 
-        const rawMessages = await getChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token);
+        const rawMessages = await getChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, apiKey);
 
         return NextResponse.json({ messages: rawMessages.list || rawMessages || [] });
     } catch (e: any) {
@@ -47,12 +44,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
         }
 
-        const account = await prisma.account.findFirst({
-            where: { providerAccountId: creator.telegramId }
-        });
-
-        if (!account || !account.access_token) {
-            return NextResponse.json({ error: "No physical OnlyFans access token found." }, { status: 401 });
+        const apiKey = process.env.OFAPI_API_KEY;
+        if (!apiKey) {
+            return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
         }
 
         // Call user's requested Typing Indicator before sending the message! (Simulates "Model is typing...")
@@ -60,7 +54,7 @@ export async function POST(request: Request) {
             await fetch(`https://onlyfans-prod.vercel.app/api/inbox/typing`, { method: 'POST', body: JSON.stringify({ creatorId, chatId }) }).catch();
         } catch (e) { }
 
-        const response = await sendChatMessage(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token, { text });
+        const response = await sendChatMessage(creator.ofapiCreatorId || creator.telegramId, chatId, apiKey, { text });
 
         return NextResponse.json({ success: true, message: response });
     } catch (e: any) {

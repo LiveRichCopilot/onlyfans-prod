@@ -14,17 +14,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
         }
 
-        // The true token is stored in the NextAuth Account table, not the Creator table placeholder
-        const account = await prisma.account.findFirst({
-            where: { providerAccountId: creator.telegramId }
-        });
-
-        if (!account || !account.access_token) {
-            return NextResponse.json({ error: "No physical OnlyFans access token found in database for this creator." }, { status: 401 });
+        const apiKey = process.env.OFAPI_API_KEY;
+        if (!apiKey) {
+            return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
         }
 
-        const realToken = account.access_token;
-        const rawChats = await listChats(creator.ofapiCreatorId || creator.telegramId, realToken);
+        const rawChats = await listChats(creator.ofapiCreatorId || creator.telegramId, apiKey);
 
         // Return the raw list from OnlyFans. The frontend will map it.
         return NextResponse.json({ chats: rawChats.list || rawChats || [] });
