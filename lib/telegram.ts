@@ -30,7 +30,8 @@ import {
     getRevenueForecast,
     getNotificationCounts,
     getTransactions,
-    calculateTopFans
+    calculateTopFans,
+    sendVaultMediaToFan
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
 
@@ -453,7 +454,44 @@ bot.command("list", async (ctx) => {
 
 
 
-// Handle interactive button callbacks here in the future if needed...
+// Simple memory cache for mapping a Creator's next media upload to a specific Fan Chat
+const activeReplies: Record<string, string> = {};
+
+// Handle Interactive Button Clicks from Alerts
+bot.on("callback_query:data", async (ctx) => {
+    const threadId = ctx.callbackQuery.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
+    const data = ctx.callbackQuery.data;
+
+    if (data === "action_skip" || data === "action_ack") {
+        await ctx.answerCallbackQuery("Alert dismissed.");
+        await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+        return;
+    }
+
+    if (data.startsWith("alert_reply_")) {
+        const parts = data.split("_");
+        const type = parts[2]; // voice | video | text
+        const fanId = parts[3];
+
+        // Route the fan destination securely to the creator's Telegram DM ID
+        if (ctx.from?.id && fanId) {
+            activeReplies[String(ctx.from.id)] = fanId;
+        }
+
+        // Acknowledge the click to remove the loading spinner
+        await ctx.answerCallbackQuery();
+
+        let promptStr = "";
+        if (type === "voice") promptStr = "🎤 Please record and send your Voice Note now. Our AI will auto-tag it and push it directly into your OnlyFans Vault before sending it to the fan.";
+        if (type === "video") promptStr = "📹 Please upload your Video now. Our AI will auto-tag it and push it directly into your OnlyFans Vault before sending it to the fan.";
+        if (type === "text") promptStr = "✍️ Please type your Text message now. (It will be automatically sent via the chat engine).";
+
+        await ctx.reply(promptStr, replyOpt);
+        await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+});
 
 // Handler for direct media uploads to the vault
 bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
@@ -545,7 +583,16 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             }
         });
 
-        const successMd = `
+        // 6. Automatically dispatch to the specific Whale Chat if triggered via /report
+        const targetFanId = activeReplies[telegramId];
+        if (targetFanId && uploadResponse.id) {
+            await sendVaultMediaToFan(targetFanId, uploadResponse.id, apiKey);
+            // Clear the active session queue
+            delete activeReplies[telegramId];
+
+            await ctx.reply(`✅ Direct Message Sent! The Vault media asset has successfully been forwarded to fan ID: ${targetFanId}.`);
+        } else {
+            const successMd = `
 Upload Complete [Track ID: ${uploadResponse.id || uploadResponse.prefixed_id || 'N/A'}]
 
 Title: ${safetyResult.title}
@@ -553,42 +600,12 @@ Tags: ${safetyResult.description}
 
 Your file is now securely stored in your Vault.
         `;
+            await ctx.reply(successMd);
+        }
 
-        await ctx.reply(successMd);
     } catch (e: any) {
         console.error("Direct Upload Handler Error:", e);
         await ctx.reply("Sorry, an error occurred while processing your vault upload: " + e.message);
-    }
-});
-
-// Handle Interactive Button Clicks from Alerts
-bot.on("callback_query:data", async (ctx) => {
-    const threadId = ctx.callbackQuery.message?.message_thread_id;
-    const replyOpt = threadId ? { message_thread_id: threadId } : {};
-
-    const data = ctx.callbackQuery.data;
-
-    if (data === "action_skip" || data === "action_ack") {
-        await ctx.answerCallbackQuery("Alert dismissed.");
-        await ctx.editMessageReplyMarkup({ reply_markup: undefined });
-        return;
-    }
-
-    if (data.startsWith("alert_reply_")) {
-        const parts = data.split("_");
-        const type = parts[2]; // voice | video | text
-        const fanId = parts[3];
-
-        // Acknowledge the click to remove the loading spinner
-        await ctx.answerCallbackQuery();
-
-        let promptStr = "";
-        if (type === "voice") promptStr = "🎤 Please record and send your Voice Note now. Our AI will auto-tag it and push it directly into your OnlyFans Vault.";
-        if (type === "video") promptStr = "📹 Please upload your Video now. Our AI will auto-tag it and push it directly into your OnlyFans Vault.";
-        if (type === "text") promptStr = "✍️ Please type your Text message now. (It will be automatically sent via the chat engine).";
-
-        await ctx.reply(promptStr, replyOpt);
-        await ctx.editMessageReplyMarkup({ reply_markup: undefined });
     }
 });
 
