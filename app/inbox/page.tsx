@@ -75,7 +75,7 @@ export default function InboxPage() {
                         avatar: c.fan?.avatar || c.withUser?.avatar || ""
                     },
                     lastMessage: {
-                        text: c.lastMessage?.text || "No message",
+                        text: c.lastMessage?.text?.replace(/<[^>]*>?/gm, '') || (c.lastMessage?.media?.length > 0 || c.hasMedia ? "📸 [Media Attachment]" : "No message"),
                         createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
                         isRead: c.lastMessage?.isOpened ?? true
                     },
@@ -111,7 +111,7 @@ export default function InboxPage() {
 
                     return {
                         id: m.id || m.message_id || Math.random().toString(),
-                        text: m.text || "",
+                        text: m.text || (m.media?.length > 0 || m.hasMedia ? "📸 [Media Attachment]" : ""),
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
                         isFromCreator: isCreator
@@ -169,7 +169,7 @@ export default function InboxPage() {
     };
 
     return (
-        <div className="flex h-screen bg-[#1c1c21] text-white">
+        <div className="flex h-screen bg-[#1c1c21] text-white overflow-hidden">
 
             {/* LEFT SIDEBAR: Chat List */}
             <div className="w-[340px] border-r border-[#2d2d34] flex flex-col bg-[#1c1c21]">
@@ -210,7 +210,7 @@ export default function InboxPage() {
                 </div>
 
                 {/* Chat List */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     {!selectedCreatorId ? (
                         <div className="p-6 text-center text-sm text-gray-500">Please select a creator to view chats.</div>
                     ) : loading ? (
@@ -270,7 +270,7 @@ export default function InboxPage() {
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 relative">
+                        <div className="flex-1 overflow-y-auto min-h-0 p-6 flex flex-col gap-4 relative">
                             <div className="text-center text-xs text-gray-500 my-4">Live API Chat Thread Synced Securely</div>
 
                             {msgsLoading && (
@@ -288,7 +288,10 @@ export default function InboxPage() {
                                             ? 'bg-[#14b8a6] text-white rounded-br-sm'
                                             : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
                                             }`}>
-                                            {msg.text}
+                                            <div
+                                                dangerouslySetInnerHTML={{ __html: msg.text }}
+                                                className="break-words whitespace-pre-wrap [&>p]:m-0 [&>p]:inline"
+                                            />
                                             {isSelf && (
                                                 <div className="flex justify-end mt-1">
                                                     <CheckCheck size={12} className="text-white/60" />
