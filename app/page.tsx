@@ -13,12 +13,15 @@ import {
   X
 } from "lucide-react";
 import { useState, useEffect } from "react";
+// @ts-ignore: Next relies on Vercel install
+import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
 export default function AgencyDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newTelegramId, setNewTelegramId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAuthenticatingId, setIsAuthenticatingId] = useState<string | null>(null);
 
   const [creators, setCreators] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,13 +128,58 @@ export default function AgencyDashboard() {
                       <div className="text-white font-medium">{c.name || 'Unknown'}</div>
                       <div className="text-xs text-white/50 mb-3">{c.ofapiCreatorId || c.telegramId}</div>
                     </div>
-                    <div className="glass-button p-2 rounded-xl">
-                      {isUnderperforming ? (
-                        <AlertCircle size={20} className="text-red-400" />
-                      ) : c.active ? (
-                        <CheckCircle2 size={20} className="text-teal-400" />
+
+                    <div className="flex gap-2 items-center">
+                      {!c.ofapiToken || c.ofapiToken === "unlinked" ? (
+                        <button
+                          onClick={async () => {
+                            setIsAuthenticatingId(c.id);
+                            try {
+                              const sessionRes = await fetch("/api/client-session", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ displayName: c.name || "Agency Pipeline" }),
+                              });
+                              const { token } = await sessionRes.json();
+
+                              startOnlyFansAuthentication(token, {
+                                onSuccess: async (data: any) => {
+                                  await fetch("/api/accounts", {
+                                    method: "PUT",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      id: c.id,
+                                      ofapiToken: "linked_via_auth_module"
+                                    }),
+                                  });
+                                  setIsAuthenticatingId(null);
+                                  window.location.reload();
+                                },
+                                onError: (error: any) => {
+                                  console.error("Auth failed:", error);
+                                  setIsAuthenticatingId(null);
+                                }
+                              });
+                            } catch (err) {
+                              console.error("Session fetch failed", err);
+                              setIsAuthenticatingId(null);
+                            }
+                          }}
+                          disabled={isAuthenticatingId === c.id}
+                          className="glass-button px-3 py-1.5 rounded-xl text-xs font-medium text-purple-400 border border-purple-500/30 hover:bg-purple-500/10 flex items-center gap-2"
+                        >
+                          {isAuthenticatingId === c.id ? "Connecting..." : "Connect OF"}
+                        </button>
                       ) : (
-                        <Activity size={20} className="text-white/30" />
+                        <div className="glass-button p-2 rounded-xl">
+                          {isUnderperforming ? (
+                            <AlertCircle size={20} className="text-red-400" />
+                          ) : c.active ? (
+                            <CheckCircle2 size={20} className="text-teal-400" />
+                          ) : (
+                            <Activity size={20} className="text-white/30" />
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -243,9 +291,9 @@ export default function AgencyDashboard() {
             >
               <X size={20} />
             </button>
-            <h2 className="text-xl font-bold text-white mb-2">Link OnlyFans Account</h2>
+            <h2 className="text-xl font-bold text-white mb-2">Add Creator Account</h2>
             <p className="text-sm text-white/60 mb-6">
-              Connect an account that you have already authenticated inside your OnlyFansAPI.com console.
+              Enter the creator's username to register them. Once added, you can click "Connect OF" to authenticate their account.
             </p>
 
             <div className="space-y-4 mb-6">
@@ -297,7 +345,7 @@ export default function AgencyDashboard() {
               }}
               className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold transition disabled:opacity-50"
             >
-              {isSubmitting ? "Linking..." : "Link Account"}
+              {isSubmitting ? "Adding..." : "Add Creator"}
             </button>
           </div>
         </div>

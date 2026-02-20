@@ -20,6 +20,7 @@ model Creator {
   active         Boolean       @default(true)
   
   fans           Fan[]
+  mediaAssets    MediaAsset[]
   
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -78,6 +79,18 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model MediaAsset {
+  id             String        @id @default(cuid())
+  creatorId      String
+  creator        Creator       @relation(fields: [creatorId], references: [id])
+  ofapiMediaId   String        @unique
+  fileType       String
+  originalName   String?
+  totalRevenue   Float         @default(0.00)
+  transactions   Transaction[]
+  createdAt      DateTime      @default(now())
+}
+
 model Fan {
   id             String        @id @default(cuid())
   ofapiFanId     String        @unique
@@ -100,6 +113,8 @@ model Transaction {
   date           DateTime
   
   fan            Fan           @relation(fields: [fanId], references: [id])
+  mediaAssetId   String?
+  mediaAsset     MediaAsset?   @relation(fields: [mediaAssetId], references: [id])
   
   createdAt      DateTime      @default(now())
 }

@@ -12,16 +12,38 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // In a production app, we would bind the OF API token specifically to this creator
+        // Initialize the account in an unlinked state
         const account = await prisma.creator.create({
             data: {
                 ofapiCreatorId: username,
                 telegramId: accountId, // fallback for now to ensure uniqueness
-                ofapiToken: "linked_via_auth_module"
+                ofapiToken: "unlinked"
             },
         });
 
         return NextResponse.json(account, { status: 201 });
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+}
+
+export async function PUT(request: NextRequest) {
+    try {
+        const { id, ofapiToken } = await request.json();
+
+        if (!id || !ofapiToken) {
+            return NextResponse.json(
+                { error: "id and ofapiToken are required" },
+                { status: 400 }
+            );
+        }
+
+        const account = await prisma.creator.update({
+            where: { id },
+            data: { ofapiToken }
+        });
+
+        return NextResponse.json(account, { status: 200 });
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
