@@ -12,9 +12,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const apiKey = process.env.OFAPI_API_KEY || "ofapi_test_key_12345"; // fallback for Vercel demo
+        const apiKey = process.env.OFAPI_API_KEY;
 
-        // Create client session via OnlyFans API
+        if (!apiKey) {
+            return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
+        }
+
         const response = await fetch(
             "https://app.onlyfansapi.com/api/client-sessions",
             {
@@ -28,13 +31,13 @@ export async function POST(request: NextRequest) {
         );
 
         if (!response.ok) {
-            // We'll mock a valid response token if the real API key isn't setup yet during Vercel boot up
-            return NextResponse.json({ token: "ofapi_cs_MOCK_TOKEN_UPDATE_API_KEY_LATER" });
+            const errStr = await response.text();
+            throw new Error(`Scribe API Session creation failed: ${response.status} ${errStr}`);
         }
 
         const data = await response.json();
-        return NextResponse.json({ token: data.data?.token || "ofapi_cs_MOCK_TOKEN" });
+        return NextResponse.json({ token: data.data?.token || data.token });
     } catch (e: any) {
-        return NextResponse.json({ token: "ofapi_cs_FALLBACK_MOCK_TOKEN_FOR_DEV" });
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

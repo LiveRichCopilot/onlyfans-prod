@@ -244,60 +244,11 @@ bot.command("list", async (ctx) => {
     }
 });
 
-// ==========================================
-// V11: On-Demand Demo Triggers
-// ==========================================
 
-bot.command("testwhale", async (ctx) => {
-    try {
-        const telegramId = String(ctx.from?.id);
-        const fanId = "U1234567";
-        const totalSpend = 520;
 
-        const keyboard = new InlineKeyboard()
-            .text("🎤 Voice Note", `alert_reply_voice_${fanId}`)
-            .text("📹 Video", `alert_reply_video_${fanId}`)
-            .text("✍️ Text", `alert_reply_text_${fanId}`)
-            .text("Skip", "action_skip");
 
-        const message = `
-🐳 Whale Alert
 
-Fan: Marcus T.
-Spent today: $${totalSpend}
-Lifetime: $4,200
-On page: 8 months
-
-He tipped $200 on your last PPV.
-
-How do you want to respond?`;
-
-        await ctx.reply(message, { reply_markup: keyboard });
-    } catch (e) {
-        console.error(e);
-    }
-});
-
-bot.command("testchatter", async (ctx) => {
-    try {
-        const keyboard = new InlineKeyboard()
-            .text("Message Manager", "action_msg_manager")
-            .text("Acknowledge", "action_ack");
-
-        const message = `
-⚠️ CHATTER TARGET MISSED ⚠️
-
-Account: "@AgencyMockAccount"
-Revenue (Last Hour): $45
-Target: $100
-
-Chatters are currently falling behind the hourly revenue goal. Check the feed and course correct.`;
-
-        await ctx.reply(message, { reply_markup: keyboard });
-    } catch (e) {
-        console.error(e);
-    }
-});
+// Handle interactive button callbacks here in the future if needed...
 
 // Handler for direct media uploads to the vault
 bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
