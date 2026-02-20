@@ -8,18 +8,37 @@ export default async function CFODashboard() {
         where: { active: true }
     });
 
-    // MOCK DATA for rendering UI.
-    const totalHourlyRevenue = 4120.00; // Aggregated
-    const chattersUnderperforming = [
-        { handle: "madison420ivy", actual: 45.50, target: 100 },
-        { handle: "jessica_xo", actual: 80.00, target: 150 },
-    ];
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const hourlyTransactions = await prisma.transaction.findMany({
+        where: { date: { gte: oneHourAgo } },
+        include: { fan: { include: { creator: true } } }
+    });
+
+    let totalHourlyRevenue = 0;
+    const creatorRevenue: Record<string, { handle: string, actual: number, target: number }> = {};
+
+    creators.forEach((c: any) => {
+        creatorRevenue[c.id] = {
+            handle: c.ofapiCreatorId || c.telegramId,
+            actual: 0,
+            target: c.hourlyTarget
+        };
+    });
+
+    hourlyTransactions.forEach((tx: any) => {
+        totalHourlyRevenue += tx.amount;
+        if (creatorRevenue[tx.fan.creatorId]) {
+            creatorRevenue[tx.fan.creatorId].actual += tx.amount;
+        }
+    });
+
+    const chattersUnderperforming = Object.values(creatorRevenue).filter(c => c.actual < c.target);
 
     return (
         <div className="min-h-screen bg-[#050510] relative text-white pt-10 px-8">
             {/* Background Orbs */}
-            <div className="absolute top-[-5%] left-[20%] w-[30%] h-[30%] bg-blue-600/20 rounded-full blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] bg-emerald-600/20 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute top-[-5%] left-[20%] w-[30%] h-[30%] bg-teal-600/20 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-[10%] right-[10%] w-[40%] h-[40%] bg-gray-600/20 rounded-full blur-[120px] pointer-events-none" />
 
             <h1 className="text-4xl font-bold tracking-tight mb-2 z-10 relative">CFO Executive Overview</h1>
             <p className="text-white/60 mb-8 z-10 relative">Real-time financial aggregated analytics and chatter performance gaps.</p>
@@ -34,7 +53,7 @@ export default async function CFODashboard() {
                 </div>
 
                 <div className="glass-panel p-6 rounded-2xl border border-white/10">
-                    <TrendingUp className="text-blue-400 mb-4" size={28} />
+                    <TrendingUp className="text-teal-400 mb-4" size={28} />
                     <p className="text-white/50 text-sm font-semibold tracking-wider uppercase mb-1">Active Modules</p>
                     <p className="text-4xl font-bold">{creators.length + 2}</p>
                 </div>

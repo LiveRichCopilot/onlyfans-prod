@@ -14,8 +14,8 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     /* Apple Glass / VisionOS vibe typically relies on a rich, colorful gradient background layered behind the glass UI */
-    background-image: radial-gradient(circle at 15% 50%, rgba(66, 32, 114, 0.4), transparent 50%),
-      radial-gradient(circle at 85% 30%, rgba(20, 80, 163, 0.4), transparent 50%);
+    background-image: radial-gradient(circle at 15% 50%, rgba(20, 20, 25, 0.8), transparent 50%),
+      radial-gradient(circle at 85% 30%, rgba(13, 148, 136, 0.15), transparent 50%);
     background-attachment: fixed;
     @apply antialiased font-sans;
   }

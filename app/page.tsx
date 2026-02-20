@@ -11,18 +11,27 @@ import {
   AlertCircle,
   CheckCircle2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // @ts-ignore: Next relies on Vercel install
 import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
 export default function AgencyDashboard() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  // Mock data for the Agency view showing multiple creators/chatters
-  const creators = [
-    { id: '1', name: "Madison Ivy", handle: "@madison420ivy", active: true, hourlyRev: 450, target: 100, whaleAlertTarget: 200 },
-    { id: '2', name: "Lexi Belle", handle: "@lexibelle", active: true, hourlyRev: 85, target: 100, whaleAlertTarget: 500 },
-    { id: '3', name: "Riley Reid", handle: "@rileyreid", active: false, hourlyRev: 0, target: 100, whaleAlertTarget: 1000 },
-  ];
+  const [creators, setCreators] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/creators")
+      .then(res => res.json())
+      .then(data => {
+        setCreators(data.creators || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to fetch creators", err);
+        setLoading(false);
+      });
+  }, []);
 
   const modules = [
     { id: 'NOT-01', title: "Whale Alert", desc: "Push notification when fan crosses tip threshold.", active: true },
@@ -33,9 +42,9 @@ export default function AgencyDashboard() {
   return (
     <div className="flex min-h-screen text-white/90 overflow-hidden relative">
       {/* Apple Glass Main Sidebar */}
-      <aside className="w-72 glass-panel m-4 rounded-3xl p-6 hidden md:flex flex-col z-10 border-white/10">
+      <aside className="w-72 glass-panel m-4 rounded-3xl p-6 hidden md:flex flex-col z-10 border-gray-800">
         <div className="flex items-center gap-3 mb-10">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center font-bold text-lg shadow-lg shadow-purple-500/50">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50">
             OF
           </div>
           <div>
@@ -53,14 +62,17 @@ export default function AgencyDashboard() {
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs border border-white/20">
-                        {c.name.charAt(0)}
+                        {c.name ? c.name.charAt(0) : '?'}
                       </div>
-                      <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-black ${c.active ? 'bg-green-500' : 'bg-gray-500'}`} />
+                      <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-black ${c.active ? 'bg-teal-500' : 'bg-gray-500'}`} />
                     </div>
-                    <span className="text-sm font-medium text-white/80 group-hover:text-white">{c.name}</span>
+                    <span className="text-sm font-medium text-white/80 group-hover:text-white">{c.name || 'Unknown'}</span>
                   </div>
                 </li>
               ))}
+              {creators.length === 0 && !loading && (
+                <li className="px-3 py-2 text-xs text-white/40 italic">No accounts linked</li>
+              )}
               <li className="mt-2 text-center">
                 <button
                   onClick={async () => {
@@ -103,7 +115,7 @@ export default function AgencyDashboard() {
                     }
                   }}
                   disabled={isAuthenticating}
-                  className="text-xs text-blue-400 font-medium hover:text-blue-300 transition"
+                  className="text-xs text-teal-400 font-medium hover:text-teal-300 transition"
                 >
                   {isAuthenticating ? "Connecting..." : "+ Add Account"}
                 </button>
@@ -128,7 +140,7 @@ export default function AgencyDashboard() {
         <header className="flex justify-between items-center mb-8 glass-panel p-6 rounded-3xl sticky top-0 z-20 border-white/10">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-white/95 mb-1">Agency Overview</h1>
-            <p className="text-sm text-white/60 font-medium">Monitoring 3 creators globally.</p>
+            <p className="text-sm text-white/60 font-medium">Monitoring {creators.length} creators globally.</p>
           </div>
           <button className="glass-button px-5 py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white">
             <Settings size={16} />
@@ -146,14 +158,14 @@ export default function AgencyDashboard() {
                 <div key={c.id} className="glass-panel p-5 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 relative overflow-hidden group">
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <div className="text-white font-medium">{c.name}</div>
-                      <div className="text-xs text-white/50 mb-3">{c.handle}</div>
+                      <div className="text-white font-medium">{c.name || 'Unknown'}</div>
+                      <div className="text-xs text-white/50 mb-3">{c.ofapiCreatorId || c.telegramId}</div>
                     </div>
                     <div className="glass-button p-2 rounded-xl">
                       {isUnderperforming ? (
                         <AlertCircle size={20} className="text-red-400" />
                       ) : c.active ? (
-                        <CheckCircle2 size={20} className="text-green-400" />
+                        <CheckCircle2 size={20} className="text-teal-400" />
                       ) : (
                         <Activity size={20} className="text-white/30" />
                       )}
@@ -174,27 +186,27 @@ export default function AgencyDashboard() {
                     </div>
                     <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-4">
                       <div
-                        className={`h-full rounded-full ${isUnderperforming ? 'bg-red-500' : 'bg-green-500'}`}
-                        style={{ width: `${Math.min((c.hourlyRev / c.target) * 100, 100)}%` }}
+                        className={`h-full rounded-full ${isUnderperforming ? 'bg-red-500' : 'bg-teal-500'}`}
+                        style={{ width: `${Math.min(((c.hourlyRev || 0) / (c.target || 100)) * 100, 100)}%` }}
                       />
                     </div>
                     <div className="pt-2 border-t border-white/10 border-dashed">
                       <div className="flex justify-between items-center mb-1">
                         <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Hourly Revenue Target</label>
-                        <span className="text-xs text-blue-400 font-medium">${c.target}/hr</span>
+                        <span className="text-xs text-teal-400 font-medium">${c.hourlyTarget || 100}/hr</span>
                       </div>
                       <input
                         type="range"
                         min="10"
                         max="500"
                         step="10"
-                        defaultValue={c.target}
-                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-blue-500 mb-4"
+                        defaultValue={c.hourlyTarget || 100}
+                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-500 mb-4"
                       />
 
                       <div className="flex justify-between items-center mb-1">
                         <label className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Daily Whale Alert Threshold</label>
-                        <span className="text-xs text-purple-400 font-medium">${c.whaleAlertTarget || 200}/day</span>
+                        <span className="text-xs text-teal-600 font-medium">${c.whaleAlertTarget || 200}/day</span>
                       </div>
                       <input
                         type="range"
@@ -202,13 +214,23 @@ export default function AgencyDashboard() {
                         max="1000"
                         step="50"
                         defaultValue={c.whaleAlertTarget || 200}
-                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-teal-600"
                       />
                     </div>
                   </div>
                 </div>
               )
             })}
+
+            {creators.length === 0 && !loading && (
+              <div className="glass-panel p-8 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                  <AlertCircle size={32} className="text-teal-500/50" />
+                </div>
+                <h3 className="text-xl font-medium text-white/90 mb-2">No Accounts Linked</h3>
+                <p className="text-sm text-white/50 max-w-xs">Connect your OnlyFans account using the Add Account button in the sidebar to view your chatter performance.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -229,7 +251,7 @@ export default function AgencyDashboard() {
                     <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-lg bg-white/10 text-white/90 shadow-inner">
                       {mod.id}
                     </span>
-                    <div className={`h-2.5 w-2.5 rounded-full ${mod.active ? 'bg-blue-400 shadow-md shadow-blue-500/80' : 'bg-white/20'}`} />
+                    <div className={`h-2.5 w-2.5 rounded-full ${mod.active ? 'bg-teal-400 shadow-md shadow-teal-500/80' : 'bg-white/20'}`} />
                   </div>
                   <h3 className="text-xl font-semibold tracking-tight text-white mb-2">{mod.title}</h3>
                   <p className="text-sm text-white/50 leading-relaxed font-medium">
