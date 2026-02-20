@@ -452,8 +452,6 @@ bot.command("list", async (ctx) => {
 
 
 
-
-
 // Simple memory cache for mapping a Creator's next media upload to a specific Fan Chat
 const activeReplies: Record<string, string> = {};
 
