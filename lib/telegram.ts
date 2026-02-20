@@ -36,68 +36,9 @@ import {
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
 
-bot.catch((err) => {
-    console.error("Global Grammy Error:", err);
-});
 
-// Configure the native Telegram Slash Command menu
-bot.api.setMyCommands([
-    { command: "start", description: "Initialize Bot" },
-    { command: "report", description: "Get the live 1H/24H Revenue Brief & Top Spenders" },
-    { command: "stats", description: "Get comprehensive performance report (e.g. /stats 24h)" },
-    { command: "topfans", description: "Find highest spenders (e.g. /topfans 1d 1000)" },
-    { command: "forecast", description: "Generate AI revenue projection" },
-    { command: "notifications", description: "Check unread priority alerts" },
-    { command: "list", description: "List connected accounts" },
-    { command: "ping", description: "Check system latency and group ID" }
-]).catch(err => console.error("Failed to set commands", err));
-
-bot.command("start", async (ctx) => {
-    try {
-        const telegramId = String(ctx.from?.id);
-        const telegramGroupId = String(ctx.chat?.id);
-
-        // Find if this user already exists
-        let creator = await prisma.creator.findFirst({
-            where: { telegramId }
-        });
-
-        // SCRIPT: SMART BINDING to heal Dashboard <-> Telegram Desync
-        if (creator && creator.ofapiToken === (process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5")) {
-            await prisma.creator.delete({ where: { id: creator.id } });
-            creator = null;
-        }
-
-        if (!creator && telegramId && telegramId !== "undefined") {
-            let realCreator = await prisma.creator.findFirst({
-                where: { ofapiToken: "linked_via_auth_module" }
-            });
-
-            if (!realCreator) {
-                realCreator = await prisma.creator.findFirst({
-                    where: { ofapiToken: "unlinked" }
-                });
-            }
-
-            if (realCreator) {
-                creator = await prisma.creator.update({
-                    where: { id: realCreator.id },
-                    data: {
-                        telegramId,
-                        telegramGroupId: (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') ? telegramGroupId : realCreator.telegramGroupId
-                    }
-                });
-            }
-        }
-
-        if (creator) {
-            // If they are starting the bot in a group chat, save the group ID
-            if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
-                creator = await prisma.creator.update({
-                    where: { id: creator.id },
-                    data: { telegramGroupId }
-                });
-            }
+async function getOrBindCreator(ctx: any) {
+    const creator = await getOrBindCreator(ctx);
             await ctx.reply(`Welcome back ${creator.name}! Your account is connected to OnlyFans Essentials. Waiting for live alerts in this chat...`);
         } else {
             await ctx.reply("Welcome to OnlyFans Essentials. You are not linked to a Creator profile yet. Please log into the web dashboard first.");
@@ -113,16 +54,7 @@ bot.command("ping", async (ctx) => {
     const replyOpt = threadId ? { message_thread_id: threadId } : {};
 
     try {
-        const telegramId = String(ctx.from?.id);
-        const telegramGroupId = String(ctx.chat?.id);
-        const creator = await prisma.creator.findFirst({
-            where: {
-                OR: [
-                    { telegramId },
-                    { telegramGroupId }
-                ]
-            }
-        });
+        const creator = await getOrBindCreator(ctx);
         await ctx.reply(`Pong! 🏓\nGroup ID: ${telegramGroupId}\nThread ID: ${threadId || 'None'}\nUser ID: ${telegramId}\nCreator Found: ${creator ? creator.name : 'NO'}`, replyOpt);
     } catch (e) {
         console.error(e);
@@ -142,16 +74,7 @@ bot.command("stats", async (ctx) => {
         if (isNaN(hours)) hours = 24;
         if (args.includes('d')) hours = parseInt(args) * 24;
 
-        const telegramId = String(ctx.from?.id);
-        const telegramGroupId = String(ctx.chat?.id);
-        const creator = await prisma.creator.findFirst({
-            where: {
-                OR: [
-                    { telegramId },
-                    { telegramGroupId }
-                ]
-            }
-        });
+        const creator = await getOrBindCreator(ctx);
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
             return ctx.reply("❌ You are not linked to an OnlyFans account.", replyOpt);
@@ -323,16 +246,7 @@ bot.command("forecast", async (ctx) => {
     const replyOpt = threadId ? { message_thread_id: threadId } : {};
 
     try {
-        const telegramId = String(ctx.from?.id);
-        const telegramGroupId = String(ctx.chat?.id);
-        const creator = await prisma.creator.findFirst({
-            where: {
-                OR: [
-                    { telegramId },
-                    { telegramGroupId }
-                ]
-            }
-        });
+        const creator = await getOrBindCreator(ctx);
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") return;
 
@@ -374,16 +288,7 @@ bot.command("notifications", async (ctx) => {
     const replyOpt = threadId ? { message_thread_id: threadId } : {};
 
     try {
-        const telegramId = String(ctx.from?.id);
-        const telegramGroupId = String(ctx.chat?.id);
-        const creator = await prisma.creator.findFirst({
-            where: {
-                OR: [
-                    { telegramId },
-                    { telegramGroupId }
-                ]
-            }
-        });
+        const creator = await getOrBindCreator(ctx);
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
             return ctx.reply("❌ You are not linked.", replyOpt);
@@ -424,16 +329,7 @@ bot.command("topfans", async (ctx) => {
             threshold = parseFloat(parts[1]) || 1000;
         }
 
-        const telegramId = String(ctx.from?.id);
-        const telegramGroupId = String(ctx.chat?.id);
-        const creator = await prisma.creator.findFirst({
-            where: {
-                OR: [
-                    { telegramId },
-                    { telegramGroupId }
-                ]
-            }
-        });
+        const creator = await getOrBindCreator(ctx);
 
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
             return ctx.reply("❌ You are not linked to an OnlyFans account.", replyOpt);
