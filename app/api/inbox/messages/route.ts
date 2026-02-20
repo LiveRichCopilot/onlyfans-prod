@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { searchChatMessages, sendChatMessage } from "@/lib/ofapi";
+import { getChatMessages, sendChatMessage } from "@/lib/ofapi";
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "No physical OnlyFans access token found." }, { status: 401 });
         }
 
-        const rawMessages = await searchChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token);
+        const rawMessages = await getChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, account.access_token);
 
         return NextResponse.json({ messages: rawMessages.list || rawMessages || [] });
     } catch (e: any) {

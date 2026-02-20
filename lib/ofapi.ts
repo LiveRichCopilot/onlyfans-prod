@@ -244,11 +244,18 @@ export async function listChats(accountName: string, apiKey: string) {
 }
 
 /**
+ * Get messages from a specific chat.
+ * GET /api/{account}/chats/{chat_id}/messages
+ */
+export async function getChatMessages(accountName: string, chatId: string | number, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages`, apiKey);
+}
+
+/**
  * Search messages in a specific chat.
  * GET /api/{account}/chats/{chat_id}/messages/search
  */
 export async function searchChatMessages(accountName: string, chatId: string | number, apiKey: string) {
-    // Note: Scribe docs say GET /search. We'll return the raw array.
     return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages/search`, apiKey);
 }
 
@@ -256,10 +263,29 @@ export async function searchChatMessages(accountName: string, chatId: string | n
  * Send a new message to a chat.
  * POST /api/{account}/chats/{chat_id}/messages
  */
-export async function sendChatMessage(accountName: string, chatId: string | number, apiKey: string, payload: { text: string; price?: number }) {
+export async function sendChatMessage(accountName: string, chatId: string | number, apiKey: string, payload: any) {
     return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages`, apiKey, {
         method: "POST",
         body: payload
+    });
+}
+
+/**
+ * Delete a message from a chat (only within 24 hours of sending).
+ * DELETE /api/{account}/chats/{chat_id}/messages/{message_id}
+ */
+export async function deleteChatMessage(accountName: string, chatId: string | number, messageId: string, apiKey: string) {
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages/${messageId}`, apiKey, { method: "DELETE" });
+}
+
+/**
+ * Attach Tags (Release Forms) to a message.
+ * POST /api/{account}/messages/{message_id}/attach-tags
+ */
+export async function attachReleaseTags(accountName: string, messageId: string, apiKey: string, tags: any) {
+    return ofapiRequest(`/api/${accountName}/messages/${messageId}/attach-tags`, apiKey, {
+        method: "POST",
+        body: { rfTag: tags }
     });
 }
 
