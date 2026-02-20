@@ -299,4 +299,32 @@ Your file is now securely stored in your Vault.
     }
 });
 
+// Handle Interactive Button Clicks from Alerts
+bot.on("callback_query:data", async (ctx) => {
+    const data = ctx.callbackQuery.data;
+
+    if (data === "action_skip" || data === "action_ack") {
+        await ctx.answerCallbackQuery("Alert dismissed.");
+        await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+        return;
+    }
+
+    if (data.startsWith("alert_reply_")) {
+        const parts = data.split("_");
+        const type = parts[2]; // voice | video | text
+        const fanId = parts[3];
+
+        // Acknowledge the click to remove the loading spinner
+        await ctx.answerCallbackQuery();
+
+        let promptStr = "";
+        if (type === "voice") promptStr = "🎤 Please record and send your Voice Note now. Our AI will auto-tag it and push it directly into your OnlyFans Vault.";
+        if (type === "video") promptStr = "📹 Please upload your Video now. Our AI will auto-tag it and push it directly into your OnlyFans Vault.";
+        if (type === "text") promptStr = "✍️ Please type your Text message now. (It will be automatically sent via the chat engine).";
+
+        await ctx.reply(promptStr);
+        await ctx.editMessageReplyMarkup({ reply_markup: undefined });
+    }
+});
+
 // We don't start polling because we will use Next.js API Webhook for serverless execution

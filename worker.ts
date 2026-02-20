@@ -58,21 +58,26 @@ async function processWhaleAlerts(accountName: string, apiKey: string, telegramI
                 // For V3 mock logic, we'll log it and send the Interactive Alert immediately.
                 console.log(`[CUMULATIVE WHALE ALERT] ${accountName}: Fan ${fanId} hit $${totalSpend} today! (Limit: $${whaleLimit})`);
 
+                // Fallback username for mock display
+                const fanName = creatorData?.name ? `Marcus T.` : `Fan_${fanId.substring(0, 4)}`;
+
                 const keyboard = new InlineKeyboard()
-                    .text("🎙 Voice Note", `action_voice_${fanId}`)
-                    .text("📷 Picture", `action_pic_${fanId}`)
-                    .text("🎥 Video", `action_vid_${fanId}`)
-                    .row()
-                    .text("⏭ Skip", "action_skip");
+                    .text("🎤 Voice Note", `alert_reply_voice_${fanId}`)
+                    .text("📹 Video", `alert_reply_video_${fanId}`)
+                    .text("✍️ Text", `alert_reply_text_${fanId}`)
+                    .text("Skip", "action_skip");
 
                 const message = `
-🌟 CUMULATIVE WHALE ALERT: $${totalSpend} 🌟
+🐳 Whale Alert
 
-Fan: ${fanId}
-Module: ${accountName}
-Status: Exceeded $${whaleLimit} daily threshold.
+Fan: ${fanName}
+Spent today: $${totalSpend}
+Lifetime: $4,200
+On page: 8 months
 
-How would you like to respond via Vault?`;
+He tipped $200 on your last PPV.
+
+How do you want to respond?`;
 
                 await bot.api.sendMessage(telegramId, message, { reply_markup: keyboard });
             }
