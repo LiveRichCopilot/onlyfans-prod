@@ -43,7 +43,31 @@ bot.command("testbot", async (ctx) => {
 });
 
 bot.command("start", async (ctx) => {
-    await ctx.reply("Welcome to OnlyFans Essentials. Your account is connected. Waiting for alerts...");
+    try {
+        const telegramId = String(ctx.from?.id);
+        const telegramGroupId = String(ctx.chat?.id);
+
+        // Find if this user already exists
+        let creator = await prisma.creator.findFirst({
+            where: { telegramId }
+        });
+
+        if (creator) {
+            // If they are starting the bot in a group chat, save the group ID
+            if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+                creator = await prisma.creator.update({
+                    where: { id: creator.id },
+                    data: { telegramGroupId }
+                });
+            }
+            await ctx.reply(`Welcome back ${creator.name}! Your account is connected to OnlyFans Essentials. Waiting for live alerts in this chat...`);
+        } else {
+            await ctx.reply("Welcome to OnlyFans Essentials. You are not linked to a Creator profile yet. Please log into the web dashboard first.");
+        }
+    } catch (e) {
+        console.error("Start Error:", e);
+        await ctx.reply("System error during initialization.");
+    }
 });
 
 bot.command("ping", async (ctx) => {
