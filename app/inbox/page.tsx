@@ -283,7 +283,7 @@ export default function InboxPage() {
                             >
                                 <div className="w-11 h-11 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden mr-3 border border-white/10 shadow-sm">
                                     {chat.withUser.avatar ? (
-                                        <img src={chat.withUser.avatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                                        <img src={`/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`} alt="Avatar" className="w-full h-full object-cover" />
                                     ) : (
                                         <UserCircle size={24} className="text-white/30" />
                                     )}

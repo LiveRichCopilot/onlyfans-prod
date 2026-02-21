@@ -70,7 +70,7 @@ export default function AgencyDashboard() {
                                     <div className="flex items-center gap-3">
                                         <div className="relative">
                                             {c.avatarUrl ? (
-                                                <img src={c.avatarUrl} alt={c.name} className="w-8 h-8 rounded-full border border-white/20 object-cover" />
+                                                <img src={`/api/proxy-media?url=${encodeURIComponent(c.avatarUrl)}`} alt={c.name} className="w-8 h-8 rounded-full border border-white/20 object-cover" />
                                             ) : (
                                                 <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs border border-white/20">
                                                     {c.name ? c.name.charAt(0).toUpperCase() : '?'}
@@ -147,7 +147,7 @@ export default function AgencyDashboard() {
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="flex items-center gap-4">
                                                 {c.avatarUrl ? (
-                                                    <img src={c.avatarUrl} alt={c.name} className="w-12 h-12 rounded-full border-2 border-white/10" />
+                                                    <img src={`/api/proxy-media?url=${encodeURIComponent(c.avatarUrl)}`} alt={c.name} className="w-12 h-12 rounded-full border-2 border-white/10 object-cover" />
                                                 ) : (
                                                     <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-lg font-bold border border-white/20">
                                                         {c.name ? c.name.charAt(0).toUpperCase() : '?'}
