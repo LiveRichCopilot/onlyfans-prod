@@ -33,7 +33,8 @@ import {
     fetchAllTransactions,
     calculateTopFans,
     sendVaultMediaToFan,
-    getMe
+    getMe,
+    updateVaultMedia
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
 
@@ -613,10 +614,25 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             creator.ofapiCreatorId || creator.telegramId,
             apiKey,
             buffer,
-            fileName,
-            safeTitle,
-            safeDescription
+            fileName
         );
+
+        const newMediaId = uploadResponse.data?.id || uploadResponse.id || uploadResponse.prefixed_id;
+
+        if (newMediaId) {
+            // Stage 2: Push the AI Tags into the Vault
+            try {
+                await updateVaultMedia(
+                    creator.ofapiCreatorId || creator.telegramId,
+                    apiKey,
+                    String(newMediaId),
+                    safeTitle,
+                    safeDescription
+                );
+            } catch (err) {
+                console.error("Non-fatal error updating vault tags:", err);
+            }
+        }
 
         // 5. Create "Meta Pixel" tracking asset
         await prisma.mediaAsset.create({
@@ -631,8 +647,8 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
 
         // 6. Automatically dispatch to the specific Whale Chat if triggered via /report
         const targetFanId = activeReplies[telegramId];
-        if (targetFanId && uploadResponse.id) {
-            await sendVaultMediaToFan(targetFanId, uploadResponse.id, apiKey);
+        if (targetFanId && newMediaId) {
+            await sendVaultMediaToFan(targetFanId, newMediaId, apiKey);
             // Clear the active session queue
             delete activeReplies[telegramId];
 

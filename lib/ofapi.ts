@@ -131,19 +131,12 @@ export async function getActiveFans(account: string, apiKey: string) {
     return ofapiRequest(`/api/${account}/fans/active`, apiKey);
 }
 
-/**
- * Upload Media to Vault
- * Uses POST /api/{account}/media/vault
- */
-export async function uploadToVault(account: string, apiKey: string, mediaBuffer: Buffer, fileName: string, title?: string, description?: string) {
+export async function uploadToVault(account: string, apiKey: string, mediaBuffer: Buffer, fileName: string) {
     console.log(`Uploading ${fileName} to OnlyFans Vault via OFAPI...`);
 
     const formData = new FormData();
     // @ts-ignore - FormData accepts Blob/Buffer depending on Node version
     formData.append("file", new Blob([mediaBuffer]), fileName);
-
-    if (title) formData.append("title", title);
-    if (description) formData.append("text", description); // Or 'notes' depending on OFAPI exact schema
 
     const url = `${OFAPI_BASE}/api/${account}/media/vault`;
 
@@ -162,7 +155,21 @@ export async function uploadToVault(account: string, apiKey: string, mediaBuffer
         throw new Error(`Media Upload failed: HTTP ${response.status} | Details: ${err}`);
     }
 
-    return response.json(); // { prefixed_id, file_name, thumbs... }
+    return response.json(); // { data: { id, type... } }
+}
+
+/**
+ * Update Metadata (Title/Tags) on an existing Vault Media item
+ * Uses PUT /api/{account}/media/vault/{media_id}
+ */
+export async function updateVaultMedia(account: string, apiKey: string, mediaId: string, title: string, text: string) {
+    return ofapiRequest(`/api/${account}/media/vault/${mediaId}`, apiKey, {
+        method: "PUT",
+        body: {
+            title: title,
+            text: text
+        }
+    });
 }
 
 /**
