@@ -143,18 +143,40 @@ bot.command("stats", async (ctx) => {
             return ctx.reply("❌ You are not linked to an OnlyFans account.", replyOpt);
         }
 
-        await ctx.reply(`📊 Fetching performance data for the last ${args}...`, replyOpt);
+        let ofAccount = creator.ofapiCreatorId || creator.telegramId;
+        let creatorName = creator.name;
+
+        if (!creatorName || !ofAccount || Number.isNaN(Number(ofAccount)) || ofAccount === creator.telegramId) {
+            try {
+                const me = await getMe(ofAccount, creator.ofapiToken).catch(() => null);
+                if (me) {
+                    creatorName = me.name || creatorName || "Creator";
+                    if (me.id) ofAccount = String(me.id);
+
+                    await prisma.creator.update({
+                        where: { id: creator.id },
+                        data: { name: creatorName, ofapiCreatorId: ofAccount }
+                    }).catch(() => null);
+                }
+            } catch (e) {
+                // Ignore API failures during auto-heal
+            }
+        }
+
+        creatorName = creatorName || "Creator";
+
+        await ctx.reply(`📊 Fetching performance data for ${creatorName} over the last ${args}...`, replyOpt);
 
         const now = new Date();
         const startWindow = new Date(now.getTime() - (hours * 60 * 60 * 1000));
 
         const payload = {
-            account_ids: [creator.ofapiCreatorId || creator.telegramId],
+            account_ids: [ofAccount],
             start_date: startWindow.toISOString(),
             end_date: now.toISOString()
         };
 
-        const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null);
+        const txResponse = await getTransactions(ofAccount, creator.ofapiToken).catch(() => null);
         const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
 
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= startWindow);
@@ -178,7 +200,7 @@ bot.command("stats", async (ctx) => {
         const totalFees = totalGross * 0.2;
 
         const md = `
-PERFORMANCE REPORT: ${creator.name}
+PERFORMANCE REPORT: ${creatorName}
 Window: Last ${args}
 
 Gross Revenue: $${totalGross.toFixed(2)}
@@ -210,19 +232,41 @@ bot.command("report", async (ctx) => {
             return ctx.reply("❌ You are not linked.", replyOpt);
         }
 
-        await ctx.reply(`📊 Compiling Live Daily Brief for ${creator.name}...`, replyOpt);
+        let ofAccount = creator.ofapiCreatorId || creator.telegramId;
+        let creatorName = creator.name;
+
+        if (!creatorName || !ofAccount || Number.isNaN(Number(ofAccount)) || ofAccount === creator.telegramId) {
+            try {
+                const me = await getMe(ofAccount, creator.ofapiToken).catch(() => null);
+                if (me) {
+                    creatorName = me.name || creatorName || "Creator";
+                    if (me.id) ofAccount = String(me.id);
+
+                    await prisma.creator.update({
+                        where: { id: creator.id },
+                        data: { name: creatorName, ofapiCreatorId: ofAccount }
+                    }).catch(() => null);
+                }
+            } catch (e) {
+                // Ignore API failures during auto-heal
+            }
+        }
+
+        creatorName = creatorName || "Creator";
+
+        await ctx.reply(`📊 Compiling Live Daily Brief for ${creatorName}...`, replyOpt);
 
         const now = new Date();
         const start20m = new Date(now.getTime() - (20 * 60 * 1000));
         const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
         const payload20m = {
-            account_ids: [creator.ofapiCreatorId || creator.telegramId],
+            account_ids: [ofAccount],
             start_date: start20m.toISOString(),
             end_date: now.toISOString()
         };
         const payload24h = {
-            account_ids: [creator.ofapiCreatorId || creator.telegramId],
+            account_ids: [ofAccount],
             start_date: start24h.toISOString(),
             end_date: now.toISOString()
         };
@@ -230,7 +274,7 @@ bot.command("report", async (ctx) => {
         const [summary20m, summary24h, txResponse] = await Promise.all([
             getTransactionsSummary(creator.ofapiToken, payload20m).catch(() => null),
             getTransactionsSummary(creator.ofapiToken, payload24h).catch(() => null),
-            getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null)
+            getTransactions(ofAccount, creator.ofapiToken).catch(() => null)
         ]);
 
         const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
@@ -254,7 +298,7 @@ bot.command("report", async (ctx) => {
 
         const validSpenders = topFans.filter(f => f.spend > 0);
 
-        let md = `🔥 **DAILY BRIEF**: ${creator.name}\n\n`;
+        let md = `🔥 **DAILY BRIEF**: ${creatorName}\n\n`;
         md += `⏱ **20-Minute Velocity:** $${gross20m}\n`;
         md += `📅 **24-Hour Total:** $${gross24h}\n\n`;
         md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
