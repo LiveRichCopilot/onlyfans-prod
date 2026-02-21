@@ -30,6 +30,7 @@ import {
     getRevenueForecast,
     getNotificationCounts,
     getTransactions,
+    fetchAllTransactions,
     calculateTopFans,
     sendVaultMediaToFan,
     getMe
@@ -179,8 +180,7 @@ bot.command("stats", async (ctx) => {
             end_date: now.toISOString()
         };
 
-        const txResponse = await getTransactions(ofAccount, creator.ofapiToken).catch(() => null);
-        const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
+        const allTx = await fetchAllTransactions(ofAccount, creator.ofapiToken, startWindow);
 
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= startWindow);
 
@@ -274,13 +274,11 @@ bot.command("report", async (ctx) => {
             end_date: now.toISOString()
         };
 
-        const [summary20m, summary24h, txResponse] = await Promise.all([
+        const [summary20m, summary24h, allTx] = await Promise.all([
             getTransactionsSummary(creator.ofapiToken, payload20m).catch(() => null),
             getTransactionsSummary(creator.ofapiToken, payload24h).catch(() => null),
-            getTransactions(ofAccount, creator.ofapiToken).catch(() => null)
+            fetchAllTransactions(ofAccount, creator.ofapiToken, start24h).catch(() => [])
         ]);
-
-        const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
 
         // The OF Analytics summary endpoint ignores hours and rounds to days.

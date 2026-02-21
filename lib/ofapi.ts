@@ -49,14 +49,48 @@ export async function getProfile(username: string, apiKey: string) {
  * Fetch transactions incrementally
  * Uses GET /api/{account}/transactions 
  */
-export async function getTransactions(account: string, apiKey: string, filterType?: string, limit: number = 100) {
+export async function getTransactions(account: string, apiKey: string, filterType?: string, limit: number = 100, marker?: string) {
     // OnlyFans API strictly restricts limit to a max of 100 over GET /transactions
     let endpoint = `/api/${account}/transactions?limit=${Math.min(limit, 100)}`;
     if (filterType) {
         // Ex: type=tip
         endpoint += `&type=${filterType}`;
     }
+    if (marker) {
+        endpoint += `&marker=${marker}`;
+    }
     return ofapiRequest(endpoint, apiKey);
+}
+
+/**
+ * Automatically paginates through transactions until it hits the target timestamp boundary.
+ * Extremely useful for accurately compiling 3d, 7d, and 30d high-volume revenue reports.
+ */
+export async function fetchAllTransactions(account: string, apiKey: string, startWindow: Date, absoluteMax: number = 5000) {
+    let allTxs: any[] = [];
+    let marker: string | undefined = undefined;
+    let hasMore = true;
+
+    while (hasMore && allTxs.length < absoluteMax) {
+        const res: any = await getTransactions(account, apiKey, undefined, 100, marker).catch(() => null);
+        if (!res || (!res.data && !res.list)) break;
+
+        const txs = res.data?.list || res.list || res.transactions || [];
+        if (txs.length === 0) break;
+
+        allTxs.push(...txs);
+
+        const oldestDate = new Date(txs[txs.length - 1].createdAt);
+        if (oldestDate < startWindow) break;
+
+        hasMore = res.data?.hasMore ?? res.hasMore ?? false;
+        marker = res.data?.nextMarker ?? res.nextMarker;
+
+        // Failsafe exit if no marker returned
+        if (!marker) break;
+    }
+
+    return allTxs;
 }
 
 /**
