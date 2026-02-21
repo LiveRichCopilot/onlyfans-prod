@@ -7,7 +7,7 @@ export async function GET() {
     try {
         const updated = await prisma.creator.updateMany({
             where: { name: "angiyang" },
-            data: { telegramGroupId: null, telegramId: null }
+            data: { telegramGroupId: null, telegramId: "unlinked_angiyang" }
         });
         return NextResponse.json({ success: true, updated: updated.count });
     } catch (e: any) {
