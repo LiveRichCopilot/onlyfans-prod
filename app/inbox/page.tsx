@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Send, Image as ImageIcon, Search, CheckCheck, MoreHorizontal, UserCircle, Activity, Eye, EyeOff, FolderOpen } from "lucide-react";
+import Link from "next/link";
+import { Send, Image as ImageIcon, Search, CheckCheck, MoreHorizontal, UserCircle, Activity, Eye, EyeOff, FolderOpen, LayoutGrid, MessageSquare } from "lucide-react";
 
 type Chat = {
     id: string;
@@ -187,74 +188,109 @@ export default function InboxPage() {
     };
 
     return (
-        <div className="flex h-screen bg-[#1c1c21] text-white overflow-hidden">
+        <div className="flex bg-black text-white/90 min-h-screen overflow-hidden relative">
+
+            {/* Background Orbs/Gradients */}
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
+            <div className="absolute top-[20%] left-[60%] w-[30%] h-[30%] bg-cyan-600/10 rounded-full blur-[100px] mix-blend-screen pointer-events-none" />
+
+            {/* Global Nav Sidebar from Dashboard */}
+            <aside className="w-16 lg:w-64 glass-panel m-4 mr-0 rounded-3xl p-4 lg:p-6 hidden md:flex flex-col z-10 border-white/10">
+                <div className="flex items-center gap-3 mb-10">
+                    <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50">
+                        OF
+                    </div>
+                    <div className="hidden lg:block">
+                        <div className="text-xl font-bold tracking-tight text-white/90">HQ</div>
+                        <div className="text-xs text-white/50">Agency Workspace</div>
+                    </div>
+                </div>
+
+                <nav className="space-y-8 flex-1">
+                    <div>
+                        <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2 hidden lg:block">Management</div>
+                        <ul className="space-y-2">
+                            <Link href="/">
+                                <li className="flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
+                                    <LayoutGrid size={20} /> <span className="hidden lg:inline text-sm">Dashboard</span>
+                                </li>
+                            </Link>
+                            <li className="flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-xl bg-white/10 text-white shadow-sm border border-white/10">
+                                <MessageSquare size={20} /> <span className="hidden lg:inline text-sm">Live Inbox</span>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            </aside>
 
             {/* LEFT SIDEBAR: Chat List */}
-            <div className="w-[340px] border-r border-[#2d2d34] flex flex-col bg-[#1c1c21]">
+            <div className="w-[340px] m-4 mr-0 flex flex-col z-10 glass-panel rounded-3xl overflow-hidden border-white/10">
                 {/* Creator Selector Header */}
-                <div className="p-4 border-b border-[#2d2d34] flex items-center justify-between">
+                <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/20">
                     <select
                         value={selectedCreatorId}
                         onChange={(e) => {
                             setSelectedCreatorId(e.target.value);
                             setChats([]);
                             setActiveChat(null);
+                            setMessages([]);
                         }}
-                        className="w-full bg-[#2d2d34] text-sm text-white rounded-lg px-3 py-2 outline-none border border-[#2d2d34] focus:border-teal-500 transition-colors"
+                        className="w-full bg-white/5 text-sm text-white rounded-xl px-3 py-2 outline-none border border-white/10 focus:border-teal-500 transition-colors appearance-none"
                     >
-                        <option value="">Select a Creator</option>
+                        <option value="" className="text-black">Select a Creator</option>
                         {creators.map(c => (
-                            <option key={c.id} value={c.id}>{c.name || 'Unnamed Creator'} {c.ofapiToken === 'unlinked' ? '(Unlinked)' : ''}</option>
+                            <option key={c.id} value={c.id} className="text-black">{c.name || 'Unnamed Creator'} {c.ofapiToken === 'unlinked' ? '(Unlinked)' : ''}</option>
                         ))}
                     </select>
                 </div>
 
-                <div className="p-4 border-b border-[#2d2d34] flex items-center justify-between">
-                    <div className="flex bg-[#2d2d34] rounded-full p-1 relative w-full">
-                        <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/20">
+                    <div className="flex bg-white/5 rounded-xl border border-white/10 p-1 relative w-full">
+                        <Search className="absolute left-3 top-2.5 text-white/40" size={16} />
                         <input
                             type="text"
                             placeholder="Search chats"
-                            className="bg-transparent border-none outline-none w-full pl-8 pr-4 text-sm py-1.5"
+                            className="bg-transparent border-none outline-none w-full pl-8 pr-4 text-sm py-1.5 text-white placeholder-white/30"
                         />
                     </div>
                 </div>
 
                 {/* Filters */}
-                <div className="px-4 py-3 flex gap-2 overflow-x-auto border-b border-[#2d2d34]">
-                    <button className="px-3 py-1 bg-[#14b8a6] rounded-full text-xs font-medium">All</button>
-                    <button className="px-3 py-1 bg-[#2d2d34] rounded-full text-xs font-medium text-gray-300">Unread</button>
-                    <button className="px-3 py-1 bg-[#2d2d34] rounded-full text-xs font-medium text-gray-300">Super Fans</button>
+                <div className="px-4 py-3 flex gap-2 overflow-x-auto border-b border-white/10 bg-black/10">
+                    <button className="px-4 py-1.5 bg-teal-500/20 text-teal-400 border border-teal-500/30 rounded-full text-xs font-semibold tracking-wide">All</button>
+                    <button className="px-4 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors rounded-full text-xs font-semibold text-white/60">Unread</button>
+                    <button className="px-4 py-1.5 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors rounded-full text-xs font-semibold text-white/60">Super Fans</button>
                 </div>
 
                 {/* Chat List */}
-                <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
                     {!selectedCreatorId ? (
-                        <div className="p-6 text-center text-sm text-gray-500">Please select a creator to view chats.</div>
+                        <div className="p-6 text-center text-sm text-white/40">Please select a creator to view chats.</div>
                     ) : loading ? (
-                        <div className="p-6 text-center text-sm text-gray-500 flex flex-col items-center">
-                            <div className="animate-spin w-6 h-6 rounded-full border-t-2 border-[#14b8a6] mb-3"></div>
+                        <div className="p-6 text-center text-sm text-white/50 flex flex-col items-center">
+                            <div className="animate-spin w-6 h-6 rounded-full border-t-2 border-teal-500 mb-3"></div>
                             Loading Live Live Chats...
                         </div>
                     ) : chats.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-gray-500">No chats found for this creator.</div>
+                        <div className="p-6 text-center text-sm text-white/40">No chats found for this creator.</div>
                     ) : (
                         chats.map(chat => (
                             <div
                                 key={chat.id}
                                 onClick={() => setActiveChat(chat)}
-                                className={`flex items-start p-4 cursor-pointer hover:bg-[#25252b] transition-colors ${activeChat?.id === chat.id ? 'bg-[#25252b]' : ''}`}
+                                className={`flex items-start p-4 cursor-pointer border-b border-white/5 transition-colors ${activeChat?.id === chat.id ? 'bg-white/10 border-l-2 border-l-teal-500' : 'hover:bg-white/5 border-l-2 border-l-transparent'}`}
                             >
-                                <div className="w-10 h-10 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center overflow-hidden mr-3">
+                                <div className="w-11 h-11 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden mr-3 border border-white/10 shadow-sm">
                                     {chat.withUser.avatar ? (
                                         <img src={chat.withUser.avatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                                     ) : (
-                                        <UserCircle size={28} className="text-gray-400" />
+                                        <UserCircle size={24} className="text-white/30" />
                                     )}
                                 </div>
-                                <div className="flex-1 min-w-0 border-b border-[#2d2d34] pb-4">
+                                <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-1">
-                                        <h3 className="font-medium text-sm truncate">{chat.withUser.name} <span className="text-xs text-gray-500 font-normal">@{chat.withUser.username}</span></h3>
+                                        <h3 className="font-semibold text-sm truncate text-white/90">{chat.withUser.name} <span className="text-xs text-white/40 font-normal">@{chat.withUser.username}</span></h3>
                                         <span className="text-[10px] text-gray-500 flex-shrink-0 ml-2">
                                             {chat.lastMessage.createdAt ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
@@ -273,31 +309,31 @@ export default function InboxPage() {
             </div>
 
             {/* MAIN PANEL: Active Chat */}
-            <div className="flex-1 flex flex-col bg-[#16161a]">
+            <div className="flex-1 flex flex-col m-4 z-10 glass-panel rounded-3xl overflow-hidden border-white/10 relative shadow-2xl">
                 {activeChat ? (
                     <>
                         {/* Chat Header */}
-                        <div className="h-16 px-6 border-b border-[#2d2d34] flex items-center justify-between shrink-0 bg-[#1c1c21]">
+                        <div className="h-16 px-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-black/20 backdrop-blur-md">
                             <div className="flex items-center">
-                                <h2 className="font-semibold text-lg">{activeChat.withUser.name} <span className="text-sm font-normal text-gray-400">@{activeChat.withUser.username}</span></h2>
+                                <h2 className="font-semibold text-lg tracking-wide text-white/95">{activeChat.withUser.name} <span className="text-sm font-normal text-white/40 ml-1">@{activeChat.withUser.username}</span></h2>
                             </div>
-                            <div className="flex items-center gap-4 text-gray-400">
-                                <button onClick={() => setIsSfw(!isSfw)} className={`transition-colors ${isSfw ? 'text-[#14b8a6]' : 'hover:text-gray-200'}`} title="Toggle Safe For Work Mode">
+                            <div className="flex items-center gap-4 text-white/50">
+                                <button onClick={() => setIsSfw(!isSfw)} className={`transition-colors p-2 rounded-lg hover:bg-white/10 ${isSfw ? 'text-teal-400 bg-teal-500/10' : 'hover:text-white'}`} title="Toggle Safe For Work Mode">
                                     {isSfw ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
-                                <Activity size={18} />
-                                <MoreHorizontal size={18} />
+                                <button className="p-2 rounded-lg hover:bg-white/10 hover:text-white transition-colors"><Activity size={18} /></button>
+                                <button className="p-2 rounded-lg hover:bg-white/10 hover:text-white transition-colors"><MoreHorizontal size={18} /></button>
                             </div>
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto min-h-0 p-6 flex flex-col gap-4 relative">
-                            <div className="text-center text-xs text-gray-500 my-4">Live API Chat Thread Synced Securely</div>
+                        <div className="flex-1 overflow-y-auto min-h-0 p-6 flex flex-col gap-4 relative custom-scrollbar bg-black/10">
+                            <div className="text-center text-[10px] text-white/30 uppercase tracking-widest my-4 bg-black/20 py-1.5 px-4 rounded-full mx-auto border border-white/5 shadow-inner">Live API Chat Thread Synced Securely</div>
 
                             {msgsLoading && (
-                                <div className="absolute inset-0 bg-[#16161a] z-10 flex flex-col items-center justify-center text-gray-500">
-                                    <div className="animate-spin w-8 h-8 rounded-full border-t-2 border-[#14b8a6] mb-3"></div>
-                                    Syncing OnlyFans chat payload...
+                                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-white/60">
+                                    <div className="animate-spin w-8 h-8 rounded-full border-t-2 border-teal-500 mb-3"></div>
+                                    Syncing OnlyFans payload...
                                 </div>
                             )}
 
@@ -305,9 +341,9 @@ export default function InboxPage() {
                                 const isSelf = msg.isFromCreator;
                                 return (
                                     <div key={msg.id} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${isSelf
-                                            ? 'bg-[#0f766e] text-white rounded-br-sm'
-                                            : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
+                                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-md ${isSelf
+                                            ? 'bg-teal-600/80 backdrop-blur-md text-white rounded-br-sm border border-teal-500/30'
+                                            : 'bg-white/10 backdrop-blur-md text-white/95 rounded-bl-sm border border-white/10'
                                             }`}>
                                             {msg.media && msg.media.length > 0 && (
                                                 <div className={`grid gap-1.5 mb-2 ${msg.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -367,9 +403,9 @@ export default function InboxPage() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 bg-[#1c1c21] border-t border-[#2d2d34]">
-                            <div className="flex items-center bg-[#25252b] rounded-xl px-2 py-1">
-                                <button className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors" title="Upload Local Media">
+                        <div className="p-4 border-t border-white/10 bg-black/20 backdrop-blur-md">
+                            <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl px-2 py-1.5 shadow-inner">
+                                <button className="p-2.5 text-white/40 hover:bg-white/10 hover:text-white rounded-xl transition-colors" title="Upload Local Media">
                                     <ImageIcon size={20} />
                                 </button>
                                 <button className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors" title="Attach from OnlyFans Vault">
@@ -382,14 +418,14 @@ export default function InboxPage() {
                                     onChange={handleTyping}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                                     placeholder="Type a message to send directly to OnlyFans..."
-                                    className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm"
+                                    className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm text-white placeholder-white/30"
                                     disabled={msgsLoading}
                                 />
 
                                 <button
                                     onClick={handleSend}
                                     disabled={!inputText.trim() || msgsLoading}
-                                    className={`p-2 rounded-lg transition-colors ${inputText.trim() ? 'bg-[#0f766e] text-white hover:bg-[#0d9488]' : 'text-gray-500'
+                                    className={`p-2.5 rounded-xl transition-all shadow-sm ${inputText.trim() ? 'bg-teal-500 text-white hover:bg-teal-400 active:scale-95' : 'bg-white/5 text-white/30'
                                         }`}
                                 >
                                     <Send size={18} />
@@ -399,51 +435,55 @@ export default function InboxPage() {
                     </>
                 ) : (
                     /* Empty State */
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-500 relative">
-                        <div className="w-16 h-16 rounded-full bg-[#25252b] flex items-center justify-center mb-4">
-                            <Search size={32} className="text-gray-600" />
+                    <div className="flex-1 flex flex-col items-center justify-center text-white/40 relative bg-black/10">
+                        <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-inner">
+                            <MessageSquare size={36} className="text-white/20" />
                         </div>
-                        <h3 className="text-lg font-medium text-gray-300">Select an active conversation</h3>
-                        <p className="text-sm mt-2 max-w-sm text-center">Click a fan on the left sidebar to securely sync this workspace with their live OnlyFans chat thread.</p>
+                        <h3 className="text-xl font-medium text-white/80">Select an active conversation</h3>
+                        <p className="text-sm mt-3 max-w-sm text-center font-medium leading-relaxed">Click a fan on the left sidebar to securely sync this workspace with their live OnlyFans chat thread.</p>
                     </div>
                 )}
             </div>
 
             {/* RIGHT PANEL: Stats / Insights */}
             {activeChat && (
-                <div className="w-[300px] border-l border-[#2d2d34] bg-[#1c1c21] hidden lg:block p-6">
-                    <div className="flex justify-between border-b border-[#2d2d34] pb-3 mb-6">
-                        <span className="text-[#14b8a6] border-b-2 border-[#14b8a6] pb-3 -mb-3 font-medium text-sm">Insights</span>
-                        <span className="text-gray-500 text-sm">Purchase History</span>
+                <div className="w-[300px] m-4 ml-0 flex flex-col z-10 glass-panel rounded-3xl overflow-y-auto custom-scrollbar border-white/10 p-6 hidden xl:block shadow-2xl">
+                    <div className="flex justify-between border-b border-white/10 pb-3 mb-6 sticky top-0 bg-black/20 backdrop-blur-xl z-20">
+                        <span className="text-teal-400 border-b-2 border-teal-400 pb-3 -mb-3 font-semibold text-sm tracking-wide">Insights</span>
+                        <span className="text-white/40 text-sm font-medium hover:text-white transition-colors cursor-pointer">Purchase History</span>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                         <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-sm font-semibold">Preferences</h4>
-                                <button className="text-[#14b8a6] text-xs font-semibold">+ Add</button>
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-sm font-bold tracking-tight text-white/90">Preferences</h4>
+                                <button className="text-teal-400 bg-teal-500/10 px-2 py-1 rounded border border-teal-500/20 text-xs font-bold hover:bg-teal-500/20 transition-colors">+ Add</button>
                             </div>
-                            <p className="text-xs text-gray-500">No profile preferences saved yet.</p>
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                                <p className="text-xs text-white/40">No profile preferences saved yet.</p>
+                            </div>
                         </div>
 
                         <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <h4 className="text-sm font-semibold">Notes</h4>
-                                <button className="text-[#14b8a6] text-xs font-semibold">+ Add</button>
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-sm font-bold tracking-tight text-white/90">Notes</h4>
+                                <button className="text-teal-400 bg-teal-500/10 px-2 py-1 rounded border border-teal-500/20 text-xs font-bold hover:bg-teal-500/20 transition-colors">+ Add</button>
                             </div>
-                            <p className="text-xs text-gray-500">No CRM notes saved yet.</p>
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
+                                <p className="text-xs text-white/40">No CRM notes saved yet.</p>
+                            </div>
                         </div>
 
-                        <div>
-                            <h4 className="text-sm font-semibold mb-4">Financials</h4>
-                            <div className="space-y-3 text-sm">
+                        <div className="bg-black/20 border border-white/10 rounded-2xl p-4">
+                            <h4 className="text-sm font-bold tracking-tight text-white/90 mb-4">Financials</h4>
+                            <div className="space-y-4 text-sm font-medium">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-400">Total lifetime spend</span>
-                                    <span className="font-bold text-[#14b8a6]">${activeChat.totalSpend || 0}</span>
+                                    <span className="text-white/50">Total lifetime spend</span>
+                                    <span className="font-bold text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-lg border border-teal-500/20">${activeChat.totalSpend || 0}</span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-400">Last seen parsing</span>
-                                    <span className="text-xs">Live Feed</span>
+                                <div className="flex justify-between items-center bg-white/5 -mx-4 -mb-4 px-4 py-3 rounded-b-2xl border-t border-white/5">
+                                    <span className="text-white/50 text-xs">Last seen parsing</span>
+                                    <span className="text-xs text-white/80 flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,1)]"></div>Live Feed</span>
                                 </div>
                             </div>
                         </div>
