@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { bot } from "@/lib/telegram";
 
-const WEBHOOK_SECRET = process.env.OFAPI_WEBHOOK_SECRET || "temp_secret";
+const WEBHOOK_SECRET = process.env.OFAPI_WEBHOOK_SECRET || "my_secure_dev_secret_123";
 
 export async function POST(request: NextRequest) {
     try {
