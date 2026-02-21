@@ -553,16 +553,19 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             return;
         }
 
-        // 4. Upload to OnlyFans Vault with dynamic tags
+        // 4. Upload to OnlyFans Vault with dynamic tags (hard limit 512 chars)
         await ctx.reply("AI Scan Passed! Uploading to OnlyFans Vault and attaching tags...");
+
+        const safeTitle = (safetyResult.title || "").substring(0, 50);
+        const safeDescription = (safetyResult.description || "").substring(0, 450);
 
         const uploadResponse = await uploadToVault(
             creator.ofapiCreatorId || creator.telegramId,
             apiKey,
             buffer,
             fileName,
-            safetyResult.title,
-            safetyResult.description
+            safeTitle,
+            safeDescription
         );
 
         // 5. Create "Meta Pixel" tracking asset
@@ -588,8 +591,8 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             const successMd = `
 Upload Complete [Track ID: ${uploadResponse.id || uploadResponse.prefixed_id || 'N/A'}]
 
-Title: ${safetyResult.title}
-Tags: ${safetyResult.description}
+Title: ${safeTitle}
+Tags: ${safeDescription}
 
 Your file is now securely stored in your Vault.
         `;

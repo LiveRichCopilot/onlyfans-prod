@@ -22,7 +22,7 @@ export async function GET() {
 
         const enrichedCreators = creators.map((c: any) => ({
             ...c,
-            name: c.ofapiCreatorId || c.telegramId || "Unknown Creator",
+            name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
             handle: `@${c.ofapiCreatorId || c.telegramId}`,
             hourlyRev: hourlyRevMap[c.id] || 0,
             target: c.hourlyTarget || 100,

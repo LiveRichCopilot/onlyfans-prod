@@ -4,7 +4,7 @@ import { getMe } from "@/lib/ofapi";
 
 export async function POST(request: NextRequest) {
     try {
-        const { accountId, username, telegramGroupId } = await request.json();
+        const { accountId, username, telegramGroupId, name, avatar } = await request.json();
 
         if (!accountId || !username) {
             return NextResponse.json(
@@ -18,7 +18,9 @@ export async function POST(request: NextRequest) {
                 ofapiCreatorId: username,
                 telegramId: accountId,
                 telegramGroupId: telegramGroupId || null,
-                ofapiToken: "unlinked"
+                ofapiToken: "unlinked",
+                name: name || null,
+                avatarUrl: avatar || null
             },
         });
 
