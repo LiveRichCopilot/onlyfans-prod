@@ -306,22 +306,23 @@ export default function InboxPage() {
                                 return (
                                     <div key={msg.id} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${isSelf
-                                            ? 'bg-[#14b8a6] text-white rounded-br-sm'
+                                            ? 'bg-[#0f766e] text-white rounded-br-sm'
                                             : 'bg-[#25252b] text-gray-100 rounded-bl-sm'
                                             }`}>
                                             {msg.media && msg.media.length > 0 && (
                                                 <div className={`grid gap-1.5 mb-2 ${msg.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                                     {msg.media.map(med => {
                                                         const mediaUrl = med.canView ? med.src : med.preview;
+                                                        const proxyUrl = mediaUrl ? `/api/proxy-media?url=${encodeURIComponent(mediaUrl)}` : '';
                                                         return (
                                                             <div key={med.id} className="relative rounded-xl overflow-hidden bg-black/40 flex items-center justify-center min-h-[150px] border border-white/5">
                                                                 {med.type === 'video' ? (
-                                                                    <video src={mediaUrl} poster={med.preview} controls controlsList="nodownload" className={`w-full h-full max-h-[320px] object-cover ${(!med.canView || isSfw) ? 'blur-xl scale-110' : ''}`} />
+                                                                    <video src={proxyUrl} poster={med.preview ? `/api/proxy-media?url=${encodeURIComponent(med.preview)}` : undefined} controls controlsList="nodownload" className={`w-full h-full max-h-[320px] object-cover ${(!med.canView || isSfw) ? 'blur-xl scale-110' : ''}`} />
                                                                 ) : med.type === 'audio' ? (
-                                                                    <audio src={mediaUrl} controls className={`w-full max-w-[220px] m-4 ${!med.canView ? 'blur-md' : ''}`} />
+                                                                    <audio src={proxyUrl} controls className={`w-full max-w-[220px] m-4 ${!med.canView ? 'blur-md' : ''}`} />
                                                                 ) : (
                                                                     <img
-                                                                        src={mediaUrl}
+                                                                        src={proxyUrl}
                                                                         alt="Media Attachment"
                                                                         referrerPolicy="no-referrer"
                                                                         className={`w-full h-full max-h-[320px] object-cover ${(!med.canView || isSfw) ? 'blur-xl scale-110 cursor-pointer' : ''}`}
@@ -355,7 +356,7 @@ export default function InboxPage() {
                                                     <span className="text-[10px] text-white/50 bg-black/20 px-2 py-0.5 rounded-full border border-white/5">
                                                         Sent by {msg.senderName}
                                                     </span>
-                                                    <CheckCheck size={12} className="text-[#14b8a6]" />
+                                                    <CheckCheck size={12} className="text-[#0d9488]" />
                                                 </div>
                                             )}
                                         </div>
@@ -368,10 +369,10 @@ export default function InboxPage() {
                         {/* Input Area */}
                         <div className="p-4 bg-[#1c1c21] border-t border-[#2d2d34]">
                             <div className="flex items-center bg-[#25252b] rounded-xl px-2 py-1">
-                                <button className="p-2 text-gray-400 hover:text-[#14b8a6] transition-colors" title="Upload Local Media">
+                                <button className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors" title="Upload Local Media">
                                     <ImageIcon size={20} />
                                 </button>
-                                <button className="p-2 text-gray-400 hover:text-[#14b8a6] transition-colors" title="Attach from OnlyFans Vault">
+                                <button className="p-2 text-gray-400 hover:text-[#0d9488] transition-colors" title="Attach from OnlyFans Vault">
                                     <FolderOpen size={20} />
                                 </button>
 
@@ -388,7 +389,7 @@ export default function InboxPage() {
                                 <button
                                     onClick={handleSend}
                                     disabled={!inputText.trim() || msgsLoading}
-                                    className={`p-2 rounded-lg transition-colors ${inputText.trim() ? 'bg-[#14b8a6] text-white hover:bg-[#0d9488]' : 'text-gray-500'
+                                    className={`p-2 rounded-lg transition-colors ${inputText.trim() ? 'bg-[#0f766e] text-white hover:bg-[#0d9488]' : 'text-gray-500'
                                         }`}
                                 >
                                     <Send size={18} />
