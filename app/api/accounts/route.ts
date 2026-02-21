@@ -13,8 +13,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const account = await prisma.creator.create({
-            data: {
+        const account = await prisma.creator.upsert({
+            where: { telegramId: accountId },
+            update: {
+                name: name || null,
+                avatarUrl: avatar || null
+            },
+            create: {
                 ofapiCreatorId: username,
                 telegramId: accountId,
                 telegramGroupId: telegramGroupId || null,
