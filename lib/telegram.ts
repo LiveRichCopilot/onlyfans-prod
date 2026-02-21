@@ -653,11 +653,6 @@ ${safeDescription}
 This media is now stored natively in your Vault. You can easily attach it to a Mass Message from your Inbox using the 📁 button.
 `;
             await ctx.reply(successMd, { parse_mode: "Markdown" });
-            Tags: ${ safeDescription }
-
-Your file is now securely stored in your Vault.
-        `;
-            await ctx.reply(successMd);
         }
 
     } catch (e: any) {
