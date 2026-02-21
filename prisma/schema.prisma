@@ -103,6 +103,9 @@ model MediaAsset {
   fileType       String
   originalName   String?
   totalRevenue   Float         @default(0.00)
+  aiTitle        String?
+  aiDescription  String?
+
   transactions   Transaction[]
   createdAt      DateTime      @default(now())
 }

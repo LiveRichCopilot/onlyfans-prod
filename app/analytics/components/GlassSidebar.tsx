@@ -9,11 +9,11 @@ interface GlassSidebarProps {
 
 export function GlassSidebar({ activeTab, setActiveTab }: GlassSidebarProps) {
     const navItems = [
-        { id: 'overview', label: 'Overview', icon: LineChart },
-        { id: 'chats', label: 'Chats & Messages', icon: MessageSquare },
-        { id: 'earnings', label: 'Payouts & Earnings', icon: LineChart },
-        { id: 'fans', label: 'Fans & Subscribers', icon: Users },
-        { id: 'vault', label: 'Media & Vault', icon: Database },
+        { id: 'home', label: 'Home', icon: LineChart },
+        { id: 'creator-analytics', label: 'Creator Analytics', icon: Users },
+        { id: 'team-analytics', label: 'Team Analytics', icon: Users },
+        { id: 'inbox', label: 'Inbox', icon: MessageSquare },
+        { id: 'automations', label: 'Automations', icon: Database },
     ];
 
     return (
@@ -32,8 +32,8 @@ export function GlassSidebar({ activeTab, setActiveTab }: GlassSidebarProps) {
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 ${isActive
-                                    ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]'
-                                    : 'text-white/60 hover:bg-white/5 hover:text-white'
+                                ? 'bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                                : 'text-white/60 hover:bg-white/5 hover:text-white'
                                 }`}
                         >
                             <Icon size={18} className={isActive ? 'text-blue-400' : 'text-current'} />

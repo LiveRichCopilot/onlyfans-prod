@@ -619,29 +619,16 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
 
         const newMediaId = uploadResponse.data?.id || uploadResponse.id || uploadResponse.prefixed_id;
 
-        if (newMediaId) {
-            // Stage 2: Push the AI Tags into the Vault
-            try {
-                await updateVaultMedia(
-                    creator.ofapiCreatorId || creator.telegramId,
-                    apiKey,
-                    String(newMediaId),
-                    safeTitle,
-                    safeDescription
-                );
-            } catch (err) {
-                console.error("Non-fatal error updating vault tags:", err);
-            }
-        }
-
-        // 5. Create "Meta Pixel" tracking asset
+        // 5. Create "Meta Pixel" tracking asset with AI Tags cached!
         await prisma.mediaAsset.create({
             data: {
                 creatorId: creator.id,
-                ofapiMediaId: uploadResponse.id || uploadResponse.prefixed_id || "vault_" + Date.now(),
+                ofapiMediaId: String(newMediaId || "vault_" + Date.now()),
                 fileType: mimeType,
                 originalName: fileName,
-                totalRevenue: 0.00
+                totalRevenue: 0.00,
+                aiTitle: safeTitle,
+                aiDescription: safeDescription
             }
         });
 
@@ -655,10 +642,18 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             await ctx.reply(`✅ Direct Message Sent! The Vault media asset has successfully been forwarded to fan ID: ${targetFanId}.`);
         } else {
             const successMd = `
-Upload Complete [Track ID: ${uploadResponse.id || uploadResponse.prefixed_id || 'N/A'}]
+✅ *Upload Complete* [ID: ${newMediaId || 'N/A'}]
 
-Title: ${safeTitle}
-Tags: ${safeDescription}
+🤖 *AI Generated Title:*
+${safeTitle}
+
+🤖 *AI Suggested Caption:*
+${safeDescription}
+
+This media is now stored natively in your Vault. You can easily attach it to a Mass Message from your Inbox using the 📁 button.
+`;
+            await ctx.reply(successMd, { parse_mode: "Markdown" });
+            Tags: ${ safeDescription }
 
 Your file is now securely stored in your Vault.
         `;
