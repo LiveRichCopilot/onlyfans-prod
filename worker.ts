@@ -102,12 +102,12 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
         const name = creator?.name || accountName;
 
         const now = new Date();
-        const start1h = new Date(now.getTime() - (1 * 60 * 60 * 1000));
+        const start20m = new Date(now.getTime() - (20 * 60 * 1000));
         const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
-        const payload1h = {
+        const payload20m = {
             account_ids: [accountName],
-            start_date: start1h.toISOString(),
+            start_date: start20m.toISOString(),
             end_date: now.toISOString()
         };
         const payload24h = {
@@ -116,8 +116,8 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
             end_date: now.toISOString()
         };
 
-        const [summary1h, summary24h, txResponse] = await Promise.all([
-            getTransactionsSummary(apiKey, payload1h).catch(() => null),
+        const [summary20m, summary24h, txResponse] = await Promise.all([
+            getTransactionsSummary(apiKey, payload20m).catch(() => null),
             getTransactionsSummary(apiKey, payload24h).catch(() => null),
             getTransactions(accountName, apiKey).catch(() => null)
         ]);
@@ -125,8 +125,8 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
         const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
 
-        const txs1h = allTx.filter((t: any) => new Date(t.createdAt) >= start1h);
-        const manualGross1h = txs1h.reduce((sum: number, t: any) => {
+        const txs20m = allTx.filter((t: any) => new Date(t.createdAt) >= start20m);
+        const manualGross20m = txs20m.reduce((sum: number, t: any) => {
             return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
         }, 0);
 
@@ -134,13 +134,13 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
             return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
         }, 0);
 
-        const gross1h = manualGross1h.toFixed(2);
+        const gross20m = manualGross20m.toFixed(2);
         const gross24h = manualGross24h.toFixed(2);
 
         const topFans = calculateTopFans(rawTxs, 0);
 
         let md = `🤖 **AUTOMATED BRIEF**: ${name}\n\n`;
-        md += `⏱ **Last Hour Sells:** $${gross1h}\n`;
+        md += `⏱ **Last 20 Mins:** $${gross20m}\n`;
         md += `📅 **Last 24 Hours:** $${gross24h}\n\n`;
         md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
 

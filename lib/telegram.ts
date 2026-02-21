@@ -42,44 +42,39 @@ async function getOrBindCreator(ctx: any) {
     const telegramGroupId = String(ctx.chat?.id);
     const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
-    let creator = null;
-
-    if (isGroup) {
-        // STRICT multi-tenant group routing: Match strictly by the Group ID set in the dashboard
-        creator = await prisma.creator.findFirst({
-            where: { telegramGroupId }
-        });
-    } else {
-        // DM routing: Match strictly by the user's personal Telegram ID
-        creator = await prisma.creator.findFirst({
-            where: { telegramId }
-        });
-
-        // Fallback for single-tenant DMs if they haven't bound their ID yet
-        if (!creator && telegramId && telegramId !== "undefined") {
-            let realCreator = await prisma.creator.findFirst({
-                where: { ofapiToken: "linked_via_auth_module", telegramId: { in: ["", "unlinked", null] } }
-            });
-
-            if (!realCreator) {
-                realCreator = await prisma.creator.findFirst({
-                    where: { ofapiToken: "unlinked", telegramId: { in: ["", "unlinked", null] } }
-                });
-            }
-
-            if (realCreator) {
-                creator = await prisma.creator.update({
-                    where: { id: realCreator.id },
-                    data: { telegramId }
-                });
-            }
+    let creator = await prisma.creator.findFirst({
+        where: {
+            OR: [
+                { telegramId },
+                { telegramGroupId }
+            ]
         }
-    }
+    });
 
     // Cleanup ghost mock bot data if present
     if (creator && creator.ofapiToken === (process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5")) {
         await prisma.creator.delete({ where: { id: creator.id } });
         creator = null;
+    }
+
+    // Fallback logic for single-tenant DMs if they haven't bound their ID yet
+    if (!creator && !isGroup && telegramId && telegramId !== "undefined") {
+        let realCreator = await prisma.creator.findFirst({
+            where: { ofapiToken: "linked_via_auth_module", telegramId: { in: ["", "unlinked"] } }
+        });
+
+        if (!realCreator) {
+            realCreator = await prisma.creator.findFirst({
+                where: { ofapiToken: "unlinked", telegramId: { in: ["", "unlinked"] } }
+            });
+        }
+
+        if (realCreator) {
+            creator = await prisma.creator.update({
+                where: { id: realCreator.id },
+                data: { telegramId }
+            });
+        }
     }
 
     return creator;
@@ -218,12 +213,12 @@ bot.command("report", async (ctx) => {
         await ctx.reply(`📊 Compiling Live Daily Brief for ${creator.name}...`, replyOpt);
 
         const now = new Date();
-        const start1h = new Date(now.getTime() - (1 * 60 * 60 * 1000));
+        const start20m = new Date(now.getTime() - (20 * 60 * 1000));
         const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
-        const payload1h = {
+        const payload20m = {
             account_ids: [creator.ofapiCreatorId || creator.telegramId],
-            start_date: start1h.toISOString(),
+            start_date: start20m.toISOString(),
             end_date: now.toISOString()
         };
         const payload24h = {
@@ -232,8 +227,8 @@ bot.command("report", async (ctx) => {
             end_date: now.toISOString()
         };
 
-        const [summary1h, summary24h, txResponse] = await Promise.all([
-            getTransactionsSummary(creator.ofapiToken, payload1h).catch(() => null),
+        const [summary20m, summary24h, txResponse] = await Promise.all([
+            getTransactionsSummary(creator.ofapiToken, payload20m).catch(() => null),
             getTransactionsSummary(creator.ofapiToken, payload24h).catch(() => null),
             getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null)
         ]);
@@ -242,9 +237,9 @@ bot.command("report", async (ctx) => {
         const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
 
         // The OF Analytics summary endpoint ignores hours and rounds to days.
-        // To get true 1-hour velocity, we manually sum the raw ledger events from the last 60 mins.
-        const txs1h = allTx.filter((t: any) => new Date(t.createdAt) >= start1h);
-        const manualGross1h = txs1h.reduce((sum: number, t: any) => {
+        // To get true 20-minute velocity, we manually sum the raw ledger events from the last 20 mins.
+        const txs20m = allTx.filter((t: any) => new Date(t.createdAt) >= start20m);
+        const manualGross20m = txs20m.reduce((sum: number, t: any) => {
             return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
         }, 0);
 
@@ -252,7 +247,7 @@ bot.command("report", async (ctx) => {
             return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
         }, 0);
 
-        const gross1h = manualGross1h.toFixed(2);
+        const gross20m = manualGross20m.toFixed(2);
         const gross24h = manualGross24h.toFixed(2);
 
         const topFans = calculateTopFans(rawTxs, 0);
@@ -260,7 +255,7 @@ bot.command("report", async (ctx) => {
         const validSpenders = topFans.filter(f => f.spend > 0);
 
         let md = `🔥 **DAILY BRIEF**: ${creator.name}\n\n`;
-        md += `⏱ **1-Hour Velocity:** $${gross1h}\n`;
+        md += `⏱ **20-Minute Velocity:** $${gross20m}\n`;
         md += `📅 **24-Hour Total:** $${gross24h}\n\n`;
         md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
 
