@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         const payload = JSON.parse(rawBody);
         console.log("Received Webhook Event:", payload.event);
 
-        if (payload.event === "subscriptions.new" || payload.event === "messages.ppv.unlocked") {
+        if (payload.event === "subscriptions.new" || payload.event === "messages.ppv.unlocked" || payload.event === "tips.received") {
             const accountId = payload.account_id || payload.data?.creator_id;
 
             if (accountId) {
@@ -44,10 +44,17 @@ export async function POST(request: NextRequest) {
                         message += `💰 Amount: $${Number(amount).toFixed(2)}\n`;
                         if (amount >= 50) message += `🐳 **WHALE ALERT**\n`;
                     } else if (payload.event === "messages.ppv.unlocked") {
-                        const amount = payload.data?.price || 0;
-                        const user = payload.data?.buyer?.name || "Someone";
+                        const amount = payload.data?.price || payload.data?.amount || 0;
+                        const user = payload.data?.buyer?.name || payload.data?.user?.name || "Someone";
                         message += `🔓 **${user}** unlocked a PPV message!\n`;
                         message += `💵 Amount: $${Number(amount).toFixed(2)}\n`;
+                        if (amount >= 50) message += `🐳 **WHALE ALERT**\n`;
+                    } else if (payload.event === "tips.received") {
+                        const amount = payload.data?.amount || payload.data?.price || 0;
+                        const user = payload.data?.user?.name || payload.data?.sender?.name || "Someone";
+                        message += `💸 **${user}** sent a tip!\n`;
+                        message += `💵 Amount: $${Number(amount).toFixed(2)}\n`;
+                        if (amount >= 50) message += `🐳 **WHALE ALERT**\n`;
                     }
 
                     try {
