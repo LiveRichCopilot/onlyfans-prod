@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
         };
 
         const [summary, earnings, byType, rawTxs] = await Promise.all([
-            getTransactionsSummary(creator.ofapiToken, payload).catch(e => ({ error: e.message })),
-            getEarningsOverview(creator.ofapiToken, payload).catch(e => ({ error: e.message })),
-            getTransactionsByType(creator.ofapiToken, payload).catch(e => ({ error: e.message })),
-            getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken, undefined, 2000).catch(e => ({ error: e.message }))
+            getTransactionsSummary(creator.ofapiToken || "", payload).catch(e => ({ error: e.message })),
+            getEarningsOverview(creator.ofapiToken || "", payload).catch(e => ({ error: e.message })),
+            getTransactionsByType(creator.ofapiToken || "", payload).catch(e => ({ error: e.message })),
+            getTransactions(creator.ofapiCreatorId || creator.telegramId || "", creator.ofapiToken || "", undefined, 2000).catch(e => ({ error: e.message }))
         ]);
 
         const list = rawTxs?.list || rawTxs?.data?.list || [];
