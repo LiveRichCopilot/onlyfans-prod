@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getTransactions, getTransactionsSummary } from "@/lib/ofapi";
+import { getTransactionsSummary, getEarningsOverview, getTransactionsByType, getTransactions } from "@/lib/ofapi";
 
 export async function GET(request: NextRequest) {
     try {
@@ -11,24 +11,36 @@ export async function GET(request: NextRequest) {
         if (!creator) return NextResponse.json({ error: "No creator found" });
 
         const now = new Date();
-        const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+        // The dashboard screenshot shows From: Feb 19, 2026 To: Feb 28, 2026 
+        // We simulate the exact same payload params 
+        const startWindow = new Date("2026-02-19T00:00:00Z");
 
-        const payload24h = {
+        const payload = {
             account_ids: [creator.ofapiCreatorId || creator.telegramId],
-            start_date: start24h.toISOString(),
+            start_date: startWindow.toISOString(),
             end_date: now.toISOString()
         };
 
-        const [summary, transactions] = await Promise.all([
-            getTransactionsSummary(creator.ofapiToken, payload24h).catch(e => ({ error: e.message })),
-            getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(e => ({ error: e.message }))
+        const [summary, earnings, byType, rawTxs] = await Promise.all([
+            getTransactionsSummary(creator.ofapiToken, payload).catch(e => ({ error: e.message })),
+            getEarningsOverview(creator.ofapiToken, payload).catch(e => ({ error: e.message })),
+            getTransactionsByType(creator.ofapiToken, payload).catch(e => ({ error: e.message })),
+            getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken, undefined, 2000).catch(e => ({ error: e.message }))
         ]);
 
+        const list = rawTxs?.list || rawTxs?.data?.list || [];
+        const recentTxs = list.filter((t: any) => new Date(t.createdAt) >= startWindow);
+        let manualSum = 0;
+        recentTxs.forEach((t: any) => manualSum += parseFloat(t.amount || t.gross || t.price || "0"));
+
         return NextResponse.json({
-            creator: creator.name,
-            summary_api: summary,
-            transactions_count: transactions?.list?.length || transactions?.data?.list?.length || 0,
-            first_transaction: transactions?.list?.[0] || transactions?.data?.list?.[0] || null
+            dashboard_match_params: payload,
+            getTransactionsSummary: summary,
+            getEarningsOverview: earnings,
+            getTransactionsByType: byType,
+            getTransactions_ManualSum: manualSum.toFixed(2),
+            raw_tx_count_since_feb19: recentTxs.length,
+            sample_recent_tx: recentTxs[0] || null
         });
 
     } catch (e: any) {
