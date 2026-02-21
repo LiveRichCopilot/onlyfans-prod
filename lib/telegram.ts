@@ -40,48 +40,46 @@ import { analyzeMediaSafety } from "./ai-analyzer";
 async function getOrBindCreator(ctx: any) {
     const telegramId = String(ctx.from?.id);
     const telegramGroupId = String(ctx.chat?.id);
+    const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
-    let creator = await prisma.creator.findFirst({
-        where: {
-            OR: [
-                { telegramId },
-                { telegramGroupId }
-            ]
+    let creator = null;
+
+    if (isGroup) {
+        // STRICT multi-tenant group routing: Match strictly by the Group ID set in the dashboard
+        creator = await prisma.creator.findFirst({
+            where: { telegramGroupId }
+        });
+    } else {
+        // DM routing: Match strictly by the user's personal Telegram ID
+        creator = await prisma.creator.findFirst({
+            where: { telegramId }
+        });
+
+        // Fallback for single-tenant DMs if they haven't bound their ID yet
+        if (!creator && telegramId && telegramId !== "undefined") {
+            let realCreator = await prisma.creator.findFirst({
+                where: { ofapiToken: "linked_via_auth_module", telegramId: { in: ["", "unlinked", null] } }
+            });
+
+            if (!realCreator) {
+                realCreator = await prisma.creator.findFirst({
+                    where: { ofapiToken: "unlinked", telegramId: { in: ["", "unlinked", null] } }
+                });
+            }
+
+            if (realCreator) {
+                creator = await prisma.creator.update({
+                    where: { id: realCreator.id },
+                    data: { telegramId }
+                });
+            }
         }
-    });
+    }
 
+    // Cleanup ghost mock bot data if present
     if (creator && creator.ofapiToken === (process.env.TEST_OFAPI_KEY || "ofapi_03SJHIffT7oMztcLSET7yTA7x0g53ijf9TARi20L0eff63a5")) {
         await prisma.creator.delete({ where: { id: creator.id } });
         creator = null;
-    }
-
-    if (!creator && telegramId && telegramId !== "undefined") {
-        let realCreator = await prisma.creator.findFirst({
-            where: { ofapiToken: "linked_via_auth_module" }
-        });
-
-        if (!realCreator) {
-            realCreator = await prisma.creator.findFirst({
-                where: { ofapiToken: "unlinked" }
-            });
-        }
-
-        if (realCreator) {
-            creator = await prisma.creator.update({
-                where: { id: realCreator.id },
-                data: {
-                    telegramId,
-                    telegramGroupId: (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') ? telegramGroupId : realCreator.telegramGroupId
-                }
-            });
-        }
-    }
-
-    if (creator && (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') && creator.telegramGroupId !== telegramGroupId) {
-        creator = await prisma.creator.update({
-            where: { id: creator.id },
-            data: { telegramGroupId }
-        });
     }
 
     return creator;
@@ -161,33 +159,41 @@ bot.command("stats", async (ctx) => {
             end_date: now.toISOString()
         };
 
-        const [summary, byType] = await Promise.all([
-            getTransactionsSummary(creator.ofapiToken, payload).catch(() => null),
-            getTransactionsByType(creator.ofapiToken, payload).catch(() => null)
-        ]);
+        const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken).catch(() => null);
+        const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
 
-        if (!summary) return ctx.reply("❌ API Error: Could not fetch transaction summary at this time.");
+        const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= startWindow);
 
-        const summaryData = summary?.data || {};
+        let totalGross = 0;
+        let subscriptions = 0;
+        let tips = 0;
+        let messages = 0;
 
-        const byTypeData = byType?.data || {};
+        rawTxs.forEach((t: any) => {
+            const amt = parseFloat(t.amount || t.gross || t.price || "0");
+            totalGross += amt;
+            // Best effort categorization since OF drops labels in raw payload without deep parsing
+            if (t.description?.toLowerCase().includes("tip")) tips += amt;
+            else if (t.description?.toLowerCase().includes("message")) messages += amt;
+            else subscriptions += amt;
+        });
 
-        console.log("=== BY TYPE JSON REVENUE DUMP ===");
-        console.log(JSON.stringify(byTypeData));
-        console.log("=================================");
+        // Hardcoded flat 20% OF Fee
+        const totalNet = totalGross * 0.8;
+        const totalFees = totalGross * 0.2;
 
         const md = `
 PERFORMANCE REPORT: ${creator.name}
 Window: Last ${args}
 
-Gross Revenue: $${parseFloat(summaryData.total_gross || "0").toFixed(2)}
-Net Profit: $${parseFloat(summaryData.total_net || "0").toFixed(2)}
-Platform Fees: $${parseFloat(summaryData.total_fees || "0").toFixed(2)}
+Gross Revenue: $${totalGross.toFixed(2)}
+Net Profit: $${totalNet.toFixed(2)}
+Platform Fees: $${totalFees.toFixed(2)}
 
-Breakdown:
-- Subscriptions: ${parseFloat(byTypeData.subscriptions || "0").toFixed(2)}
-- Tips: ${parseFloat(byTypeData.tips || "0").toFixed(2)}
-- Messages: ${parseFloat(byTypeData.messages || "0").toFixed(2)}
+Breakdown (Est.):
+- Subscriptions: $${subscriptions.toFixed(2)}
+- Tips: $${tips.toFixed(2)}
+- Messages: $${messages.toFixed(2)}
         `;
 
         await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
@@ -242,8 +248,12 @@ bot.command("report", async (ctx) => {
             return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
         }, 0);
 
+        const manualGross24h = rawTxs.reduce((sum: number, t: any) => {
+            return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
+        }, 0);
+
         const gross1h = manualGross1h.toFixed(2);
-        const gross24h = parseFloat(summary24h?.data?.total_gross || "0").toFixed(2);
+        const gross24h = manualGross24h.toFixed(2);
 
         const topFans = calculateTopFans(rawTxs, 0);
 

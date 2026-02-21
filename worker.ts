@@ -130,8 +130,12 @@ async function processChatterPerformance(accountName: string, apiKey: string, te
             return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
         }, 0);
 
+        const manualGross24h = rawTxs.reduce((sum: number, t: any) => {
+            return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
+        }, 0);
+
         const gross1h = manualGross1h.toFixed(2);
-        const gross24h = parseFloat(summary24h?.data?.total_gross || "0").toFixed(2);
+        const gross24h = manualGross24h.toFixed(2);
 
         const topFans = calculateTopFans(rawTxs, 0);
 

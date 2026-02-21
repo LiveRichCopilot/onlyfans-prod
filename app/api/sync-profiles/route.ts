@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
     try {
         const creators = await prisma.creator.findMany({
-            where: { ofapiToken: { not: null, not: "unlinked" } }
+            where: { ofapiToken: { not: "unlinked" } }
         });
 
         const updated = [];
