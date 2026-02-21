@@ -48,6 +48,9 @@ async function getOrBindCreator(ctx: any) {
                 { telegramId },
                 { telegramGroupId }
             ]
+        },
+        orderBy: {
+            updatedAt: 'desc'
         }
     });
 
