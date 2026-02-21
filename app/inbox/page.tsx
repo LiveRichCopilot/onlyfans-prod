@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Send, Image as ImageIcon, Search, CheckCheck, MoreHorizontal, UserCircle, Activity } from "lucide-react";
+import { Send, Image as ImageIcon, Search, CheckCheck, MoreHorizontal, UserCircle, Activity, Eye, EyeOff, FolderOpen } from "lucide-react";
 
 type Chat = {
     id: string;
@@ -47,6 +47,7 @@ export default function InboxPage() {
     const [inputText, setInputText] = useState("");
     const [loading, setLoading] = useState(true);
     const [msgsLoading, setMsgsLoading] = useState(false);
+    const [isSfw, setIsSfw] = useState(true); // Default to Safe For Work Mode
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // 1. Fetch connected creators on load
@@ -130,7 +131,7 @@ export default function InboxPage() {
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
                         isFromCreator: isCreator,
-                        senderName: m.author?.name || "Human Chatter"
+                        senderName: m.author?.name || (isCreator ? "Creator" : activeChat.withUser.name)
                     };
                 }) : [];
 
@@ -246,7 +247,7 @@ export default function InboxPage() {
                             >
                                 <div className="w-10 h-10 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center overflow-hidden mr-3">
                                     {chat.withUser.avatar ? (
-                                        <img src={chat.withUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                        <img src={chat.withUser.avatar} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                                     ) : (
                                         <UserCircle size={28} className="text-gray-400" />
                                     )}
@@ -281,6 +282,9 @@ export default function InboxPage() {
                                 <h2 className="font-semibold text-lg">{activeChat.withUser.name} <span className="text-sm font-normal text-gray-400">@{activeChat.withUser.username}</span></h2>
                             </div>
                             <div className="flex items-center gap-4 text-gray-400">
+                                <button onClick={() => setIsSfw(!isSfw)} className={`transition-colors ${isSfw ? 'text-[#14b8a6]' : 'hover:text-gray-200'}`} title="Toggle Safe For Work Mode">
+                                    {isSfw ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                                 <Activity size={18} />
                                 <MoreHorizontal size={18} />
                             </div>
@@ -312,14 +316,16 @@ export default function InboxPage() {
                                                         return (
                                                             <div key={med.id} className="relative rounded-xl overflow-hidden bg-black/40 flex items-center justify-center min-h-[150px] border border-white/5">
                                                                 {med.type === 'video' ? (
-                                                                    <video src={mediaUrl} poster={med.preview} controls controlsList="nodownload" className={`w-full h-full max-h-[320px] object-cover ${!med.canView ? 'blur-xl scale-110' : ''}`} />
+                                                                    <video src={mediaUrl} poster={med.preview} controls controlsList="nodownload" className={`w-full h-full max-h-[320px] object-cover ${(!med.canView || isSfw) ? 'blur-xl scale-110' : ''}`} />
                                                                 ) : med.type === 'audio' ? (
                                                                     <audio src={mediaUrl} controls className={`w-full max-w-[220px] m-4 ${!med.canView ? 'blur-md' : ''}`} />
                                                                 ) : (
                                                                     <img
                                                                         src={mediaUrl}
                                                                         alt="Media Attachment"
-                                                                        className={`w-full h-full max-h-[320px] object-cover ${!med.canView ? 'blur-xl scale-110' : ''}`}
+                                                                        referrerPolicy="no-referrer"
+                                                                        className={`w-full h-full max-h-[320px] object-cover ${(!med.canView || isSfw) ? 'blur-xl scale-110 cursor-pointer' : ''}`}
+                                                                        onClick={() => { if (isSfw) setIsSfw(false); }}
                                                                         onError={(e) => {
                                                                             e.currentTarget.style.display = 'none';
                                                                             e.currentTarget.parentElement!.innerHTML += '<div class="absolute inset-0 flex flex-col items-center justify-center text-[10px] text-white/50 bg-[#16161a]"><span>Expired Media</span><span class="text-[8px] opacity-50 mt-1">API URL revoked</span></div>';
@@ -362,8 +368,11 @@ export default function InboxPage() {
                         {/* Input Area */}
                         <div className="p-4 bg-[#1c1c21] border-t border-[#2d2d34]">
                             <div className="flex items-center bg-[#25252b] rounded-xl px-2 py-1">
-                                <button className="p-2 text-gray-400 hover:text-[#14b8a6] transition-colors">
+                                <button className="p-2 text-gray-400 hover:text-[#14b8a6] transition-colors" title="Upload Local Media">
                                     <ImageIcon size={20} />
+                                </button>
+                                <button className="p-2 text-gray-400 hover:text-[#14b8a6] transition-colors" title="Attach from OnlyFans Vault">
+                                    <FolderOpen size={20} />
                                 </button>
 
                                 <input
