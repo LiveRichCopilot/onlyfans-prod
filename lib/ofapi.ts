@@ -49,8 +49,9 @@ export async function getProfile(username: string, apiKey: string) {
  * Fetch transactions incrementally
  * Uses GET /api/{account}/transactions 
  */
-export async function getTransactions(account: string, apiKey: string, filterType?: string, limit: number = 1000) {
-    let endpoint = `/api/${account}/transactions?limit=${limit}`;
+export async function getTransactions(account: string, apiKey: string, filterType?: string, limit: number = 100) {
+    // OnlyFans API strictly restricts limit to a max of 100 over GET /transactions
+    let endpoint = `/api/${account}/transactions?limit=${Math.min(limit, 100)}`;
     if (filterType) {
         // Ex: type=tip
         endpoint += `&type=${filterType}`;
