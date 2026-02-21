@@ -49,11 +49,11 @@ export async function getProfile(username: string, apiKey: string) {
  * Fetch transactions incrementally
  * Uses GET /api/{account}/transactions 
  */
-export async function getTransactions(account: string, apiKey: string, filterType?: string) {
-    let endpoint = `/api/${account}/transactions`;
+export async function getTransactions(account: string, apiKey: string, filterType?: string, limit: number = 1000) {
+    let endpoint = `/api/${account}/transactions?limit=${limit}`;
     if (filterType) {
         // Ex: type=tip
-        endpoint += `?type=${filterType}`;
+        endpoint += `&type=${filterType}`;
     }
     return ofapiRequest(endpoint, apiKey);
 }
