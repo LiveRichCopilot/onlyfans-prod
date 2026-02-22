@@ -299,12 +299,22 @@ export function calculateTopFans(transactions: any[], threshold: number = 0) {
 /**
  * Get earnings for a specific type (tips, messages, post, subscribes, stream)
  * Uses GET /api/{account}/statistics/statements/earnings?type=X
- * Returns gross + net + hourly chart data
  */
 export async function getEarningsByType(account: string, apiKey: string, type: string, startDate: string, endDate: string) {
     const start = encodeURIComponent(startDate);
     const end = encodeURIComponent(endDate);
     return ofapiRequest(`/api/${account}/statistics/statements/earnings?start_date=${start}&end_date=${end}&type=${type}`, apiKey);
+}
+
+/**
+ * Full statistics overview — earnings, posts, visitors, subscribers, mass messages
+ * With daily chart data for each. The motherlode endpoint.
+ * Uses GET /api/{account}/statistics/overview
+ */
+export async function getStatisticsOverview(account: string, apiKey: string, startDate: string, endDate: string) {
+    const start = encodeURIComponent(startDate);
+    const end = encodeURIComponent(endDate);
+    return ofapiRequest(`/api/${account}/statistics/overview?start_date=${start}&end_date=${end}`, apiKey);
 }
 
 // ==========================================

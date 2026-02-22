@@ -105,17 +105,29 @@ export function StatsGrid({ stats }: Props) {
                 </div>
             )}
 
-            {/* Profile Stats */}
+            {/* Profile & Audience */}
             <div>
-                <h2 className="text-[11px] uppercase tracking-wider text-white/35 font-medium mb-4 px-1">Profile</h2>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <StatCard label="OF Ranking" value={`${stats.topPercentage}%`} color={COLORS.teal} tooltip="Your position on OnlyFans — lower is better" />
-                    <StatCard label="Active Fans" value={(stats.activeFans || 0).toLocaleString()} color={COLORS.cyan} tooltip="Currently subscribed fans" />
-                    <StatCard label="Avg / Spender" value={fmt(stats.avgSpendPerSpender || 0)} color={COLORS.orange} tooltip="Average amount spent by fans who purchased content or tipped" />
+                <h2 className="text-[11px] uppercase tracking-wider text-white/35 font-medium mb-4 px-1">Profile & Audience</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <StatCard label="OF Ranking" value={`${stats.topPercentage}%`} color={COLORS.teal} tooltip="Your position on OnlyFans — lower is better (0.16% = top 0.16%)" />
+                    <StatCard label="Subscribers" value={(stats.subscribersCount || stats.activeFans || 0).toLocaleString()} color={COLORS.cyan} tooltip="Total subscribers on this account" />
+                    <StatCard label="New Subs (7d)" value={(stats.newSubs || 0).toLocaleString()} color={COLORS.green} tooltip="New subscriptions in the last 7 days" />
+                    <StatCard label="Visitors (7d)" value={(stats.visitors || 0).toLocaleString()} color={COLORS.violet} tooltip="Profile visitors in the last 7 days" />
+                    <StatCard label="Avg / Spender" value={fmt(stats.avgSpendPerSpender || 0)} color={COLORS.orange} tooltip="Average amount spent by fans who purchased content or tipped today" />
                     <StatCard label="Avg / Transaction" value={fmt(stats.avgSpendPerTransaction || 0)} color={COLORS.yellow} tooltip="Average amount per individual transaction today" />
-                    <StatCard label="Account Created" value={stats.startDate !== "Unknown" ? new Date(stats.startDate).toLocaleDateString() : "—"} color={COLORS.violet} tooltip="When this OnlyFans account started monetizing" />
                 </div>
             </div>
+
+            {/* Mass Messages */}
+            {(stats.massMessages?.count > 0 || stats.massMessages?.earnings > 0) && (
+                <div>
+                    <h2 className="text-[11px] uppercase tracking-wider text-white/35 font-medium mb-4 px-1">Mass Messages (7d)</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        <StatCard label="Messages Sent" value={(stats.massMessages.count || 0).toLocaleString()} color={COLORS.pink} tooltip="Total mass messages sent in the last 7 days" />
+                        <StatCard label="Mass Msg Revenue" value={fmt(stats.massMessages.earnings || 0)} color={COLORS.pink} tooltip="Gross revenue from mass messages (PPV)" />
+                    </div>
+                </div>
+            )}
 
             {/* Top Fans Today */}
             {stats.topFans && stats.topFans.length > 0 && (
