@@ -5,6 +5,7 @@ const OFAPI_BASE = "https://app.onlyfansapi.com";
 type RequestOptions = {
     method?: string;
     body?: any;
+    targetAccountId?: string;
 };
 
 async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOptions = {}) {
@@ -16,12 +17,16 @@ async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOp
         resolvedKey = process.env.OFAPI_API_KEY || process.env.TEST_OFAPI_KEY || "";
     }
 
-    const headers = {
+    const headers: any = {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${resolvedKey}`,
     };
 
-    const response = await fetch(url, {
+    if (options.targetAccountId) {
+        headers["X-Account-Id"] = options.targetAccountId;
+    }
+
+    const response = await fetch(options.targetAccountId ? `${url}?accountId=${options.targetAccountId}` : url, {
         method: options.method || "GET",
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
@@ -105,10 +110,11 @@ export async function getMe(account: string, apiKey: string) {
  * Fetch transaction summary (Gross, Net, Fees) 
  * Uses POST /api/analytics/financial/transactions/summary
  */
-export async function getTransactionsSummary(apiKey: string, bodyData: any) {
+export async function getTransactionsSummary(apiKey: string, bodyData: any, accountId?: string) {
     return ofapiRequest(`/api/analytics/financial/transactions/summary`, apiKey, {
         method: "POST",
         body: bodyData,
+        targetAccountId: accountId || (bodyData?.account_ids?.[0])
     });
 }
 
@@ -116,10 +122,11 @@ export async function getTransactionsSummary(apiKey: string, bodyData: any) {
  * Fetch Earnings Overview
  * Uses POST /api/analytics/summary/earnings
  */
-export async function getEarningsOverview(apiKey: string, bodyData: any) {
+export async function getEarningsOverview(apiKey: string, bodyData: any, accountId?: string) {
     return ofapiRequest(`/api/analytics/summary/earnings`, apiKey, {
         method: "POST",
         body: bodyData,
+        targetAccountId: accountId || (bodyData?.account_ids?.[0])
     });
 }
 
@@ -190,10 +197,11 @@ export async function sendVaultMediaToFan(fanId: string, vaultMediaId: string, a
  * Get transaction totals grouped by transaction type (subscriptions, tips, messages, etc.).
  * POST /api/analytics/financial/transactions/by-type
  */
-export async function getTransactionsByType(apiKey: string, payload: any) {
+export async function getTransactionsByType(apiKey: string, payload: any, accountId?: string) {
     return ofapiRequest("/api/analytics/financial/transactions/by-type", apiKey, {
         method: "POST",
-        body: payload
+        body: payload,
+        targetAccountId: accountId || (payload?.account_ids?.[0])
     });
 }
 
