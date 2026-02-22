@@ -11,7 +11,9 @@ datasource db {
 model Creator {
   id             String        @id @default(cuid())
   name           String?
+  ofUsername      String?       // The actual OnlyFans username (e.g. "angiyang")
   avatarUrl      String?
+  headerUrl      String?       // OF profile header/banner image URL
   telegramId     String        @unique
   ofapiToken     String?
   ofapiCreatorId String?       @unique

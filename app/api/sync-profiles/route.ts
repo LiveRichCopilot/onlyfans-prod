@@ -13,18 +13,31 @@ export async function GET() {
         const updated = [];
 
         for (const c of creators) {
-            if (!c.name || !c.avatarUrl || c.name === c.ofapiCreatorId) {
+            // Always re-sync if missing avatar, username, or header
+            if (!c.avatarUrl || !c.ofUsername || !c.headerUrl || c.name === c.ofapiCreatorId) {
                 try {
                     const me = await getMe(c.ofapiCreatorId || c.telegramId, c.ofapiToken as string);
-                    if (me && me.name) {
-                        await prisma.creator.update({
-                            where: { id: c.id },
-                            data: {
-                                name: me.name,
-                                avatarUrl: me.avatar
-                            }
-                        });
-                        updated.push(me.name);
+
+                    if (me) {
+                        // OFAPI /me response can have various field names — handle all possibilities
+                        const profileName = me.name || me.display_name || me.displayName || c.name;
+                        const username = me.username || me.onlyfans_username || me.of_username || null;
+                        const avatar = me.avatar || me.avatarUrl || me.avatar_url || me.profilePicUrl || null;
+                        const header = me.header || me.headerUrl || me.header_url || me.headerImage || me.banner || null;
+
+                        const updateData: any = {};
+                        if (profileName && profileName !== c.name) updateData.name = profileName;
+                        if (username) updateData.ofUsername = username;
+                        if (avatar) updateData.avatarUrl = avatar;
+                        if (header) updateData.headerUrl = header;
+
+                        if (Object.keys(updateData).length > 0) {
+                            await prisma.creator.update({
+                                where: { id: c.id },
+                                data: updateData
+                            });
+                            updated.push({ id: c.id, name: profileName, username, hasAvatar: !!avatar, hasHeader: !!header });
+                        }
                     }
                 } catch (e: any) {
                     console.error(`Failed to sync ${c.ofapiCreatorId}: ${e.message}`);
