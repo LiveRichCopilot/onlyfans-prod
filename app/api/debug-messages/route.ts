@@ -23,11 +23,11 @@ export async function GET(request: Request) {
         const firstChat = chatsArray[0];
         const chatId = firstChat.withUser?.id || firstChat.fan?.id || firstChat.chat_id || firstChat.id;
 
-        const msgsUrl = `${OFAPI_BASE}/api/${creator.ofapiCreatorId || creator.telegramId}/chats/${chatId}/messages?limit=3`;
+        const msgsUrl = `${OFAPI_BASE}/api2/v2/chats/${chatId}/messages?limit=3`;
         const msgsRes = await fetch(msgsUrl, { headers: { "Authorization": `Bearer ${apiKey}` } });
         const msgsData = await msgsRes.json();
 
-        return NextResponse.json({ chat: firstChat, messages: msgsData.list || msgsData.data || msgsData });
+        return NextResponse.json({ chat: firstChat, messages: msgsData.list || msgsData.data || msgsData, raw_url: msgsUrl });
     } catch (e: any) {
         return NextResponse.json({ error: e.message });
     }
