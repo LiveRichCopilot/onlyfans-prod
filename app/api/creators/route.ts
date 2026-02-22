@@ -62,10 +62,28 @@ async function autoSyncUnsynced(creators: any[]) {
             const username = match.onlyfans_username || userData.username;
             if (username) updateData.ofUsername = username;
 
-            const avatar = userData.avatar || userData.avatarUrl;
-            if (avatar) updateData.avatarUrl = avatar;
+            let avatar = userData.avatar || userData.avatarUrl;
+            let header = userData.header || userData.headerUrl || userData.header_image;
 
-            const header = userData.header || userData.headerUrl || userData.header_image;
+            // Fallback: if accounts list didn't have avatar/header, call /api/{account}/me directly
+            if (!avatar || !header) {
+                try {
+                    const meRes = await fetch(`${OFAPI_BASE}/api/${match.id}/me`, {
+                        headers: { Authorization: `Bearer ${apiKey}` },
+                    });
+                    if (meRes.ok) {
+                        const me = await meRes.json();
+                        if (!avatar) avatar = me.avatar || me.avatarUrl;
+                        if (!header) header = me.header || me.headerUrl || me.header_image || me.headerSize?.url;
+                        if (!updateData.name && me.name) updateData.name = me.name;
+                        if (!updateData.ofUsername && me.username) updateData.ofUsername = me.username;
+                    }
+                } catch (e) {
+                    console.log(`[auto-sync] /me fallback failed for ${match.id}`);
+                }
+            }
+
+            if (avatar) updateData.avatarUrl = avatar;
             if (header) updateData.headerUrl = header;
 
             if (creator.ofapiToken === "unlinked") {
@@ -78,7 +96,7 @@ async function autoSyncUnsynced(creators: any[]) {
                     where: { id: creator.id },
                     data: updateData,
                 });
-                console.log(`[auto-sync] Synced profile for ${displayName || match.id}`);
+                console.log(`[auto-sync] Synced profile for ${updateData.name || displayName || match.id}`);
             }
         }
     } catch (e: any) {
