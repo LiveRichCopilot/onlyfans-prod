@@ -296,6 +296,17 @@ export function calculateTopFans(transactions: any[], threshold: number = 0) {
     return sorted;
 }
 
+/**
+ * Get earnings for a specific type (tips, messages, post, subscribes, stream)
+ * Uses GET /api/{account}/statistics/statements/earnings?type=X
+ * Returns gross + net + hourly chart data
+ */
+export async function getEarningsByType(account: string, apiKey: string, type: string, startDate: string, endDate: string) {
+    const start = encodeURIComponent(startDate);
+    const end = encodeURIComponent(endDate);
+    return ofapiRequest(`/api/${account}/statistics/statements/earnings?start_date=${start}&end_date=${end}&type=${type}`, apiKey);
+}
+
 // ==========================================
 // V11: Chat & Inbox Integration Endpoints
 // ==========================================

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import {
     getTransactionsSummary,
     getTransactions,
-    getTransactionsByType,
+    getEarningsByType,
     getActiveFans,
     getTopPercentage,
     getModelStartDate,
@@ -50,15 +50,22 @@ export async function GET(
             const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
             try {
-                // Fetch everything in parallel — same proven approach as Telegram cron
-                const byTypePayload = { account_ids: [accountName], start_date: thirtyDaysAgo.toISOString(), end_date: now.toISOString() };
+                // Date strings for the earnings-by-type endpoint (URL-encoded spaces + colons)
+                const fmtDate = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                const start30 = fmtDate(thirtyDaysAgo);
+                const endNow = fmtDate(now);
 
-                const [summary1h, summaryToday, summary7d, summary30d, byTypeRes, fansRes, topPercentObj, startDateObj, txRes] = await Promise.all([
+                // Fetch everything in parallel
+                const [summary1h, summaryToday, summary7d, summary30d, tipRes, msgRes, postRes, subRes, streamRes, fansRes, topPercentObj, startDateObj, txRes] = await Promise.all([
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: oneHourAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: todayStart.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: sevenDaysAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: thirtyDaysAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
-                    getTransactionsByType(apiKey, byTypePayload, accountName).catch(() => null),
+                    getEarningsByType(accountName, apiKey, "tips", start30, endNow).catch(() => null),
+                    getEarningsByType(accountName, apiKey, "messages", start30, endNow).catch(() => null),
+                    getEarningsByType(accountName, apiKey, "post", start30, endNow).catch(() => null),
+                    getEarningsByType(accountName, apiKey, "subscribes", start30, endNow).catch(() => null),
+                    getEarningsByType(accountName, apiKey, "stream", start30, endNow).catch(() => null),
                     getActiveFans(accountName, apiKey).catch(() => null),
                     getTopPercentage(accountName, apiKey).catch(() => null),
                     getModelStartDate(accountName, apiKey).catch(() => null),
@@ -85,15 +92,17 @@ export async function GET(
                 stats.topPercentage = topPercentObj?.percentage || topPercentObj?.data?.percentage || "N/A";
                 stats.startDate = startDateObj?.start_date || startDateObj?.data?.start_date || "Unknown";
 
-                // Earnings by type (subs, tips, posts, messages, streams, referrals)
-                const byType = byTypeRes?.data || byTypeRes || {};
+                // Earnings by type — each response has data.{type}.gross
+                const parseEarning = (res: any, key: string) => {
+                    const d = res?.data?.[key] || res?.data || {};
+                    return parseFloat(d.gross || d.total || "0");
+                };
                 stats.earningsByType = {
-                    subscriptions: parseFloat(byType.subscriptions || byType.subscribes || "0"),
-                    tips: parseFloat(byType.tips || "0"),
-                    posts: parseFloat(byType.posts || byType.post || "0"),
-                    messages: parseFloat(byType.messages || "0"),
-                    streams: parseFloat(byType.streams || byType.stream || "0"),
-                    referrals: parseFloat(byType.referrals || "0"),
+                    tips: parseEarning(tipRes, "tips"),
+                    messages: parseEarning(msgRes, "chat_messages"),
+                    posts: parseEarning(postRes, "post"),
+                    subscriptions: parseEarning(subRes, "subscribes"),
+                    streams: parseEarning(streamRes, "stream"),
                 };
 
                 // Top fans from raw transactions (today)
