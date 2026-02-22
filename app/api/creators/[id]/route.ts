@@ -24,8 +24,8 @@ export async function GET(
 
         const stats: any = {
             todayRevenue: 0, hourlyRevenue: 0, weeklyRevenue: 0, monthlyRevenue: 0,
-            activeFans: 0, subscribersCount: 0, topPercentage: "N/A",
-            earningsByType: {}, overview: null, dailyChart: [],
+            subscribersCount: 0, topPercentage: "N/A", weeklyDelta: 0,
+            earningsByType: {}, dailyChart: [],
             topFansToday: [], topFansWeek: [], topFansMonth: [],
             txCountToday: 0, avgSpendPerSpender: 0, avgSpendPerTransaction: 0,
             massMessages: { count: 0, earnings: 0 },
@@ -33,89 +33,96 @@ export async function GET(
         };
 
         if (creator.ofapiToken && creator.ofapiToken !== "unlinked") {
-            const accountName = creator.ofapiCreatorId || creator.telegramId;
-            const apiKey = creator.ofapiToken;
+            const acct = creator.ofapiCreatorId || creator.telegramId;
+            const key = creator.ofapiToken;
             const now = new Date();
             const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            const todayStart = new Date(now.getTime()); todayStart.setUTCHours(0, 0, 0, 0);
+            const todayUTC = new Date(now); todayUTC.setUTCHours(0, 0, 0, 0);
             const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            const fmtDate = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+            const fmt = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 
             try {
-                const [summary1h, summaryToday, summary7d, summary30d, meRes, topPercentObj, overviewRes, tipRes, msgRes, postRes, subRes, streamRes, txRes] = await Promise.all([
-                    getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: oneHourAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
-                    getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: todayStart.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
-                    getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: sevenDaysAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
-                    getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: thirtyDaysAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
-                    getMe(accountName, apiKey).catch(() => null),
-                    getTopPercentage(accountName, apiKey).catch(() => null),
-                    getStatisticsOverview(accountName, apiKey, fmtDate(sevenDaysAgo), fmtDate(now)).catch(() => null),
-                    getEarningsByType(accountName, apiKey, "tips", fmtDate(thirtyDaysAgo), fmtDate(now)).catch(() => null),
-                    getEarningsByType(accountName, apiKey, "messages", fmtDate(thirtyDaysAgo), fmtDate(now)).catch(() => null),
-                    getEarningsByType(accountName, apiKey, "post", fmtDate(thirtyDaysAgo), fmtDate(now)).catch(() => null),
-                    getEarningsByType(accountName, apiKey, "subscribes", fmtDate(thirtyDaysAgo), fmtDate(now)).catch(() => null),
-                    getEarningsByType(accountName, apiKey, "stream", fmtDate(thirtyDaysAgo), fmtDate(now)).catch(() => null),
-                    getTransactions(accountName, apiKey).catch(() => null),
+                // All parallel — 13 calls
+                const [summaryToday, meRes, topPctRes, overviewRes, earningsChartRes,
+                       tipRes, msgRes, postRes, subRes, streamRes, txResToday, txResWeek, txResMonth] = await Promise.all([
+                    getTransactionsSummary(key, { account_ids: [acct], start_date: todayUTC.toISOString(), end_date: now.toISOString() }, acct).catch(() => null),
+                    getMe(acct, key).catch(() => null),
+                    getTopPercentage(acct, key).catch(() => null),
+                    getStatisticsOverview(acct, key, fmt(sevenDaysAgo), fmt(now)).catch(() => null),
+                    getEarningsByType(acct, key, "total", fmt(sevenDaysAgo), fmt(now)).catch(() => null),
+                    getEarningsByType(acct, key, "tips", fmt(thirtyDaysAgo), fmt(now)).catch(() => null),
+                    getEarningsByType(acct, key, "messages", fmt(thirtyDaysAgo), fmt(now)).catch(() => null),
+                    getEarningsByType(acct, key, "post", fmt(thirtyDaysAgo), fmt(now)).catch(() => null),
+                    getEarningsByType(acct, key, "subscribes", fmt(thirtyDaysAgo), fmt(now)).catch(() => null),
+                    getEarningsByType(acct, key, "stream", fmt(thirtyDaysAgo), fmt(now)).catch(() => null),
+                    getTransactions(acct, key).catch(() => null),
+                    fetchAllTransactions(acct, key, sevenDaysAgo, 500).catch(() => []),
+                    fetchAllTransactions(acct, key, thirtyDaysAgo, 2000).catch(() => []),
                 ]);
 
-                // Revenue
-                stats.hourlyRevenue = parseFloat(summary1h?.data?.total_gross || "0");
+                // Today revenue from transaction summary
                 stats.todayRevenue = parseFloat(summaryToday?.data?.total_gross || "0");
-                stats.weeklyRevenue = parseFloat(summary7d?.data?.total_gross || "0");
-                stats.monthlyRevenue = parseFloat(summary30d?.data?.total_gross || "0");
 
-                // Subscriber count from /me (the real number)
-                const meData = meRes?.data || meRes || {};
-                stats.subscribersCount = meData.subscribersCount || meData.subscribedOnCount || 0;
-                stats.activeFans = meData.subscribersCount || 0;
+                // Weekly + monthly from earnings endpoint (more accurate)
+                const totalEarnings7d = earningsChartRes?.data?.total || {};
+                stats.weeklyRevenue = totalEarnings7d.gross || 0;
+                stats.weeklyDelta = totalEarnings7d.delta || 0;
 
-                // Top percentage
-                stats.topPercentage = topPercentObj?.percentage || topPercentObj?.data?.percentage || "N/A";
-
-                // Overview data (7d) — mass messages, visitors, new subs, daily chart
-                const overview = overviewRes?.data || {};
-                if (overview.earning?.chartData) {
-                    stats.dailyChart = overview.earning.chartData.map((p: any) => ({
-                        date: p.date?.substring(0, 10) || "",
-                        revenue: p.count || 0,
-                    }));
-                }
-                if (overview.massMessages) {
-                    stats.massMessages = {
-                        count: overview.massMessages.count?.total || 0,
-                        earnings: overview.massMessages.earnings?.gross || 0,
-                    };
-                }
-                if (overview.visitors?.subscriptions) {
-                    stats.newSubs = overview.visitors.subscriptions.new?.total || 0;
-                }
-                stats.visitors = overview.visitors?.visitors?.total || 0;
-
-                // Earnings by type (30d)
-                const parseEarning = (res: any, key: string) => {
-                    const d = res?.data?.[key] || res?.data || {};
+                // Monthly: sum from the 30d earnings by type
+                const parseEarning = (res: any, k: string) => {
+                    const d = res?.data?.[k] || res?.data || {};
                     return parseFloat(d.gross || d.total || "0");
                 };
-                stats.earningsByType = {
-                    tips: parseEarning(tipRes, "tips"),
-                    messages: parseEarning(msgRes, "chat_messages"),
-                    posts: parseEarning(postRes, "post"),
-                    subscriptions: parseEarning(subRes, "subscribes"),
-                    streams: parseEarning(streamRes, "stream"),
-                    massMessages: overview.massMessages?.earnings?.gross || 0,
-                };
+                const tipVal = parseEarning(tipRes, "tips");
+                const msgVal = parseEarning(msgRes, "chat_messages");
+                const postVal = parseEarning(postRes, "post");
+                const subVal = parseEarning(subRes, "subscribes");
+                const streamVal = parseEarning(streamRes, "stream");
+                stats.monthlyRevenue = tipVal + msgVal + postVal + subVal + streamVal;
 
-                // Top fans — today, week, month from raw transactions
-                const allTx = txRes?.data?.list || txRes?.list || txRes?.transactions || [];
-                const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayStart);
-                const weekTx = allTx.filter((t: any) => new Date(t.createdAt) >= sevenDaysAgo);
+                stats.earningsByType = { tips: tipVal, messages: msgVal, posts: postVal, subscriptions: subVal, streams: streamVal };
+
+                // Chart data from earnings?type=total (7d daily bars)
+                const chartAmount = totalEarnings7d.chartAmount || [];
+                stats.dailyChart = chartAmount.map((p: any) => ({
+                    date: p.date?.substring(0, 10) || "",
+                    revenue: p.count || 0,
+                })).filter((p: any) => p.date);
+
+                // Subscriber count + profile data from /me
+                const me = meRes?.data || meRes || {};
+                stats.subscribersCount = me.subscribersCount || 0;
+
+                // Top percentage — field is "top_percentage" not "percentage"
+                stats.topPercentage = topPctRes?.data?.top_percentage ?? topPctRes?.percentage ?? "N/A";
+
+                // Overview data (7d) — mass messages, visitors, new subs
+                const ov = overviewRes?.data || {};
+                if (ov.massMessages) {
+                    stats.massMessages = { count: ov.massMessages.count?.total || 0, earnings: ov.massMessages.earnings?.gross || 0 };
+                }
+                stats.earningsByType.massMessages = stats.massMessages.earnings;
+                stats.newSubs = ov.visitors?.subscriptions?.new?.total || 0;
+                stats.visitors = ov.visitors?.visitors?.total || 0;
+
+                // Hourly revenue — calculate from RAW transactions (not summary which caches)
+                const todayTxList = txResToday?.data?.list || txResToday?.list || txResToday?.transactions || [];
+                const recentTx = todayTxList.filter((t: any) => new Date(t.createdAt) >= oneHourAgo);
+                stats.hourlyRevenue = recentTx.reduce((s: number, t: any) => s + (parseFloat(t.amount) || 0), 0);
+                stats.txCountToday = todayTxList.filter((t: any) => new Date(t.createdAt) >= todayUTC).length;
+
+                // Top fans — today from latest 100, week/month from paginated fetches
+                const todayTx = todayTxList.filter((t: any) => new Date(t.createdAt) >= todayUTC);
                 stats.topFansToday = calculateTopFans(todayTx, 0).slice(0, 5);
-                stats.topFansWeek = calculateTopFans(weekTx, 0).slice(0, 5);
-                stats.topFansMonth = calculateTopFans(allTx, 0).slice(0, 10);
-                stats.txCountToday = todayTx.length;
 
-                // Averages
+                const weekTx = Array.isArray(txResWeek) ? txResWeek : [];
+                stats.topFansWeek = calculateTopFans(weekTx, 0).slice(0, 5);
+
+                const monthTx = Array.isArray(txResMonth) ? txResMonth : [];
+                stats.topFansMonth = calculateTopFans(monthTx, 0).slice(0, 10);
+
+                // Averages (today)
                 const todayTotal = todayTx.reduce((s: number, t: any) => s + (parseFloat(t.amount) || 0), 0);
                 stats.avgSpendPerTransaction = todayTx.length > 0 ? todayTotal / todayTx.length : 0;
                 const spenders = stats.topFansToday.length;
