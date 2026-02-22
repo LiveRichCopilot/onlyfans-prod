@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { listChats } from "@/lib/ofapi";
+import { fetchAllChats } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Fetch chats from OFAPI.
+ * Fetch ALL chats from OFAPI (paginated up to 200 per creator).
  * ?creatorId=xxx — single creator
  * ?all=true — merge chats from ALL linked creators
  */
@@ -23,7 +23,6 @@ export async function GET(request: Request) {
         let creatorsToFetch: any[] = [];
 
         if (fetchAll || !creatorId) {
-            // Fetch chats from ALL linked creators
             creatorsToFetch = await prisma.creator.findMany({
                 where: {
                     AND: [
@@ -33,7 +32,6 @@ export async function GET(request: Request) {
                 },
             });
         } else {
-            // Single creator
             const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
             if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
                 return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
@@ -45,14 +43,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ chats: [] });
         }
 
-        // Fetch chats from all creators in parallel
+        // Fetch ALL chats (paginated) from all creators in parallel
         const results = await Promise.allSettled(
             creatorsToFetch.map(async (creator) => {
                 const accountName = creator.ofapiCreatorId || creator.telegramId;
-                const rawChats = await listChats(accountName, apiKey);
-                const chatList = rawChats?.list || rawChats?.data?.list || rawChats?.data || rawChats || [];
-                // Tag each chat with the creator info so frontend knows which creator it belongs to
-                return (Array.isArray(chatList) ? chatList : []).map((chat: any) => ({
+                const allChats = await fetchAllChats(accountName, apiKey, 200);
+                return allChats.map((chat: any) => ({
                     ...chat,
                     _creatorId: creator.id,
                     _creatorName: creator.name || creator.ofUsername || accountName,
@@ -60,7 +56,6 @@ export async function GET(request: Request) {
             })
         );
 
-        // Merge all chats, sorted by most recent
         let allChats: any[] = [];
         for (const r of results) {
             if (r.status === "fulfilled") {

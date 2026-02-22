@@ -325,8 +325,8 @@ export async function getStatisticsOverview(account: string, apiKey: string, sta
  * Get the list of chats for an Account.
  * GET /api/{account}/chats
  */
-export async function listChats(accountName: string, apiKey: string) {
-    return ofapiRequest(`/api/${accountName}/chats`, apiKey);
+export async function listChats(accountName: string, apiKey: string, limit: number = 50, offset: number = 0) {
+    return ofapiRequest(`/api/${accountName}/chats?limit=${limit}&offset=${offset}`, apiKey);
 }
 
 /**
@@ -423,6 +423,28 @@ export async function sendTypingIndicator(account: string, chatId: string, apiKe
 
 export async function getChatMedia(account: string, chatId: string, apiKey: string) {
     return ofapiRequest(`/api/${account}/chats/${chatId}/media`, apiKey);
+}
+
+/** Paginate through all chats for an account (up to maxChats) */
+export async function fetchAllChats(accountName: string, apiKey: string, maxChats: number = 200) {
+    let allChats: any[] = [];
+    let offset = 0;
+    const pageSize = 50;
+
+    while (allChats.length < maxChats) {
+        const res = await listChats(accountName, apiKey, pageSize, offset).catch(() => null);
+        if (!res) break;
+
+        const chatList = res?.list || res?.data?.list || res?.data || [];
+        if (!Array.isArray(chatList) || chatList.length === 0) break;
+
+        allChats.push(...chatList);
+        if (chatList.length < pageSize) break; // No more pages
+
+        offset += pageSize;
+    }
+
+    return allChats;
 }
 
 export async function markChatAsRead(account: string, chatId: string, apiKey: string) {

@@ -87,72 +87,81 @@ export default function InboxPage() {
             });
     }, [selectedCreatorId]);
 
-    // 3. Fetch messages + live polling
-    // Use the chat's creatorId when in "all" mode
+    // 3. Fetch messages + fresh media, then poll
     const activeCreatorId = activeChat?._creatorId || selectedCreatorId;
+    const [mediaMap, setMediaMap] = useState<Record<string, { src: string; preview: string; type: string }>>({});
 
     useEffect(() => {
         if (!activeChat || (!activeCreatorId || activeCreatorId === "all")) return;
         setMsgsLoading(true);
-        fetchMessages();
-        const pollInterval = setInterval(() => fetchMessages(false), 5000);
+        setMediaMap({});
+
+        // Fetch messages AND fresh media URLs in parallel
+        const cId = activeChat._creatorId || selectedCreatorId;
+        Promise.all([
+            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}`).then(r => r.json()).catch(() => ({ messages: [] })),
+            fetch(`/api/inbox/media?creatorId=${cId}&chatId=${activeChat.id}`).then(r => r.json()).catch(() => ({ media: {} })),
+        ]).then(([msgData, mediaData]) => {
+            if (mediaData.media) setMediaMap(mediaData.media);
+            processMessages(msgData);
+            setMsgsLoading(false);
+            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        });
+
+        // Poll messages only (media URLs stay fresh for a while)
+        const pollInterval = setInterval(() => {
+            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}`)
+                .then(r => r.json())
+                .then(data => processMessages(data))
+                .catch(console.error);
+        }, 5000);
         return () => clearInterval(pollInterval);
     }, [activeChat, activeCreatorId]);
 
-    const fetchMessages = (showLoader = true) => {
-        if (showLoader) setMsgsLoading(true);
-        const cId = activeChat?._creatorId || selectedCreatorId;
-        fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat?.id}`)
-            .then((res) => res.json())
-            .then((data) => {
-                const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
-                const sortedRaw = [...rawMsgs].sort(
-                    (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-                );
-                const mappedMsgs: Message[] =
-                    typeof sortedRaw.map === "function"
-                        ? sortedRaw.map((m: any) => {
-                              const fromId = m.fromUser?.id || m.author?.id || "unknown";
-                              const isCreator = fromId !== activeChat?.withUser?.id;
-                              const cleanText = (m.text || "").replace(/<[^>]*>?/gm, "");
-                              return {
-                                  id: m.id || m.message_id || Math.random().toString(),
-                                  text: cleanText,
-                                  media: Array.isArray(m.media)
-                                      ? m.media.map((med: any) => {
-                                            // Extract the best URL from various OFAPI response shapes
-                                            const src = med.src || med.full || med.source?.source || med.source?.url
-                                                || med.files?.source?.url || med.files?.preview?.url
-                                                || med.video?.url || med.audio?.url
-                                                || med.preview || med.thumb || med.squarePreview || "";
-                                            const preview = med.preview || med.thumb || med.squarePreview
-                                                || med.files?.preview?.url || med.source?.source || src || "";
-                                            return {
-                                                id: med.id?.toString() || Math.random().toString(),
-                                                type: med.type === "gif" ? "photo" : (med.type || "photo"),
-                                                canView: med.canView !== false,
-                                                preview,
-                                                src,
-                                            };
-                                        }).filter((med: any) => med.src || med.preview) // Skip media with no URLs
-                                      : [],
-                                  createdAt: m.createdAt || new Date().toISOString(),
-                                  fromUser: { id: fromId },
-                                  isFromCreator: isCreator,
-                                  senderName: isCreator ? "Creator" : activeChat?.withUser?.name || "Fan",
-                              };
-                          })
-                        : [];
-                setMessages(mappedMsgs);
-                if (showLoader) {
-                    setMsgsLoading(false);
-                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-                }
-            })
-            .catch((err) => {
-                console.error("Failed to load messages", err);
-                if (showLoader) setMsgsLoading(false);
-            });
+    const processMessages = (data: any) => {
+        const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
+        const sortedRaw = [...rawMsgs].sort(
+            (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        const mappedMsgs: Message[] =
+            typeof sortedRaw.map === "function"
+                ? sortedRaw.map((m: any) => {
+                      const fromId = m.fromUser?.id || m.author?.id || "unknown";
+                      const isCreator = fromId !== activeChat?.withUser?.id;
+                      const cleanText = (m.text || "").replace(/<[^>]*>?/gm, "");
+                      return {
+                          id: m.id || m.message_id || Math.random().toString(),
+                          text: cleanText,
+                          media: Array.isArray(m.media)
+                              ? m.media.map((med: any) => {
+                                    const medId = med.id?.toString() || "";
+                                    // Use fresh media URLs from getChatMedia if available
+                                    const fresh = mediaMap[medId];
+                                    const src = fresh?.src
+                                        || med.src || med.full || med.source?.source || med.source?.url
+                                        || med.files?.source?.url || med.files?.preview?.url
+                                        || med.video?.url || med.audio?.url
+                                        || med.preview || med.thumb || med.squarePreview || "";
+                                    const preview = fresh?.preview
+                                        || med.preview || med.thumb || med.squarePreview
+                                        || med.files?.preview?.url || src || "";
+                                    return {
+                                        id: medId || Math.random().toString(),
+                                        type: fresh?.type || (med.type === "gif" ? "photo" : (med.type || "photo")),
+                                        canView: med.canView !== false,
+                                        preview,
+                                        src,
+                                    };
+                                }).filter((med: any) => med.src || med.preview)
+                              : [],
+                          createdAt: m.createdAt || new Date().toISOString(),
+                          fromUser: { id: fromId },
+                          isFromCreator: isCreator,
+                          senderName: isCreator ? "Creator" : activeChat?.withUser?.name || "Fan",
+                      };
+                  })
+                : [];
+        setMessages(mappedMsgs);
     };
 
     const handleSelectCreator = (id: string) => {
