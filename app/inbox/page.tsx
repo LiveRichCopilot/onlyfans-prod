@@ -102,12 +102,25 @@ export default function InboxPage() {
             });
     }, [selectedCreatorId]);
 
-    // 3. Fetch Messages when a Chat is clicked
     useEffect(() => {
         if (!activeChat || !selectedCreatorId) return;
-        setMsgsLoading(true);
 
-        fetch(`/api/inbox/messages?creatorId=${selectedCreatorId}&chatId=${activeChat.id}`)
+        // Initial load
+        setMsgsLoading(true);
+        fetchMessages();
+
+        // Start Live Polling (every 5 seconds)
+        const pollInterval = setInterval(() => {
+            fetchMessages(false); // Silent fetch, no loading spinner
+        }, 5000);
+
+        return () => clearInterval(pollInterval);
+    }, [activeChat, selectedCreatorId]);
+
+    const fetchMessages = (showLoader = true) => {
+        if (showLoader) setMsgsLoading(true);
+
+        fetch(`/api/inbox/messages?creatorId=${selectedCreatorId}&chatId=${activeChat?.id}`)
             .then(res => res.json())
             .then(data => {
                 const rawMsgs = Array.isArray(data.messages) ? data.messages : (data.messages?.data || []);
@@ -117,7 +130,7 @@ export default function InboxPage() {
 
                 const mappedMsgs: Message[] = typeof sortedRaw.map === 'function' ? sortedRaw.map((m: any) => {
                     const fromId = m.fromUser?.id || m.author?.id || "unknown";
-                    const isCreator = fromId !== activeChat.withUser.id;
+                    const isCreator = fromId !== activeChat?.withUser.id;
 
                     return {
                         id: m.id || m.message_id || Math.random().toString(),
@@ -132,19 +145,21 @@ export default function InboxPage() {
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
                         isFromCreator: isCreator,
-                        senderName: m.author?.name || (isCreator ? "Creator" : activeChat.withUser.name)
+                        senderName: m.author?.name || (isCreator ? "Creator" : activeChat?.withUser.name)
                     };
                 }) : [];
 
                 setMessages(mappedMsgs);
-                setMsgsLoading(false);
-                setTimeout(scrollToBottom, 50);
+                if (showLoader) {
+                    setMsgsLoading(false);
+                    setTimeout(scrollToBottom, 50);
+                }
             })
             .catch(err => {
                 console.error("Failed to load messages", err);
-                setMsgsLoading(false);
+                if (showLoader) setMsgsLoading(false);
             });
-    }, [activeChat, selectedCreatorId]);
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
