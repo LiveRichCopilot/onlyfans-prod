@@ -4,6 +4,88 @@ import { getTransactionsSummary, getTransactions, calculateTopFans } from "@/lib
 
 export const dynamic = "force-dynamic";
 
+const OFAPI_BASE = "https://app.onlyfansapi.com";
+
+/**
+ * Auto-sync any creators missing profile data (name, avatar, header).
+ * Runs inline on dashboard load — only fires when unsynced creators exist.
+ */
+async function autoSyncUnsynced(creators: any[]) {
+    const unsynced = creators.filter(
+        (c) =>
+            !c.name ||
+            c.name.startsWith("acct_") ||
+            (!c.avatarUrl && !c.headerUrl) ||
+            c.ofapiToken === "unlinked"
+    );
+
+    if (unsynced.length === 0) return;
+
+    const apiKey = process.env.OFAPI_API_KEY;
+    if (!apiKey) {
+        console.error("[auto-sync] No OFAPI_API_KEY — cannot sync profiles");
+        return;
+    }
+
+    try {
+        const accountsRes = await fetch(`${OFAPI_BASE}/api/accounts`, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!accountsRes.ok) {
+            console.error("[auto-sync] OFAPI /api/accounts failed:", accountsRes.status);
+            return;
+        }
+
+        const accounts = await accountsRes.json();
+        const accountList = Array.isArray(accounts) ? accounts : accounts?.data || [];
+
+        for (const creator of unsynced) {
+            const match = accountList.find(
+                (a: any) =>
+                    a.id === creator.ofapiCreatorId ||
+                    a.onlyfans_username === creator.ofapiCreatorId ||
+                    a.onlyfans_username === creator.ofUsername ||
+                    a.display_name === creator.ofapiCreatorId
+            );
+
+            if (!match) {
+                console.log(`[auto-sync] No OFAPI match for creator ${creator.id} (${creator.ofapiCreatorId})`);
+                continue;
+            }
+
+            const userData = match.onlyfans_user_data || {};
+            const updateData: any = {};
+
+            const displayName = userData.name || match.display_name;
+            if (displayName) updateData.name = displayName;
+
+            const username = match.onlyfans_username || userData.username;
+            if (username) updateData.ofUsername = username;
+
+            const avatar = userData.avatar || userData.avatarUrl;
+            if (avatar) updateData.avatarUrl = avatar;
+
+            const header = userData.header || userData.headerUrl || userData.header_image;
+            if (header) updateData.headerUrl = header;
+
+            if (creator.ofapiToken === "unlinked") {
+                updateData.ofapiToken = apiKey;
+            }
+            updateData.ofapiCreatorId = match.id;
+
+            if (Object.keys(updateData).length > 0) {
+                await prisma.creator.update({
+                    where: { id: creator.id },
+                    data: updateData,
+                });
+                console.log(`[auto-sync] Synced profile for ${displayName || match.id}`);
+            }
+        }
+    } catch (e: any) {
+        console.error("[auto-sync] Failed:", e.message);
+    }
+}
+
 /**
  * Dashboard creators list with LIVE OFAPI revenue.
  * Will switch to Supabase once backfill is complete.
@@ -14,7 +96,15 @@ export async function GET(request: Request) {
         const startParam = searchParams.get("start");
         const endParam = searchParams.get("end");
 
-        const creators = await prisma.creator.findMany({
+        let creators = await prisma.creator.findMany({
+            orderBy: { createdAt: "desc" },
+        });
+
+        // Auto-sync any creators missing profiles (name, avatar, header)
+        await autoSyncUnsynced(creators);
+
+        // Re-fetch after sync so we return fresh data
+        creators = await prisma.creator.findMany({
             orderBy: { createdAt: "desc" },
         });
 
