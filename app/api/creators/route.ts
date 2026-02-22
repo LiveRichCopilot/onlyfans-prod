@@ -29,29 +29,25 @@ export async function GET(request: Request) {
                 const accountName = creator.ofapiCreatorId || creator.telegramId;
                 const apiKey = creator.ofapiToken!;
 
-                const payload1h = {
-                    account_ids: [accountName],
-                    start_date: oneHourAgo.toISOString(),
-                    end_date: now.toISOString(),
-                };
                 const payloadToday = {
                     account_ids: [accountName],
                     start_date: todayStart.toISOString(),
                     end_date: now.toISOString(),
                 };
 
-                const [summary1h, summaryToday, txResponse] = await Promise.all([
-                    getTransactionsSummary(apiKey, payload1h, accountName).catch(() => null),
+                // Today revenue from summary + raw transactions for hourly (summary lies on short windows)
+                const [summaryToday, txResponse] = await Promise.all([
                     getTransactionsSummary(apiKey, payloadToday, accountName).catch(() => null),
                     getTransactions(accountName, apiKey).catch(() => null),
                 ]);
 
-                const hourlyRev = parseFloat(summary1h?.data?.total_gross || summary1h?.total_gross || "0");
                 const todayRev = parseFloat(summaryToday?.data?.total_gross || summaryToday?.total_gross || "0");
 
-                // Top fans from raw transactions
+                // Hourly + top fans from RAW transactions (not summary — it caches/lies)
                 const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
                 const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayStart);
+                const recentTx = allTx.filter((t: any) => new Date(t.createdAt) >= oneHourAgo);
+                const hourlyRev = recentTx.reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
                 const topFans = calculateTopFans(todayTx, 0).slice(0, 3);
 
                 return {
