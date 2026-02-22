@@ -25,15 +25,18 @@ export async function GET() {
         const updated: any[] = [];
 
         // Get all creators from our DB
-        const creators = await prisma.creator.findMany({
-            where: { ofapiToken: { not: "unlinked" } },
-        });
+        // Sync ALL creators, including unlinked ones (they still need profile data)
+        const creators = await prisma.creator.findMany();
 
         for (const creator of creators) {
             // Match by ofapiCreatorId (the acct_xxx ID)
-            const ofAccount = Array.isArray(accounts)
-                ? accounts.find((a: any) => a.id === creator.ofapiCreatorId)
-                : null;
+            // Match by account ID or OF username
+            const accountList = Array.isArray(accounts) ? accounts : accounts?.data || [];
+            const ofAccount = accountList.find((a: any) =>
+                a.id === creator.ofapiCreatorId ||
+                a.onlyfans_username === creator.ofapiCreatorId ||
+                a.onlyfans_username === creator.ofUsername
+            );
 
             if (!ofAccount) continue;
 
@@ -62,6 +65,12 @@ export async function GET() {
             const header = userData.header || userData.headerUrl || userData.header_image;
             if (header) {
                 updateData.headerUrl = header;
+            }
+
+            // If unlinked but we found a match, link it with master key
+            if (creator.ofapiToken === "unlinked" && ofAccount) {
+                updateData.ofapiToken = apiKey;
+                updateData.ofapiCreatorId = ofAccount.id;
             }
 
             if (Object.keys(updateData).length > 0) {
