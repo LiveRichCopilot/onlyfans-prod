@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 import {
     getTransactionsSummary,
     getTransactions,
+    getTransactionsByType,
     getActiveFans,
     getTopPercentage,
     getModelStartDate,
-    getNotificationCounts,
     calculateTopFans,
 } from "@/lib/ofapi";
 
@@ -51,11 +51,14 @@ export async function GET(
 
             try {
                 // Fetch everything in parallel — same proven approach as Telegram cron
-                const [summary1h, summaryToday, summary7d, summary30d, fansRes, topPercentObj, startDateObj, txRes] = await Promise.all([
+                const byTypePayload = { account_ids: [accountName], start_date: thirtyDaysAgo.toISOString(), end_date: now.toISOString() };
+
+                const [summary1h, summaryToday, summary7d, summary30d, byTypeRes, fansRes, topPercentObj, startDateObj, txRes] = await Promise.all([
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: oneHourAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: todayStart.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: sevenDaysAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
                     getTransactionsSummary(apiKey, { account_ids: [accountName], start_date: thirtyDaysAgo.toISOString(), end_date: now.toISOString() }, accountName).catch(() => null),
+                    getTransactionsByType(apiKey, byTypePayload, accountName).catch(() => null),
                     getActiveFans(accountName, apiKey).catch(() => null),
                     getTopPercentage(accountName, apiKey).catch(() => null),
                     getModelStartDate(accountName, apiKey).catch(() => null),
@@ -82,11 +85,31 @@ export async function GET(
                 stats.topPercentage = topPercentObj?.percentage || topPercentObj?.data?.percentage || "N/A";
                 stats.startDate = startDateObj?.start_date || startDateObj?.data?.start_date || "Unknown";
 
+                // Earnings by type (subs, tips, posts, messages, streams, referrals)
+                const byType = byTypeRes?.data || byTypeRes || {};
+                stats.earningsByType = {
+                    subscriptions: parseFloat(byType.subscriptions || byType.subscribes || "0"),
+                    tips: parseFloat(byType.tips || "0"),
+                    posts: parseFloat(byType.posts || byType.post || "0"),
+                    messages: parseFloat(byType.messages || "0"),
+                    streams: parseFloat(byType.streams || byType.stream || "0"),
+                    referrals: parseFloat(byType.referrals || "0"),
+                };
+
                 // Top fans from raw transactions (today)
                 const allTx = txRes?.data?.list || txRes?.list || txRes?.transactions || [];
                 const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayStart);
                 stats.topFans = calculateTopFans(todayTx, 0).slice(0, 5);
                 stats.txCountToday = todayTx.length;
+
+                // Calculated metrics
+                const totalSpenders = stats.topFans.length;
+                stats.avgSpendPerTransaction = todayTx.length > 0
+                    ? todayTx.reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0) / todayTx.length
+                    : 0;
+                stats.avgSpendPerSpender = totalSpenders > 0
+                    ? stats.topFans.reduce((sum: number, f: any) => sum + f.spend, 0) / totalSpenders
+                    : 0;
 
             } catch (ofapiError: any) {
                 console.error(`Failed to fetch OFAPI stats for ${creator.name}: ${ofapiError.message}`);
