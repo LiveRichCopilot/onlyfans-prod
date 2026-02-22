@@ -84,7 +84,7 @@ export function StatsGrid({ stats }: Props) {
         <div className="mb-8 space-y-6">
             {/* Revenue — Big Numbers */}
             <div>
-                <h2 className="text-[11px] uppercase tracking-wider text-white/35 font-medium mb-4 px-1">Revenue</h2>
+                <h2 className="text-[11px] uppercase tracking-wider text-white/35 font-medium mb-4 px-1">Revenue (Gross)</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <StatCard label="Today (UK)" value={fmt(stats.todayRevenue || 0)} sub={`${stats.txCountToday || 0} transactions`} color={COLORS.teal} tooltip="Total gross since midnight UK time" />
                     <StatCard label="This Hour" value={fmt(stats.hourlyRevenue || 0)} sub="last 60 min" color={COLORS.cyan} tooltip="Revenue in the last 60 minutes" />
