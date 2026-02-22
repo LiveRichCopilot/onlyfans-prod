@@ -334,7 +334,7 @@ export async function listChats(accountName: string, apiKey: string) {
  * GET /api/{account}/chats/{chat_id}/messages
  */
 export async function getChatMessages(accountName: string, chatId: string | number, apiKey: string) {
-    return ofapiRequest(`/api2/v2/chats/${chatId}/messages?limit=100`, apiKey);
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages?limit=100`, apiKey);
 }
 
 /**
@@ -342,7 +342,7 @@ export async function getChatMessages(accountName: string, chatId: string | numb
  * GET /api/{account}/chats/{chat_id}/messages/search
  */
 export async function searchChatMessages(accountName: string, chatId: string | number, apiKey: string) {
-    return ofapiRequest(`/api2/v2/chats/${chatId}/messages/search`, apiKey);
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages/search`, apiKey);
 }
 
 /**
@@ -350,7 +350,7 @@ export async function searchChatMessages(accountName: string, chatId: string | n
  * POST /api/{account}/chats/{chat_id}/messages
  */
 export async function sendChatMessage(accountName: string, chatId: string | number, apiKey: string, payload: any) {
-    return ofapiRequest(`/api2/v2/chats/${chatId}/messages`, apiKey, {
+    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages`, apiKey, {
         method: "POST",
         body: payload
     });

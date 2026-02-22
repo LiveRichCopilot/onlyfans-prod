@@ -21,9 +21,13 @@ type Props = {
     onApplyFilters: (filters: any) => void;
 };
 
-export function FanList({ creators, selectedCreatorId, onSelectCreator, chats, activeChat, onSelectChat, loading, sortBy, onSortChange, unreadFirst, onUnreadFirstChange, onApplyFilters }: Props) {
+export function FanList({
+    creators, selectedCreatorId, onSelectCreator,
+    chats, activeChat, onSelectChat, loading,
+    sortBy, onSortChange, unreadFirst, onUnreadFirstChange, onApplyFilters,
+}: Props) {
     return (
-        <div className="w-[340px] m-4 mr-0 flex flex-col z-10 glass-panel rounded-3xl overflow-hidden border-white/10">
+        <div className="flex flex-col h-full">
             <CreatorPicker creators={creators} selectedCreatorId={selectedCreatorId} onSelect={onSelectCreator} />
             <SearchBar sortBy={sortBy} onSortChange={onSortChange} unreadFirst={unreadFirst} onUnreadFirstChange={onUnreadFirstChange} onApplyFilters={onApplyFilters} />
             <FilterTabs />

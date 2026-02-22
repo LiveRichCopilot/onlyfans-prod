@@ -1,23 +1,28 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchAllTransactions } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Cron job that syncs transactions from OFAPI into the local Postgres DB.
- * Run every hour via Vercel Cron. Builds local history so dashboard
- * can query without hitting OFAPI for every page load.
+ * Syncs transactions from OFAPI into local Postgres (Supabase).
+ * Runs every 30 min via Vercel Cron.
  *
- * Only syncs the last 24h of transactions each run.
- * Uses ofapiTxId for deduplication — safe to run repeatedly.
+ * Default: syncs last 48h (overlap for safety).
+ * With ?backfill=true: syncs last 30 days (one-time historical load).
+ *
+ * Deduplicates by ofapiTxId. Safe to run repeatedly.
  */
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
     if (req.headers.get("Authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
         if (process.env.NODE_ENV === "production") {
             return new NextResponse("Unauthorized", { status: 401 });
         }
     }
+
+    const backfill = req.nextUrl.searchParams.get("backfill") === "true";
+    const hoursBack = backfill ? 30 * 24 : 48; // 30 days or 48 hours
+    const maxTx = backfill ? 10000 : 3000;
 
     try {
         const creators = await prisma.creator.findMany({
@@ -30,16 +35,17 @@ export async function GET(req: Request) {
 
         let totalSynced = 0;
         let totalSkipped = 0;
+        const errors: string[] = [];
 
         for (const creator of creators) {
             if (!creator.ofapiToken || creator.ofapiToken === "unlinked") continue;
 
             const accountName = creator.ofapiCreatorId || creator.telegramId;
             const apiKey = creator.ofapiToken;
-            const startWindow = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const startWindow = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
 
             try {
-                const allTx = await fetchAllTransactions(accountName, apiKey, startWindow, 2000);
+                const allTx = await fetchAllTransactions(accountName, apiKey, startWindow, maxTx);
 
                 for (const tx of allTx) {
                     const txId = tx.id?.toString() || tx.transaction_id?.toString();
@@ -49,24 +55,26 @@ export async function GET(req: Request) {
                     if (amount === 0) continue;
 
                     const fanId = tx.user?.id?.toString() || tx.fan?.id?.toString();
-                    const fanUsername = tx.user?.username || tx.fan?.username || "unknown";
+                    const fanUsername = tx.user?.username || tx.fan?.username || null;
                     const fanName = tx.user?.name || tx.user?.displayName || tx.fan?.name || "Unknown";
                     const txDate = new Date(tx.createdAt || tx.created_at || tx.date);
+                    const txType = tx.type || tx.transactionType || tx.transaction_type || null;
 
                     if (!fanId) continue;
 
-                    // Upsert fan
+                    // Upsert fan (with username now)
                     const fan = await prisma.fan.upsert({
                         where: { ofapiFanId: fanId },
                         create: {
                             ofapiFanId: fanId,
                             creatorId: creator.id,
                             name: fanName,
+                            username: fanUsername,
                             lifetimeSpend: amount,
                         },
                         update: {
                             name: fanName,
-                            // lifetimeSpend gets recalculated below
+                            username: fanUsername || undefined,
                         },
                     });
 
@@ -77,40 +85,51 @@ export async function GET(req: Request) {
                             create: {
                                 ofapiTxId: txId,
                                 fanId: fan.id,
+                                creatorId: creator.id,
                                 amount,
+                                type: txType,
                                 date: txDate,
                             },
-                            update: {}, // Already exists, skip
+                            update: {
+                                creatorId: creator.id, // Backfill for old rows
+                                type: txType || undefined,
+                            },
                         });
                         totalSynced++;
                     } catch {
-                        totalSkipped++; // Duplicate, already exists
+                        totalSkipped++;
                     }
                 }
 
-                // Recalculate lifetime spend for all fans of this creator
-                const fans = await prisma.fan.findMany({
+                // Recalculate lifetime spend for fans of this creator
+                const fansWithTx = await prisma.fan.findMany({
                     where: { creatorId: creator.id },
-                    include: { transactions: true },
+                    include: { transactions: { select: { amount: true } } },
                 });
 
-                for (const fan of fans) {
-                    const total = fan.transactions.reduce((sum, t) => sum + t.amount, 0);
-                    await prisma.fan.update({
-                        where: { id: fan.id },
-                        data: { lifetimeSpend: total },
-                    });
+                for (const fan of fansWithTx) {
+                    const total = fan.transactions.reduce((sum: number, t: { amount: number }) => sum + t.amount, 0);
+                    if (Math.abs(total - fan.lifetimeSpend) > 0.01) {
+                        await prisma.fan.update({
+                            where: { id: fan.id },
+                            data: { lifetimeSpend: total },
+                        });
+                    }
                 }
             } catch (err: any) {
-                console.error(`Sync failed for ${creator.name || accountName}: ${err.message}`);
+                const msg = `Sync failed for ${creator.name || accountName}: ${err.message}`;
+                console.error(msg);
+                errors.push(msg);
             }
         }
 
         return NextResponse.json({
             status: "ok",
+            mode: backfill ? "backfill_30d" : "standard_48h",
             synced: totalSynced,
             skipped: totalSkipped,
             creators: creators.length,
+            errors: errors.length > 0 ? errors : undefined,
         });
     } catch (err: any) {
         console.error("Transaction sync cron error:", err);

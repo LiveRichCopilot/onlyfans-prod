@@ -1,6 +1,5 @@
 "use client";
 
-import { UserCircle } from "lucide-react";
 import type { Chat } from "./types";
 
 type Props = {
@@ -9,33 +8,72 @@ type Props = {
     onClick: () => void;
 };
 
+function timeAgo(dateStr: string): string {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return "now";
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function FanRow({ chat, isActive, onClick }: Props) {
+    const isUnread = !chat.lastMessage.isRead;
+    const avatarUrl = chat.withUser.avatar
+        ? `/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`
+        : null;
+
     return (
         <div
             onClick={onClick}
-            className={`flex items-start p-4 cursor-pointer border-b border-white/5 transition-colors ${isActive ? 'bg-white/10 border-l-2 border-l-teal-500' : 'hover:bg-white/5 border-l-2 border-l-transparent'}`}
+            className={`flex items-center px-4 py-3 cursor-pointer transition-colors ${
+                isActive
+                    ? "bg-[#007AFF]/15"
+                    : "hover:bg-white/[0.04] active:bg-white/[0.08]"
+            }`}
         >
-            <div className="w-11 h-11 rounded-full bg-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden mr-3 border border-white/10 shadow-sm">
-                {chat.withUser.avatar ? (
-                    <img src={`/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`} alt="Avatar" className="w-full h-full object-cover" />
+            {/* Avatar */}
+            <div className="w-12 h-12 rounded-full flex-shrink-0 overflow-hidden mr-3 bg-white/[0.08] flex items-center justify-center">
+                {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
-                    <UserCircle size={24} className="text-white/30" />
+                    <span className="text-lg font-semibold text-white/30">
+                        {chat.withUser.name?.charAt(0)?.toUpperCase() || "?"}
+                    </span>
                 )}
             </div>
+
+            {/* Name + preview */}
             <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="font-semibold text-sm truncate text-white/90">{chat.withUser.name} <span className="text-xs text-white/40 font-normal">@{chat.withUser.username}</span></h3>
-                    <span className="text-[10px] text-gray-500 flex-shrink-0 ml-2">
-                        {chat.lastMessage.createdAt ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                <div className="flex justify-between items-baseline">
+                    <h3 className={`text-[15px] truncate ${isUnread ? "font-semibold text-white" : "font-medium text-white/80"}`}>
+                        {chat.withUser.name || `@${chat.withUser.username}`}
+                    </h3>
+                    <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-[#007AFF]" : "text-white/30"}`}>
+                        {chat.lastMessage.createdAt ? timeAgo(chat.lastMessage.createdAt) : ""}
                     </span>
                 </div>
-                <div className="flex items-center text-xs">
-                    {chat.totalSpend !== undefined && chat.totalSpend > 0 ? (
-                        <span className="text-[#14b8a6] font-semibold mr-2">${chat.totalSpend}</span>
-                    ) : null}
-                    <p className="text-gray-400 truncate w-full">{chat.lastMessage.text}</p>
+                <div className="flex items-center mt-0.5">
+                    {chat.totalSpend !== undefined && chat.totalSpend > 0 && (
+                        <span className="text-[11px] text-emerald-400 font-semibold mr-1.5 flex-shrink-0">
+                            ${chat.totalSpend.toLocaleString()}
+                        </span>
+                    )}
+                    <p className={`text-[13px] truncate ${isUnread ? "text-white/60" : "text-white/35"}`}>
+                        {chat.lastMessage.text}
+                    </p>
                 </div>
             </div>
+
+            {/* Unread dot */}
+            {isUnread && (
+                <div className="w-2.5 h-2.5 rounded-full bg-[#007AFF] flex-shrink-0 ml-2 shadow-lg shadow-blue-500/50" />
+            )}
         </div>
     );
 }

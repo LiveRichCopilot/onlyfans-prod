@@ -117,25 +117,33 @@ model Fan {
   ofapiFanId     String        @unique
   creatorId      String
   name           String?
+  username       String?
   lifetimeSpend  Float         @default(0)
-  
+
   creator        Creator       @relation(fields: [creatorId], references: [id])
   transactions   Transaction[]
-  
+
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+
+  @@index([creatorId])
 }
 
 model Transaction {
   id             String        @id @default(cuid())
   ofapiTxId      String        @unique
   fanId          String
+  creatorId      String?       // Optional for backward compat — backfilled by cron
   amount         Float
+  type           String?       // tip, message, post, subscription, stream, referral
   date           DateTime
-  
+
   fan            Fan           @relation(fields: [fanId], references: [id])
   mediaAssetId   String?
   mediaAsset     MediaAsset?   @relation(fields: [mediaAssetId], references: [id])
-  
+
   createdAt      DateTime      @default(now())
+
+  @@index([creatorId, date])
+  @@index([date])
 }

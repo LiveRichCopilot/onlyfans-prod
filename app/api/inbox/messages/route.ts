@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getChatMessages, sendChatMessage } from "@/lib/ofapi";
+import { getChatMessages, sendChatMessage, sendTypingIndicator } from "@/lib/ofapi";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const creatorId = searchParams.get('creatorId');
-    const chatId = searchParams.get('chatId');
+    const creatorId = searchParams.get("creatorId");
+    const chatId = searchParams.get("chatId");
 
     if (!creatorId || !chatId) {
         return NextResponse.json({ error: "Missing creatorId or chatId" }, { status: 400 });
@@ -22,10 +24,15 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
         }
 
-        const rawMessages = await getChatMessages(creator.ofapiCreatorId || creator.telegramId, chatId, apiKey);
+        const accountName = creator.ofapiCreatorId || creator.telegramId;
+        const rawMessages = await getChatMessages(accountName, chatId, apiKey);
 
-        return NextResponse.json({ messages: rawMessages.list || rawMessages || [] });
+        // OFAPI may return data in different shapes
+        const messages = rawMessages?.list || rawMessages?.data?.list || rawMessages?.data || rawMessages || [];
+
+        return NextResponse.json({ messages });
     } catch (e: any) {
+        console.error("Inbox messages GET error:", e.message);
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
@@ -49,15 +56,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
         }
 
-        // Call user's requested Typing Indicator before sending the message! (Simulates "Model is typing...")
-        try {
-            await fetch(`https://onlyfans-prod.vercel.app/api/inbox/typing`, { method: 'POST', body: JSON.stringify({ creatorId, chatId }) }).catch();
-        } catch (e) { }
+        const accountName = creator.ofapiCreatorId || creator.telegramId;
 
-        const response = await sendChatMessage(creator.ofapiCreatorId || creator.telegramId, chatId, apiKey, { text });
+        // Show typing indicator before sending
+        try {
+            await sendTypingIndicator(accountName, chatId, apiKey);
+        } catch {} // Fire and forget
+
+        const response = await sendChatMessage(accountName, chatId, apiKey, { text });
 
         return NextResponse.json({ success: true, message: response });
     } catch (e: any) {
+        console.error("Inbox messages POST error:", e.message);
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
