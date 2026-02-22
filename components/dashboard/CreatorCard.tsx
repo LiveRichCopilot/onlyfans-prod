@@ -42,8 +42,8 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF }: Pro
                                 </div>
                             )}
                             <div>
-                                <div className="text-white font-semibold text-lg leading-tight group-hover:text-teal-400 transition-colors drop-shadow-md">{c.name || "Unknown Profile"}</div>
-                                <div className="text-xs text-teal-400 font-mono mt-0.5 drop-shadow-sm">@{displayHandle}</div>
+                                <div className="text-white font-semibold text-lg leading-tight group-hover:text-teal-400 transition-colors drop-shadow-md truncate max-w-[180px]">{c.name || "Unknown Profile"}</div>
+                                <div className="text-xs text-teal-400 font-mono mt-0.5 drop-shadow-sm truncate max-w-[180px]">@{displayHandle}</div>
                             </div>
                         </div>
 
