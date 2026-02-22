@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { InsightsTabs } from "./InsightsTabs";
 import { FanPreferences } from "./FanPreferences";
 import { FanNotes } from "./FanNotes";
 import { FanInfo } from "./FanInfo";
 import { PurchaseHistory } from "./PurchaseHistory";
 import type { Chat } from "./types";
+
+type FanData = {
+    totalSpend: number;
+    lastPaid: string | null;
+    fanSince: string | null;
+    txCount: number;
+    purchases: any[];
+};
 
 type Props = {
     chat: Chat;
@@ -15,22 +23,39 @@ type Props = {
 
 export function FanSidebar({ chat, width }: Props) {
     const [activeTab, setActiveTab] = useState<"insights" | "purchases">("insights");
+    const [fanData, setFanData] = useState<FanData | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!chat?._creatorId || !chat?.withUser?.id) {
+            setFanData(null);
+            return;
+        }
+        setLoading(true);
+        fetch(`/api/inbox/fan-details?creatorId=${chat._creatorId}&fanId=${chat.withUser.id}`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (!data.error) setFanData(data);
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
+    }, [chat?.id, chat?._creatorId, chat?.withUser?.id]);
 
     return (
         <div
             style={{ width: `${width}px` }}
-            className="m-4 ml-0 flex flex-col z-10 glass-panel rounded-3xl overflow-y-auto custom-scrollbar border-white/10 p-6 hidden xl:block shadow-2xl"
+            className="flex flex-col flex-shrink-0 border-l border-white/[0.06] overflow-y-auto custom-scrollbar p-4 bg-black/30"
         >
             <InsightsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
             {activeTab === "insights" ? (
-                <div className="space-y-8">
+                <div className="space-y-6">
                     <FanPreferences />
                     <FanNotes />
-                    <FanInfo chat={chat} />
+                    <FanInfo chat={chat} fanData={fanData} loading={loading} />
                 </div>
             ) : (
-                <PurchaseHistory chat={chat} />
+                <PurchaseHistory purchases={fanData?.purchases || []} loading={loading} />
             )}
         </div>
     );
