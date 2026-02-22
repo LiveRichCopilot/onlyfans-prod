@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCreatorDashboardStats } from "@/lib/revenue";
+import { getTransactionsSummary, getTransactions, calculateTopFans } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Dashboard creators list — all revenue from local Supabase.
- * Zero OFAPI calls. Instant response.
+ * Dashboard creators list with LIVE OFAPI revenue.
+ * Will switch to Supabase once backfill is complete.
  */
 export async function GET(request: Request) {
     try {
@@ -18,53 +18,77 @@ export async function GET(request: Request) {
             orderBy: { createdAt: "desc" },
         });
 
-        // If custom time range passed (from TimeRangeSelector), use those boundaries
-        const hasCustomRange = startParam && endParam;
+        const now = endParam ? new Date(endParam) : new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const todayStart = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        const enrichedCreators = await Promise.all(
-            creators.map(async (c: any) => {
-                let hourlyRev = 0, todayRev = 0, txCount = 0;
-                let topFans: { username: string; name: string; spend: number }[] = [];
+        // Fetch live revenue from OFAPI for each linked creator in parallel
+        const liveDataPromises = creators
+            .filter((c) => c.ofapiToken && c.ofapiToken !== "unlinked")
+            .map(async (creator) => {
+                const accountName = creator.ofapiCreatorId || creator.telegramId;
+                const apiKey = creator.ofapiToken!;
 
-                if (c.ofapiToken && c.ofapiToken !== "unlinked") {
-                    if (hasCustomRange) {
-                        // Custom range from TimeRangeSelector
-                        const start = new Date(startParam);
-                        const end = new Date(endParam);
-                        const { getRevenue, getTxCount, getTopFans } = await import("@/lib/revenue");
-                        const [rev, count, fans] = await Promise.all([
-                            getRevenue(c.id, start, end),
-                            getTxCount(c.id, start, end),
-                            getTopFans(c.id, start, end, 3),
-                        ]);
-                        todayRev = rev;
-                        txCount = count;
-                        topFans = fans;
-                    } else {
-                        // Default: today + hourly from local DB
-                        const stats = await getCreatorDashboardStats(c.id);
-                        todayRev = stats.todayRev;
-                        hourlyRev = stats.hourlyRev;
-                        txCount = stats.txCount;
-                        topFans = stats.topFans;
-                    }
-                }
+                const payload1h = {
+                    account_ids: [accountName],
+                    start_date: oneHourAgo.toISOString(),
+                    end_date: now.toISOString(),
+                };
+                const payloadToday = {
+                    account_ids: [accountName],
+                    start_date: todayStart.toISOString(),
+                    end_date: now.toISOString(),
+                };
+
+                const [summary1h, summaryToday, txResponse] = await Promise.all([
+                    getTransactionsSummary(apiKey, payload1h, accountName).catch(() => null),
+                    getTransactionsSummary(apiKey, payloadToday, accountName).catch(() => null),
+                    getTransactions(accountName, apiKey).catch(() => null),
+                ]);
+
+                const hourlyRev = parseFloat(summary1h?.data?.total_gross || summary1h?.total_gross || "0");
+                const todayRev = parseFloat(summaryToday?.data?.total_gross || summaryToday?.total_gross || "0");
+
+                // Top fans from raw transactions
+                const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
+                const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayStart);
+                const topFans = calculateTopFans(todayTx, 0).slice(0, 3);
 
                 return {
-                    ...c,
-                    name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
-                    handle: `@${c.ofUsername || c.ofapiCreatorId || c.telegramId}`,
-                    ofUsername: c.ofUsername || null,
-                    headerUrl: c.headerUrl || null,
+                    creatorId: creator.id,
                     hourlyRev,
                     todayRev,
                     topFans,
-                    txCount,
-                    target: c.hourlyTarget || 100,
-                    whaleAlertTarget: c.whaleAlertTarget || 200,
+                    txCount: todayTx.length,
                 };
-            })
-        );
+            });
+
+        const liveResults = await Promise.allSettled(liveDataPromises);
+
+        // Build a map of live data per creator
+        const liveMap: Record<string, any> = {};
+        liveResults.forEach((r) => {
+            if (r.status === "fulfilled" && r.value) {
+                liveMap[r.value.creatorId] = r.value;
+            }
+        });
+
+        const enrichedCreators = creators.map((c: any) => {
+            const live = liveMap[c.id];
+            return {
+                ...c,
+                name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
+                handle: `@${c.ofUsername || c.ofapiCreatorId || c.telegramId}`,
+                ofUsername: c.ofUsername || null,
+                headerUrl: c.headerUrl || null,
+                hourlyRev: live?.hourlyRev || 0,
+                todayRev: live?.todayRev || 0,
+                topFans: live?.topFans || [],
+                txCount: live?.txCount || 0,
+                target: c.hourlyTarget || 100,
+                whaleAlertTarget: c.whaleAlertTarget || 200,
+            };
+        });
 
         return NextResponse.json({ creators: enrichedCreators });
     } catch (error: any) {
