@@ -12,6 +12,7 @@ type Chat = {
         name: string;
         avatar?: string;
     };
+    fan?: any;
     lastMessage: {
         text: string;
         createdAt: string;
@@ -130,11 +131,15 @@ export default function InboxPage() {
 
                 const mappedMsgs: Message[] = typeof sortedRaw.map === 'function' ? sortedRaw.map((m: any) => {
                     const fromId = m.fromUser?.id || m.author?.id || "unknown";
-                    const isCreator = fromId !== activeChat?.withUser.id;
+                    const isCreator = fromId !== activeChat?.withUser?.id && fromId !== activeChat?.fan?.id;
+
+                    const rawText = m.text || "";
+                    // Basic HTML text strip for clean display
+                    const cleanText = rawText.replace(/<[^>]*>?/gm, '');
 
                     return {
                         id: m.id || m.message_id || Math.random().toString(),
-                        text: m.text || "",
+                        text: cleanText,
                         media: Array.isArray(m.media) ? m.media.map((med: any) => ({
                             id: med.id?.toString() || Math.random().toString(),
                             type: med.type || 'photo',
@@ -145,7 +150,7 @@ export default function InboxPage() {
                         createdAt: m.createdAt || new Date().toISOString(),
                         fromUser: { id: fromId },
                         isFromCreator: isCreator,
-                        senderName: m.author?.name || (isCreator ? "Creator" : activeChat?.withUser.name)
+                        senderName: (isCreator ? "Creator" : (activeChat?.withUser?.name || activeChat?.fan?.name || "Fan"))
                     };
                 }) : [];
 
