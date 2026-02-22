@@ -13,21 +13,35 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const account = await prisma.creator.upsert({
-            where: { telegramId: accountId },
-            update: {
-                name: name || null,
-                avatarUrl: avatar || null
-            },
-            create: {
-                ofapiCreatorId: username,
-                telegramId: accountId,
-                telegramGroupId: telegramGroupId || null,
-                ofapiToken: "unlinked",
-                name: name || null,
-                avatarUrl: avatar || null
-            },
+        // Find existing creator by OnlyFans username first to allow updating their Telegram ID
+        let account = await prisma.creator.findFirst({
+            where: { ofapiCreatorId: username }
         });
+
+        if (account) {
+            // Update the existing creator's Telegram mappings
+            account = await prisma.creator.update({
+                where: { id: account.id },
+                data: {
+                    telegramId: accountId,
+                    telegramGroupId: telegramGroupId || null,
+                    name: name || account.name,
+                    avatarUrl: avatar || account.avatarUrl
+                }
+            });
+        } else {
+            // Create new creator
+            account = await prisma.creator.create({
+                data: {
+                    ofapiCreatorId: username,
+                    telegramId: accountId,
+                    telegramGroupId: telegramGroupId || null,
+                    ofapiToken: "unlinked",
+                    name: name || null,
+                    avatarUrl: avatar || null
+                }
+            });
+        }
 
         return NextResponse.json(account, { status: 201 });
     } catch (e: any) {
