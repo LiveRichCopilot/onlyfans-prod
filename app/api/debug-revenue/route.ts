@@ -5,7 +5,7 @@ import { getTransactionsSummary, getEarningsOverview, getTransactionsByType, get
 export async function GET(request: NextRequest) {
     try {
         const creator = await prisma.creator.findFirst({
-            where: { name: { contains: "Angie" } }
+            where: { name: { contains: "Angee" } }
         });
 
         if (!creator) return NextResponse.json({ error: "No creator found" });
