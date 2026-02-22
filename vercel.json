@@ -6,7 +6,7 @@
         },
         {
             "path": "/api/cron/sync-transactions",
-            "schedule": "30 * * * *"
+            "schedule": "*/5 * * * *"
         }
     ]
 }
