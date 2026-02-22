@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getTransactionsSummary, getTransactions, calculateTopFans } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
 
@@ -129,51 +130,49 @@ export async function GET(request: Request) {
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const todayStart = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        // Read revenue from LOCAL Transaction table (synced every 5 min by cron)
-        const liveMap: Record<string, any> = {};
+        // Fetch live revenue from OFAPI for each linked creator in parallel
+        const liveDataPromises = creators
+            .filter((c) => c.ofapiToken && c.ofapiToken !== "unlinked")
+            .map(async (creator) => {
+                const accountName = creator.ofapiCreatorId || creator.telegramId;
+                const apiKey = creator.ofapiToken!;
 
-        for (const creator of creators) {
-            if (!creator.ofapiToken || creator.ofapiToken === "unlinked") continue;
+                const payloadToday = {
+                    account_ids: [accountName],
+                    start_date: todayStart.toISOString(),
+                    end_date: now.toISOString(),
+                };
 
-            // Today's transactions from local DB
-            const todayTx = await prisma.transaction.findMany({
-                where: {
+                const [summaryToday, txResponse] = await Promise.all([
+                    getTransactionsSummary(apiKey, payloadToday, accountName).catch(() => null),
+                    getTransactions(accountName, apiKey).catch(() => null),
+                ]);
+
+                const todayRev = parseFloat(summaryToday?.data?.total_gross || summaryToday?.total_gross || "0");
+
+                const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
+                const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayStart);
+                const recentTx = allTx.filter((t: any) => new Date(t.createdAt) >= oneHourAgo);
+                const hourlyRev = recentTx.reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
+                const topFans = calculateTopFans(todayTx, 0).slice(0, 3);
+
+                return {
                     creatorId: creator.id,
-                    date: { gte: todayStart, lte: now },
-                },
-                include: { fan: { select: { username: true, name: true } } },
-                orderBy: { date: "desc" },
+                    hourlyRev,
+                    todayRev,
+                    topFans,
+                    txCount: todayTx.length,
+                };
             });
 
-            const todayRev = todayTx.reduce((sum: number, t: any) => sum + t.amount, 0);
-            const hourlyRev = todayTx
-                .filter((t: any) => t.date >= oneHourAgo)
-                .reduce((sum: number, t: any) => sum + t.amount, 0);
+        const liveResults = await Promise.allSettled(liveDataPromises);
 
-            // Top fans from today's transactions
-            const fanTotals: Record<string, { username: string; name: string; spend: number }> = {};
-            for (const t of todayTx) {
-                const key = t.fanId;
-                if (!fanTotals[key]) {
-                    fanTotals[key] = {
-                        username: t.fan?.username || "unknown",
-                        name: t.fan?.name || "Unknown",
-                        spend: 0,
-                    };
-                }
-                fanTotals[key].spend += t.amount;
+        const liveMap: Record<string, any> = {};
+        liveResults.forEach((r) => {
+            if (r.status === "fulfilled" && r.value) {
+                liveMap[r.value.creatorId] = r.value;
             }
-            const topFans = Object.values(fanTotals)
-                .sort((a, b) => b.spend - a.spend)
-                .slice(0, 3);
-
-            liveMap[creator.id] = {
-                hourlyRev,
-                todayRev,
-                topFans,
-                txCount: todayTx.length,
-            };
-        }
+        });
 
         const enrichedCreators = creators.map((c: any) => {
             const live = liveMap[c.id];
