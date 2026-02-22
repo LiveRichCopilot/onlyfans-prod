@@ -43,6 +43,12 @@ export async function POST(request: NextRequest) {
             });
         }
 
+        // Auto-trigger profile sync for the new creator
+        try {
+            const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+            fetch(`${baseUrl}/api/sync-profiles`).catch(() => {});
+        } catch {} // Fire and forget
+
         return NextResponse.json(account, { status: 201 });
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
