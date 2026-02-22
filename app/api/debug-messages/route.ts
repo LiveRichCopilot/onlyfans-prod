@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         if (!chatsArray || chatsArray.length === 0) return NextResponse.json({ error: "No chats" });
 
         const firstChat = chatsArray[0];
-        const chatId = firstChat.chat_id || firstChat.withUser?.id || firstChat.id;
+        const chatId = firstChat.withUser?.id || firstChat.fan?.id || firstChat.chat_id || firstChat.id;
 
         const msgsUrl = `${OFAPI_BASE}/api/${creator.ofapiCreatorId || creator.telegramId}/chats/${chatId}/messages?limit=3`;
         const msgsRes = await fetch(msgsUrl, { headers: { "Authorization": `Bearer ${apiKey}` } });
