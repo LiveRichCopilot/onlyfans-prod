@@ -1,14 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 
-// Seed the database with some initial creators for the Agency Dashboard
 const prisma = new PrismaClient()
 
 async function main() {
     console.log("Seeding initial agency creators...")
 
-    // Add Test Creator 1 (Madison Ivy setup)
     await prisma.creator.upsert({
-        where: { telegramId: 'agency_bot_test_1' },
+        where: { ofapiCreatorId: 'madison420ivy' },
         update: {},
         create: {
             telegramId: 'agency_bot_test_1',
@@ -19,9 +17,8 @@ async function main() {
         },
     })
 
-    // Add Test Creator 2
     await prisma.creator.upsert({
-        where: { telegramId: 'agency_bot_test_2' },
+        where: { ofapiCreatorId: 'lexibelle' },
         update: {},
         create: {
             telegramId: 'agency_bot_test_2',
@@ -32,9 +29,8 @@ async function main() {
         },
     })
 
-    // Add Test Creator 3 (Offline/Inactive)
     await prisma.creator.upsert({
-        where: { telegramId: 'agency_bot_test_3' },
+        where: { ofapiCreatorId: 'rileyreid' },
         update: {},
         create: {
             telegramId: 'agency_bot_test_3',
