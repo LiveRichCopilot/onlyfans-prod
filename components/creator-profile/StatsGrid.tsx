@@ -11,7 +11,7 @@ function StatCard({ label, value, sub, color, tooltip }: { label: string; value:
     const [showTip, setShowTip] = useState(false);
 
     return (
-        <div className="glass-panel p-4 rounded-2xl border-white/5 bg-black/20 relative">
+        <div className="glass-card p-4 rounded-2xl relative">
             <div className="flex items-center justify-between mb-2">
                 <span className="text-white/40 text-[10px] font-semibold uppercase tracking-wider">{label}</span>
                 {tooltip && (
@@ -85,7 +85,7 @@ export function StatsGrid({ stats }: Props) {
                     <h2 className="text-sm font-semibold text-white/50 mb-3 px-1 uppercase tracking-wider">Top Fans Today</h2>
                     <div className="flex flex-wrap gap-2">
                         {stats.topFans.map((fan: any, i: number) => (
-                            <div key={fan.username} className="flex items-center gap-2 glass-panel px-3 py-2 rounded-xl border-white/5 bg-black/20">
+                            <div key={fan.username} className="flex items-center gap-2 glass-card px-3 py-2 rounded-xl">
                                 <span className="text-amber-400 font-bold text-xs">#{i + 1}</span>
                                 <span className="text-white/70 text-xs">@{fan.username}</span>
                                 <span className="text-teal-400 font-semibold text-xs">{fmt(fan.spend)}</span>

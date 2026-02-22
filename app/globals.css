@@ -3,35 +3,149 @@
 @theme {
   --color-background: #000000;
   --color-foreground: #ffffff;
-  --color-glass: rgba(255, 255, 255, 0.05);
-  --color-glass-hover: rgba(255, 255, 255, 0.08);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-glass: rgba(255, 255, 255, 0.04);
+  --color-glass-hover: rgba(255, 255, 255, 0.07);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
   --color-accent: #007aff;
 }
 
 @layer base {
   body {
-    background-color: var(--color-background);
+    background-color: #050508;
     color: var(--color-foreground);
-    /* Apple Glass / VisionOS vibe typically relies on a rich, colorful gradient background layered behind the glass UI */
-    background-image: radial-gradient(circle at 15% 50%, rgba(20, 20, 25, 0.8), transparent 50%),
-      radial-gradient(circle at 85% 30%, rgba(13, 148, 136, 0.15), transparent 50%);
+    background-image:
+      radial-gradient(ellipse at 15% 50%, rgba(13, 148, 136, 0.08), transparent 50%),
+      radial-gradient(ellipse at 85% 20%, rgba(99, 102, 241, 0.06), transparent 50%),
+      radial-gradient(ellipse at 50% 80%, rgba(139, 92, 246, 0.04), transparent 50%);
     background-attachment: fixed;
     @apply antialiased font-sans;
   }
 }
 
 @layer utilities {
+
+  /* ============================================
+     iOS 26 LIQUID GLASS DESIGN SYSTEM
+     Translucent, layered, specular highlights,
+     frosted depth, organic shapes
+     ============================================ */
+
+  /* Base glass — navigation panels, sidebars, modals */
   .glass-panel {
-    @apply bg-[var(--color-glass)] backdrop-blur-3xl border border-[var(--color-glass-border)] shadow-2xl;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.02) 50%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    backdrop-filter: blur(40px) saturate(1.8);
+    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 0 0 0.5px rgba(255, 255, 255, 0.05) inset,
+      0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 2px 8px rgba(0, 0, 0, 0.2);
   }
 
+  /* Elevated glass — stat cards, content cards */
+  .glass-card {
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.015) 100%
+    );
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    /* Specular highlight at top edge — simulates light refraction */
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 0 0 0.5px rgba(255, 255, 255, 0.03) inset,
+      0 4px 24px rgba(0, 0, 0, 0.3),
+      0 1px 4px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card:hover {
+    background: linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.025) 100%
+    );
+    border-top-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 0 0 0.5px rgba(255, 255, 255, 0.05) inset,
+      0 8px 40px rgba(0, 0, 0, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+  }
+
+  /* Prominent glass — CTAs, active states */
+  .glass-prominent {
+    background: linear-gradient(
+      135deg,
+      rgba(13, 148, 136, 0.15) 0%,
+      rgba(13, 148, 136, 0.05) 100%
+    );
+    backdrop-filter: blur(32px) saturate(2);
+    -webkit-backdrop-filter: blur(32px) saturate(2);
+    border: 1px solid rgba(13, 148, 136, 0.2);
+    border-top: 1px solid rgba(13, 148, 136, 0.3);
+    box-shadow:
+      0 0 0 0.5px rgba(13, 148, 136, 0.1) inset,
+      0 4px 24px rgba(13, 148, 136, 0.1),
+      0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Interactive glass button */
   .glass-button {
-    @apply bg-[var(--color-glass)] backdrop-blur-xl border border-[var(--color-glass-border)] hover:bg-[var(--color-glass-hover)] transition-all duration-300 active:scale-95;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+      0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
+  .glass-button:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    border-top-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+      0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .glass-button:active {
+    transform: scale(0.97);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.02) inset,
+      0 1px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Inset glass — inputs, sliders, nested elements */
+  .glass-inset {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.3) inset,
+      0 0 0 0.5px rgba(0, 0, 0, 0.2) inset;
+  }
+
+  /* Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -39,11 +153,11 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 10px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.3);
   }
 }
