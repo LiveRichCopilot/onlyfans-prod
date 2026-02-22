@@ -8,15 +8,24 @@ type Props = {
 };
 
 export function MessageInput({ value, onChange, onSend, disabled }: Props) {
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey && value.trim()) {
+            e.preventDefault();
+            onSend();
+        }
+    };
+
     return (
-        <input
-            type="text"
-            value={value}
-            onChange={onChange}
-            onKeyDown={(e) => e.key === "Enter" && onSend()}
-            placeholder="Type a message to send directly to OnlyFans..."
-            className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm text-white placeholder-white/30"
-            disabled={disabled}
-        />
+        <div className="flex-1 flex items-end bg-white/[0.06] border border-white/[0.1] rounded-[22px] px-3.5 py-2 min-h-[36px] transition-colors focus-within:border-white/[0.15]">
+            <input
+                type="text"
+                value={value}
+                onChange={onChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Message"
+                disabled={disabled}
+                className="flex-1 bg-transparent text-[15px] text-white/90 placeholder-white/25 outline-none min-w-0"
+            />
+        </div>
     );
 }

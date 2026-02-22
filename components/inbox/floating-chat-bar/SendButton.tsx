@@ -1,6 +1,6 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 type Props = {
     onClick: () => void;
@@ -12,13 +12,14 @@ export function SendButton({ onClick, disabled, hasText }: Props) {
     return (
         <button
             onClick={onClick}
-            disabled={disabled}
-            className={`p-2.5 rounded-xl transition-all shadow-sm ${hasText
-                ? "bg-teal-500 text-white hover:bg-teal-400 active:scale-95"
-                : "bg-white/5 text-white/30"
+            disabled={!hasText || disabled}
+            className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                hasText
+                    ? "bg-[#0D9488] text-white shadow-lg shadow-teal-500/25 scale-100"
+                    : "bg-white/[0.06] text-white/20 scale-95"
             }`}
         >
-            <Send size={18} />
+            <ArrowUp size={18} strokeWidth={2.5} />
         </button>
     );
 }
