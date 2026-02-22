@@ -97,7 +97,7 @@ export default function AgencyDashboard() {
                 <ModulesGrid />
             </main>
 
-            {showAddModal && <AddCreatorModal onClose={() => setShowAddModal(false)} />}
+            {showAddModal && <AddCreatorModal onClose={() => setShowAddModal(false)} existingCreators={creators} />}
         </div>
     );
 }

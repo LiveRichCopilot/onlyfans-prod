@@ -14,7 +14,7 @@ model Creator {
   ofUsername      String?       // The actual OnlyFans username (e.g. "angiyang")
   avatarUrl      String?
   headerUrl      String?       // OF profile header/banner image URL
-  telegramId     String        @unique
+  telegramId     String        // Agency owner's Telegram ID (same for all creators in agency)
   ofapiToken     String?
   ofapiCreatorId String?       @unique
   lastSyncCursor String?
