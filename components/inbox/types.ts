@@ -13,6 +13,8 @@ export type Chat = {
         isRead: boolean;
     };
     totalSpend?: number;
+    _creatorId?: string;   // Which creator this chat belongs to
+    _creatorName?: string; // Creator display name
 };
 
 export type Message = {

@@ -12,14 +12,14 @@ import { FanSidebar } from "@/components/inbox/FanSidebar";
 
 export default function InboxPage() {
     const [creators, setCreators] = useState<any[]>([]);
-    const [selectedCreatorId, setSelectedCreatorId] = useState<string>("");
+    const [selectedCreatorId, setSelectedCreatorId] = useState<string>("all");
     const [chats, setChats] = useState<Chat[]>([]);
     const [messages, setMessages] = useState<Message[]>([]);
     const [activeChat, setActiveChat] = useState<Chat | null>(null);
     const [inputText, setInputText] = useState("");
     const [loading, setLoading] = useState(true);
     const [msgsLoading, setMsgsLoading] = useState(false);
-    const [isSfw, setIsSfw] = useState(true);
+    const [isSfw, setIsSfw] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Mobile view state: "list" or "chat"
@@ -37,18 +37,19 @@ export default function InboxPage() {
             .then((data) => {
                 const available = data.creators || [];
                 setCreators(available);
-                const firstLinked = available.find((c: any) => c.ofapiToken && c.ofapiToken !== "unlinked");
-                if (firstLinked) setSelectedCreatorId(firstLinked.id);
-                else if (available.length > 0) setSelectedCreatorId(available[0].id);
+                // Default stays "all" — show all creators' chats merged
             })
             .catch(console.error);
     }, []);
 
-    // 2. Fetch Chat List when a creator is selected
+    // 2. Fetch Chat List when a creator is selected (or all)
     useEffect(() => {
         if (!selectedCreatorId) return;
         setLoading(true);
-        fetch(`/api/inbox/chats?creatorId=${selectedCreatorId}`)
+        const chatUrl = selectedCreatorId === "all"
+            ? "/api/inbox/chats?all=true"
+            : `/api/inbox/chats?creatorId=${selectedCreatorId}`;
+        fetch(chatUrl)
             .then((res) => res.json())
             .then((data) => {
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
@@ -70,6 +71,8 @@ export default function InboxPage() {
                                   isRead: c.lastMessage?.isOpened ?? true,
                               },
                               totalSpend: c.totalSpend || 0,
+                              _creatorId: c._creatorId || "",
+                              _creatorName: c._creatorName || "",
                           }))
                         : [];
                 mappedChats.sort(
@@ -85,17 +88,21 @@ export default function InboxPage() {
     }, [selectedCreatorId]);
 
     // 3. Fetch messages + live polling
+    // Use the chat's creatorId when in "all" mode
+    const activeCreatorId = activeChat?._creatorId || selectedCreatorId;
+
     useEffect(() => {
-        if (!activeChat || !selectedCreatorId) return;
+        if (!activeChat || (!activeCreatorId || activeCreatorId === "all")) return;
         setMsgsLoading(true);
         fetchMessages();
         const pollInterval = setInterval(() => fetchMessages(false), 5000);
         return () => clearInterval(pollInterval);
-    }, [activeChat, selectedCreatorId]);
+    }, [activeChat, activeCreatorId]);
 
     const fetchMessages = (showLoader = true) => {
         if (showLoader) setMsgsLoading(true);
-        fetch(`/api/inbox/messages?creatorId=${selectedCreatorId}&chatId=${activeChat?.id}`)
+        const cId = activeChat?._creatorId || selectedCreatorId;
+        fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat?.id}`)
             .then((res) => res.json())
             .then((data) => {
                 const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
@@ -112,13 +119,22 @@ export default function InboxPage() {
                                   id: m.id || m.message_id || Math.random().toString(),
                                   text: cleanText,
                                   media: Array.isArray(m.media)
-                                      ? m.media.map((med: any) => ({
-                                            id: med.id?.toString() || Math.random().toString(),
-                                            type: med.type || "photo",
-                                            canView: med.canView !== false,
-                                            preview: med.preview || med.thumb || med.squarePreview || med.source?.source || med.full || "",
-                                            src: med.full || med.source?.source || med.preview || med.video?.url || med.audio?.url || "",
-                                        }))
+                                      ? m.media.map((med: any) => {
+                                            // Extract the best URL from various OFAPI response shapes
+                                            const src = med.src || med.full || med.source?.source || med.source?.url
+                                                || med.files?.source?.url || med.files?.preview?.url
+                                                || med.video?.url || med.audio?.url
+                                                || med.preview || med.thumb || med.squarePreview || "";
+                                            const preview = med.preview || med.thumb || med.squarePreview
+                                                || med.files?.preview?.url || med.source?.source || src || "";
+                                            return {
+                                                id: med.id?.toString() || Math.random().toString(),
+                                                type: med.type === "gif" ? "photo" : (med.type || "photo"),
+                                                canView: med.canView !== false,
+                                                preview,
+                                                src,
+                                            };
+                                        }).filter((med: any) => med.src || med.preview) // Skip media with no URLs
                                       : [],
                                   createdAt: m.createdAt || new Date().toISOString(),
                                   fromUser: { id: fromId },
@@ -158,12 +174,13 @@ export default function InboxPage() {
     };
 
     const handleSend = async () => {
-        if (!inputText.trim() || !activeChat || !selectedCreatorId) return;
+        const sendCreatorId = activeChat?._creatorId || selectedCreatorId;
+        if (!inputText.trim() || !activeChat || !sendCreatorId || sendCreatorId === "all") return;
         const optimisticMsg: Message = {
             id: `temp_${Date.now()}`,
             text: inputText,
             createdAt: new Date().toISOString(),
-            fromUser: { id: selectedCreatorId },
+            fromUser: { id: sendCreatorId },
             isFromCreator: true,
             senderName: "You",
         };
@@ -175,7 +192,7 @@ export default function InboxPage() {
             await fetch("/api/inbox/messages", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ creatorId: selectedCreatorId, chatId: activeChat.id, text: textToSend }),
+                body: JSON.stringify({ creatorId: sendCreatorId, chatId: activeChat.id, text: textToSend }),
             });
         } catch (e) {
             console.error("Failed to send", e);

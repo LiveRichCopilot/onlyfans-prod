@@ -24,7 +24,7 @@ export function MessageBubble({ message: msg, isSfw, onDisableSfw, showTail = tr
                 <div
                     className={`rounded-[20px] px-3.5 py-2 text-[15px] leading-relaxed shadow-sm ${
                         isSelf
-                            ? "bg-[#007AFF] text-white rounded-br-[6px]"
+                            ? "bg-[#0D9488] text-white rounded-br-[6px]"
                             : "bg-white/[0.08] backdrop-blur-md text-white/95 rounded-bl-[6px] border border-white/[0.06]"
                     }`}
                 >

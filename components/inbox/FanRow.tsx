@@ -33,7 +33,7 @@ export function FanRow({ chat, isActive, onClick }: Props) {
             onClick={onClick}
             className={`flex items-center px-4 py-3 cursor-pointer transition-colors ${
                 isActive
-                    ? "bg-[#007AFF]/15"
+                    ? "bg-[#0D9488]/15"
                     : "hover:bg-white/[0.04] active:bg-white/[0.08]"
             }`}
         >
@@ -54,7 +54,7 @@ export function FanRow({ chat, isActive, onClick }: Props) {
                     <h3 className={`text-[15px] truncate ${isUnread ? "font-semibold text-white" : "font-medium text-white/80"}`}>
                         {chat.withUser.name || `@${chat.withUser.username}`}
                     </h3>
-                    <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-[#007AFF]" : "text-white/30"}`}>
+                    <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-[#0D9488]" : "text-white/30"}`}>
                         {chat.lastMessage.createdAt ? timeAgo(chat.lastMessage.createdAt) : ""}
                     </span>
                 </div>
@@ -72,7 +72,7 @@ export function FanRow({ chat, isActive, onClick }: Props) {
 
             {/* Unread dot */}
             {isUnread && (
-                <div className="w-2.5 h-2.5 rounded-full bg-[#007AFF] flex-shrink-0 ml-2 shadow-lg shadow-blue-500/50" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#0D9488] flex-shrink-0 ml-2 shadow-lg shadow-blue-500/50" />
             )}
         </div>
     );

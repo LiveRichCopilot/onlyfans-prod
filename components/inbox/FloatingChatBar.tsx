@@ -29,7 +29,7 @@ export function FloatingChatBar({ inputText, onTyping, onSend, onSetText, disabl
                 <button
                     onClick={() => setShowTools(!showTools)}
                     className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-                        showTools ? "bg-[#007AFF] text-white rotate-45" : "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]"
+                        showTools ? "bg-[#0D9488] text-white rotate-45" : "bg-white/[0.08] text-white/50 hover:bg-white/[0.12]"
                     }`}
                 >
                     <Plus size={20} strokeWidth={2.5} />
@@ -59,7 +59,7 @@ export function FloatingChatBar({ inputText, onTyping, onSend, onSetText, disabl
                     disabled={!hasText || disabled}
                     className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                         hasText
-                            ? "bg-[#007AFF] text-white shadow-lg shadow-blue-500/25 scale-100"
+                            ? "bg-[#0D9488] text-white shadow-lg shadow-blue-500/25 scale-100"
                             : "bg-white/[0.06] text-white/20 scale-95"
                     }`}
                 >

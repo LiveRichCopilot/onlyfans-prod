@@ -20,7 +20,7 @@ export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack }: Props) {
             <div className="flex items-center gap-2">
                 {/* Back button — visible on mobile */}
                 {onBack && (
-                    <button onClick={onBack} className="md:hidden p-1.5 -ml-1 text-[#007AFF] hover:bg-white/5 rounded-lg transition-colors">
+                    <button onClick={onBack} className="md:hidden p-1.5 -ml-1 text-[#0D9488] hover:bg-white/5 rounded-lg transition-colors">
                         <ChevronLeft size={24} />
                     </button>
                 )}
@@ -46,7 +46,7 @@ export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack }: Props) {
             <div className="flex items-center gap-1">
                 <button
                     onClick={onToggleSfw}
-                    className={`p-2 rounded-full transition-colors ${isSfw ? "text-[#007AFF] bg-[#007AFF]/10" : "text-white/40 hover:text-white/60 hover:bg-white/5"}`}
+                    className={`p-2 rounded-full transition-colors ${isSfw ? "text-[#0D9488] bg-[#0D9488]/10" : "text-white/40 hover:text-white/60 hover:bg-white/5"}`}
                     title={isSfw ? "SFW Mode On" : "SFW Mode Off"}
                 >
                     {isSfw ? <EyeOff size={18} /> : <Eye size={18} />}
