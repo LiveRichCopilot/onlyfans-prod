@@ -1,52 +1,89 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMe } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
 
+const OFAPI_BASE = "https://app.onlyfansapi.com";
+
 export async function GET() {
     try {
-        const creators = await prisma.creator.findMany({
-            where: { ofapiToken: { not: "unlinked" } }
+        const apiKey = process.env.OFAPI_API_KEY || "";
+        if (!apiKey) {
+            return NextResponse.json({ error: "No OFAPI_API_KEY configured" }, { status: 500 });
+        }
+
+        // Fetch all accounts from OFAPI — this has the full profile data
+        const accountsRes = await fetch(`${OFAPI_BASE}/api/accounts`, {
+            headers: { "Authorization": `Bearer ${apiKey}` },
         });
 
-        const updated = [];
+        if (!accountsRes.ok) {
+            return NextResponse.json({ error: `OFAPI error: ${accountsRes.status}` }, { status: 500 });
+        }
 
-        for (const c of creators) {
-            // Always re-sync if missing avatar, username, or header
-            if (!c.avatarUrl || !c.ofUsername || !c.headerUrl || c.name === c.ofapiCreatorId) {
-                try {
-                    const me = await getMe(c.ofapiCreatorId || c.telegramId, c.ofapiToken as string);
+        const accounts = await accountsRes.json();
+        const updated: any[] = [];
 
-                    if (me) {
-                        // OFAPI /me response can have various field names — handle all possibilities
-                        const profileName = me.name || me.display_name || me.displayName || c.name;
-                        const username = me.username || me.onlyfans_username || me.of_username || null;
-                        const avatar = me.avatar || me.avatarUrl || me.avatar_url || me.profilePicUrl || null;
-                        const header = me.header || me.headerUrl || me.header_url || me.headerImage || me.banner || null;
+        // Get all creators from our DB
+        const creators = await prisma.creator.findMany({
+            where: { ofapiToken: { not: "unlinked" } },
+        });
 
-                        const updateData: any = {};
-                        if (profileName && profileName !== c.name) updateData.name = profileName;
-                        if (username) updateData.ofUsername = username;
-                        if (avatar) updateData.avatarUrl = avatar;
-                        if (header) updateData.headerUrl = header;
+        for (const creator of creators) {
+            // Match by ofapiCreatorId (the acct_xxx ID)
+            const ofAccount = Array.isArray(accounts)
+                ? accounts.find((a: any) => a.id === creator.ofapiCreatorId)
+                : null;
 
-                        if (Object.keys(updateData).length > 0) {
-                            await prisma.creator.update({
-                                where: { id: c.id },
-                                data: updateData
-                            });
-                            updated.push({ id: c.id, name: profileName, username, hasAvatar: !!avatar, hasHeader: !!header });
-                        }
-                    }
-                } catch (e: any) {
-                    console.error(`Failed to sync ${c.ofapiCreatorId}: ${e.message}`);
-                }
+            if (!ofAccount) continue;
+
+            const userData = ofAccount.onlyfans_user_data || {};
+            const updateData: any = {};
+
+            // Name — use the OF display name
+            const displayName = userData.name || ofAccount.display_name;
+            if (displayName && displayName !== creator.name) {
+                updateData.name = displayName;
+            }
+
+            // Username — the actual @handle
+            const username = ofAccount.onlyfans_username || userData.username;
+            if (username) {
+                updateData.ofUsername = username;
+            }
+
+            // Avatar
+            const avatar = userData.avatar || userData.avatarUrl;
+            if (avatar) {
+                updateData.avatarUrl = avatar;
+            }
+
+            // Header/Banner
+            const header = userData.header || userData.headerUrl || userData.header_image;
+            if (header) {
+                updateData.headerUrl = header;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+                await prisma.creator.update({
+                    where: { id: creator.id },
+                    data: updateData,
+                });
+                updated.push({
+                    id: creator.id,
+                    name: updateData.name || creator.name,
+                    username: updateData.ofUsername,
+                    hasAvatar: !!updateData.avatarUrl,
+                    hasHeader: !!updateData.headerUrl,
+                    avatarUrl: updateData.avatarUrl || null,
+                    headerUrl: updateData.headerUrl || null,
+                });
             }
         }
 
         return NextResponse.json({ success: true, updated_profiles: updated });
     } catch (e: any) {
-        return NextResponse.json({ success: false, error: e.message });
+        console.error("Sync profiles error:", e);
+        return NextResponse.json({ success: false, error: e.message }, { status: 500 });
     }
 }
