@@ -124,16 +124,20 @@ export async function GET(request: Request) {
             autoSyncUnsynced(creators).catch(() => {}); // Fire and forget
         }
 
-        // Compute today's revenue from DB (populated by sync-transactions cron every 5 min)
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+        // Compute today's revenue from DB — OnlyFans uses UK time (GMT/BST) as daily cutoff
+        // Midnight UK = start of the OF "day" for statements
         const now = new Date();
-        const hoursSinceStart = Math.max(1, (now.getTime() - todayStart.getTime()) / 3600000);
+        const ukNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/London" }));
+        const todayStart = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), 0, 0, 0, 0);
+        // Convert UK midnight back to UTC for DB query
+        const ukOffset = ukNow.getTime() - now.getTime();
+        const todayStartUtc = new Date(todayStart.getTime() - ukOffset);
+        const hoursSinceStart = Math.max(1, (now.getTime() - todayStartUtc.getTime()) / 3600000);
 
-        // Single query: today's transactions grouped by creator
+        // Single query: today's transactions grouped by creator (UK day)
         const todayTx = await prisma.transaction.groupBy({
             by: ["creatorId"],
-            where: { date: { gte: todayStart } },
+            where: { date: { gte: todayStartUtc } },
             _sum: { amount: true },
             _count: true,
         });
@@ -142,7 +146,7 @@ export async function GET(request: Request) {
         // Top fan per creator (highest spend today)
         const topFanRows = await prisma.transaction.groupBy({
             by: ["creatorId", "fanId"],
-            where: { date: { gte: todayStart } },
+            where: { date: { gte: todayStartUtc } },
             _sum: { amount: true },
             orderBy: { _sum: { amount: "desc" } },
         });
@@ -179,6 +183,7 @@ export async function GET(request: Request) {
                 txCount,
                 target: c.hourlyTarget || 100,
                 whaleAlertTarget: c.whaleAlertTarget || 200,
+                lastSyncedAt: c.lastSyncCursor || null,
             };
         });
 
