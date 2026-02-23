@@ -69,40 +69,28 @@ export function WhaleOnlineAlert({ creatorId, onNavigateToFan }: Props) {
         return `${days}d ago`;
     };
 
-    // Show max 2 inline, collapse the rest behind a count
-    const shown = visibleAlerts.slice(0, 2);
-    const extraCount = visibleAlerts.length - shown.length;
-
     return (
-        <div className="space-y-1.5 mb-2 px-2">
-            {shown.map((alert) => (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto no-scrollbar border-b border-white/[0.06]">
+            <span className="text-[10px] text-cyan-400/60 font-semibold flex-shrink-0 uppercase tracking-wider">🐋 Online:</span>
+            {visibleAlerts.map((alert) => (
                 <button
                     key={alert.id}
-                    onClick={() => onNavigateToFan?.(alert.fanOfapiId)}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 hover:from-cyan-500/15 hover:to-blue-500/15 transition-all group"
+                    onClick={() => onNavigateToFan?.(String(alert.fanOfapiId))}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-all flex-shrink-0 group"
                 >
-                    <span className="text-sm flex-shrink-0">🐋</span>
-                    <span className="text-white/90 text-xs font-semibold truncate">{alert.name}</span>
-                    <span className="text-cyan-400 text-[11px] font-bold flex-shrink-0">${alert.spend.toLocaleString()}</span>
-                    <span className="text-white/30 text-[10px] flex-shrink-0">{formatTimeAgo(alert.timestamp)}</span>
-                    <button
+                    <span className="text-white/90 text-[11px] font-semibold">{alert.name.split(" ")[0]}</span>
+                    <span className="text-cyan-400 text-[10px] font-bold">${alert.spend >= 1000 ? `${(alert.spend / 1000).toFixed(1)}k` : alert.spend.toLocaleString()}</span>
+                    <span
                         onClick={(e) => {
                             e.stopPropagation();
                             setDismissed((prev) => new Set([...prev, alert.id]));
                         }}
-                        className="text-white/20 hover:text-white/50 transition-colors ml-auto flex-shrink-0"
+                        className="text-white/20 hover:text-white/50 transition-colors cursor-pointer"
                     >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                    </button>
+                        ×
+                    </span>
                 </button>
             ))}
-            {extraCount > 0 && (
-                <div className="text-center text-[10px] text-cyan-400/50">
-                    +{extraCount} more whale{extraCount > 1 ? "s" : ""} online
-                </div>
-            )}
         </div>
     );
 }
