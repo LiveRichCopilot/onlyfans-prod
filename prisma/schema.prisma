@@ -162,6 +162,31 @@ model Fan {
   toxicityReason  String?
   agentEffortMinutes Float?     // Estimated minutes spent on this fan
 
+  // --- Emotional drivers ---
+  emotionalDrivers String?      // JSON array: ["validation","companionship","escapism"]
+  emotionalNeeds  String?       // "someone to talk to", "stress relief"
+
+  // --- Communication preferences ---
+  messageLengthPref String?     // short, medium, long
+  frequencyPref   String?       // daily, few_times_week, only_new_content
+  bestOpenerType  String?       // meme, question, update, compliment, topic_hook
+  bestOfferType   String?       // limited_drop, bundle, personalized, behind_scenes
+
+  // --- Next best action (computed) ---
+  nextBestAction  String?       // build_rapport, ask_qualifying, offer_bundle, set_followup, deprioritize
+  nextBestActionReason String?
+  deprioritizeUntil DateTime?   // Cooldown for time-wasters
+
+  // --- Narrative summary (rolling AI/human summary) ---
+  narrativeSummary String?      // "Prefers playful banter, replies late nights, likes gaming..."
+
+  // --- Relationship timeline ---
+  firstContactAt  DateTime?
+  firstPurchaseAt DateTime?
+  biggestPurchase Float?
+  birthday        String?       // If volunteered
+  subAnniversary  DateTime?
+
   // --- Identity & context (only if volunteered) ---
   language        String?
   timezone        String?
@@ -172,6 +197,8 @@ model Fan {
   transactions    Transaction[]
   preferences     FanPreference[]
   intentEvents    FanIntentEvent[]
+  facts           FanFact[]
+  lifecycleEvents FanLifecycleEvent[]
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -244,6 +271,39 @@ model ChatQAReview {
 
   @@index([creatorId, createdAt])
   @@index([chatterId])
+}
+
+// Structured long-term memory — facts the fan has volunteered or we've detected
+model FanFact {
+  id              String        @id @default(cuid())
+  fanId           String
+  key             String        // e.g. "hobby", "pet_name", "work_schedule", "favorite_team"
+  value           String        // The actual value
+  confidence      Float         @default(0.8)
+  sourceMessageId String?       // OFAPI message ID where this was learned
+  source          String?       @default("manual") // "auto" or "manual"
+  lastConfirmedAt DateTime?     @default(now())
+  createdAt       DateTime      @default(now())
+
+  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+
+  @@unique([fanId, key])
+  @@index([fanId])
+  @@index([key])
+}
+
+// Timeline events — stage changes, milestones, follow-ups
+model FanLifecycleEvent {
+  id              String        @id @default(cuid())
+  fanId           String
+  type            String        // stage_change, followup_set, first_purchase, churn_risk, milestone, promise_made
+  metadata        Json?         // Flexible: { from: "warming", to: "active_buyer", reason: "bought 3rd PPV" }
+  createdAt       DateTime      @default(now())
+
+  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+
+  @@index([fanId, createdAt])
+  @@index([type])
 }
 
 model Transaction {
