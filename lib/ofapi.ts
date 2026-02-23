@@ -437,23 +437,39 @@ export async function getChatMedia(account: string, chatId: string, apiKey: stri
     return ofapiRequest(`/api/${account}/chats/${chatId}/media`, apiKey);
 }
 
-/** Paginate through all chats for an account (up to maxChats) */
+/** Paginate through all chats for an account using _pagination.next_page */
 export async function fetchAllChats(accountName: string, apiKey: string, maxChats: number = 200) {
     let allChats: any[] = [];
-    let offset = 0;
-    const pageSize = 50;
 
-    while (allChats.length < maxChats) {
-        const res = await listChats(accountName, apiKey, pageSize, offset).catch(() => null);
-        if (!res) break;
+    // First page
+    let res = await listChats(accountName, apiKey, 100, 0).catch(() => null);
+    if (!res) return allChats;
 
-        const chatList = res?.list || res?.data?.list || res?.data || [];
-        if (!Array.isArray(chatList) || chatList.length === 0) break;
+    const firstPage = Array.isArray(res?.data) ? res.data : (res?.list || res?.data?.list || []);
+    if (Array.isArray(firstPage)) allChats.push(...firstPage);
 
-        allChats.push(...chatList);
-        if (chatList.length < pageSize) break; // No more pages
+    // Follow _pagination.next_page until no more pages or maxChats reached
+    let nextPage = res?._pagination?.next_page || res?._meta?._pagination?.next_page || null;
 
-        offset += pageSize;
+    while (nextPage && allChats.length < maxChats) {
+        try {
+            const nextRes = await fetch(nextPage, {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+            });
+            if (!nextRes.ok) break;
+            const nextData = await nextRes.json();
+
+            const chatList = Array.isArray(nextData?.data) ? nextData.data : (nextData?.list || []);
+            if (!Array.isArray(chatList) || chatList.length === 0) break;
+
+            allChats.push(...chatList);
+            nextPage = nextData?._pagination?.next_page || nextData?._meta?._pagination?.next_page || null;
+        } catch {
+            break;
+        }
     }
 
     return allChats;

@@ -46,20 +46,13 @@ export async function GET(request: Request) {
             return NextResponse.json({ chats: [], hasMore: false });
         }
 
-        // Fetch chats from all creators in parallel
+        // Fetch all chats (auto-paginating via _pagination.next_page) from all creators
         const results = await Promise.allSettled(
             creatorsToFetch.map(async (creator) => {
                 const accountName = creator.ofapiCreatorId || creator.telegramId;
-                // Use single-page fetch with offset/limit for infinite scroll
-                const res = await listChats(accountName, apiKey, limit, offset);
-                // DEBUG: log raw response shape
-                const resKeys = Object.keys(res || {});
-                const dataType = Array.isArray(res?.data) ? "array" : typeof res?.data;
-                const dataLen = Array.isArray(res?.data) ? res.data.length : (res?.data?.list?.length || "no-list");
-                console.log(`[CHATS DEBUG] account=${accountName} limit=${limit} offset=${offset} resKeys=[${resKeys}] dataType=${dataType} dataLen=${dataLen} hasPagination=${!!res?._pagination}`);
-                // OFAPI chats response: { data: [...chats], _pagination: { next_page } }
-                const chatList = Array.isArray(res?.data) ? res.data : (res?.list || res?.data?.list || []);
-                return (Array.isArray(chatList) ? chatList : []).map((chat: any) => ({
+                const allChats = await fetchAllChats(accountName, apiKey, 200);
+                console.log(`[CHATS] account=${accountName} fetched=${allChats.length} chats`);
+                return allChats.map((chat: any) => ({
                     ...chat,
                     _creatorId: creator.id,
                     _creatorName: creator.name || creator.ofUsername || accountName,
