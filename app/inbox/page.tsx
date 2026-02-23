@@ -237,14 +237,18 @@ export default function InboxPage() {
     mediaMapRef.current = mediaMap;
 
     useEffect(() => {
-        if (!activeChat || (!activeCreatorId || activeCreatorId === "all")) return;
+        if (!activeChat) return;
+        // Use the chat's own creator ID (set during enrichment)
+        // Fall back to selected creator if chat doesn't have one (shouldn't happen but safety)
+        const cId = activeChat._creatorId || (selectedCreatorId !== "all" ? selectedCreatorId : "");
+        if (!cId) return;
+
         setMsgsLoading(true);
+        setMessages([]); // Clear stale messages immediately
         setMediaMap({});
         setHasMoreMessages(true);
         nextLastIdRef.current = null;
         isJumpedRef.current = false; setIsJumped(false); // Reset jump guard when opening a new chat
-
-        const cId = activeChat._creatorId || selectedCreatorId;
 
         // Fetch messages AND fresh media URLs in parallel
         Promise.all([
@@ -286,13 +290,13 @@ export default function InboxPage() {
             clearInterval(pollInterval);
             clearInterval(mediaRefreshInterval);
         };
-    }, [activeChat, activeCreatorId]);
+    }, [activeChat]);
 
     // --- Phase 2: Load older messages on scroll-to-top ---
     const handleLoadOlderMessages = useCallback(() => {
         if (loadingOlder || !hasMoreMessages || !activeChat) return;
-        const cId = activeChat._creatorId || selectedCreatorId;
-        if (!cId || cId === "all") return;
+        const cId = activeChat._creatorId;
+        if (!cId) return;
 
         // Use OFAPI's nextLastId cursor, fall back to oldest message ID
         const cursor = nextLastIdRef.current || messages[0]?.id;
@@ -320,7 +324,7 @@ export default function InboxPage() {
                 console.error("Failed to load older messages", err);
                 setLoadingOlder(false);
             });
-    }, [loadingOlder, hasMoreMessages, activeChat, selectedCreatorId, messages]);
+    }, [loadingOlder, hasMoreMessages, activeChat, messages]);
 
     // Map raw OFAPI messages to our Message type
     const mapRawMessages = useCallback((rawMsgs: any[]): Message[] => {
@@ -395,8 +399,8 @@ export default function InboxPage() {
     // OFAPI has no date filter — we page with id cursor until createdAt crosses targetDate
     const handleJumpToDate = useCallback(async (targetDate: Date) => {
         if (!activeChat) return;
-        const cId = activeChat._creatorId || selectedCreatorId;
-        if (!cId || cId === "all") return;
+        const cId = activeChat._creatorId;
+        if (!cId) return;
 
         setJumpingToDate(true);
         setJumpProgress(0);
@@ -481,8 +485,8 @@ export default function InboxPage() {
     const handleReturnToLatest = useCallback(() => {
         isJumpedRef.current = false; setIsJumped(false);
         if (!activeChat) return;
-        const cId = activeChat._creatorId || selectedCreatorId;
-        if (!cId || cId === "all") return;
+        const cId = activeChat._creatorId || (selectedCreatorId !== "all" ? selectedCreatorId : "");
+        if (!cId) return;
 
         setMsgsLoading(true);
         nextLastIdRef.current = null;
@@ -509,6 +513,9 @@ export default function InboxPage() {
     };
 
     const handleSelectChat = (chat: Chat) => {
+        // Reset jump state immediately so "Return to latest" banner doesn't flash
+        isJumpedRef.current = false;
+        setIsJumped(false);
         setActiveChat(chat);
         setMobileView("chat");
     };
