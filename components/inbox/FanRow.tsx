@@ -23,15 +23,15 @@ function timeAgo(dateStr: string): string {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// Spend tier dot color
-function spendDotColor(spend: number): string | null {
-    if (spend >= 10000) return "#00ff88"; // neon green — whale
+// Spend tier color — used for both the dot and the dollar amount
+function spendColor(spend: number): string | null {
+    if (spend >= 10000) return "#00ff88"; // neon green — whale, hot buyer
     if (spend >= 5000) return "#22c55e";  // green — great spender
     if (spend >= 1000) return "#86efac";  // light green — solid
-    if (spend >= 500) return "#facc15";   // yellow — moderate
-    if (spend >= 100) return "#f59e0b";   // amber — light spender
-    if (spend > 0) return "#a3a3a3";      // grey — minimal
-    return null;                           // no spend, no dot
+    if (spend >= 500) return "#facc15";   // yellow — getting cold
+    if (spend >= 100) return "#f59e0b";   // amber — cooling off
+    if (spend > 0) return "#ef4444";      // red — at risk
+    return null;                           // no spend
 }
 
 export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
@@ -40,7 +40,7 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
         ? `/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`
         : null;
     const spend = chat.totalSpend ?? 0;
-    const dotColor = spendDotColor(spend);
+    const tierColor = spendColor(spend);
 
     return (
         <div
@@ -78,8 +78,8 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
                             {chat.withUser.name || `@${chat.withUser.username}`}
                         </h3>
                         {/* Spend tier dot next to name */}
-                        {dotColor && (
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+                        {tierColor && (
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: tierColor }} />
                         )}
                     </div>
                     <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-[#2d786e]" : "text-white/30"}`}>
@@ -87,8 +87,8 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
                     </span>
                 </div>
                 <div className="flex items-center mt-0.5">
-                    {spend > 0 && (
-                        <span className="text-[11px] text-[#834aa4] font-semibold mr-1.5 flex-shrink-0">
+                    {spend > 0 && tierColor && (
+                        <span className="text-[11px] font-semibold mr-1.5 flex-shrink-0" style={{ color: tierColor }}>
                             ${spend.toLocaleString()}
                         </span>
                     )}
