@@ -123,14 +123,84 @@ model Fan {
   lastPurchaseType String?      // tip, message, post, subscription
   lastPurchaseAmount Float?     // Amount of last purchase
 
+  // Fan intelligence — detected from messages
+  fanType         String?       // submissive, dominant, romantic, transactional, lonely
+  tonePreference  String?       // playful, assertive, romantic, direct
+  priceRange      String?       // low (1-10), mid (10-50), high (50+), whale (200+)
+  lastIntentAt    DateTime?     // Last time they showed buying intent
+  intentScore     Int?          // 0-100 how likely to buy right now
+
   creator         Creator       @relation(fields: [creatorId], references: [id])
   transactions    Transaction[]
+  preferences     FanPreference[]
+  intentEvents    FanIntentEvent[]
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   @@index([creatorId])
   @@index([lastPurchaseAt])
+  @@index([fanType])
+}
+
+// What a fan is into — tags with evidence
+model FanPreference {
+  id              String        @id @default(cuid())
+  fanId           String
+  tag             String        // e.g. "roleplay", "customs", "audio", "gfe", "dominant"
+  weight          Float         @default(1.0)  // How strongly associated (1-10)
+  lastSeenAt      DateTime      @default(now())
+  sourceMessageId String?       // OFAPI message ID where this was detected
+  source          String?       // "auto" (AI detected) or "manual" (agent tagged)
+
+  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([fanId, tag])
+  @@index([fanId])
+  @@index([tag])
+}
+
+// Buying intent signals — detected from fan messages
+model FanIntentEvent {
+  id              String        @id @default(cuid())
+  fanId           String
+  intentTag       String        // ready_to_buy, wants_custom, price_question, discount_request, etc.
+  confidence      Float         @default(0.5) // 0-1 how confident the detection is
+  messageId       String?       // OFAPI message ID
+  messageText     String?       // Short excerpt of what they said
+  createdAt       DateTime      @default(now())
+
+  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+
+  @@index([fanId, createdAt])
+  @@index([intentTag])
+}
+
+// Chatter QA reviews — scores per conversation
+model ChatQAReview {
+  id              String        @id @default(cuid())
+  creatorId       String        // Which model account
+  chatterId       String?       // Which chatter handled this (User.id)
+  fanId           String?       // Which fan
+  chatId          String?       // OFAPI chat ID
+  // Scores 0-5
+  controlScore    Int?          // Conversation control
+  tensionScore    Int?          // Tension / playfulness
+  valueScore      Int?          // Value & objection handling
+  personalizationScore Int?     // Personalization to fan type
+  compliancePass  Boolean?      // Safety compliance
+  // Tags
+  mistakeTags     String[]      // permission_asking, flat_ack, no_cta, discount_too_fast
+  strengthTags    String[]      // good_push_pull, strong_cta, adapted_to_fan
+  agentStyle      String?       // direct, playful, warm, efficient
+  fanTypeGuess    String?       // submissive, dominant, romantic, transactional, lonely
+  outcome         String?       // ppv_bought, no_sale, follow_up_set
+  notes           String?       // Free text reviewer notes
+  createdAt       DateTime      @default(now())
+
+  @@index([creatorId, createdAt])
+  @@index([chatterId])
 }
 
 model Transaction {
