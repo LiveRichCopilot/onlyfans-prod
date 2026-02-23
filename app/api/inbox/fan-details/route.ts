@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const creatorId = searchParams.get("creatorId");
-    const fanId = searchParams.get("fanId");
+    const fanId = searchParams.get("fanId") ? String(searchParams.get("fanId")) : null;
 
     if (!creatorId || !fanId) {
         return NextResponse.json({ error: "Missing creatorId or fanId" }, { status: 400 });

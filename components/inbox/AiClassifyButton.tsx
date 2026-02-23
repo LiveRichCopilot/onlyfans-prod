@@ -79,16 +79,24 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onCla
             <button
                 onClick={handleClassify}
                 disabled={!canClassify || classifying}
-                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
                     classifying
-                        ? "bg-violet-500/20 text-violet-400 border border-violet-500/30 animate-pulse"
+                        ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
                         : result
                             ? "bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20"
                             : "bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20"
                 } disabled:opacity-40`}
             >
-                {classifying ? "Analyzing messages..." : result ? "Re-analyze with AI" : "Analyze Fan with AI"}
+                {classifying ? (
+                    <>
+                        <div className="w-4 h-4 rounded-full border-2 border-violet-400/30 border-t-violet-400 animate-spin" />
+                        <span>Scanning chat history...</span>
+                    </>
+                ) : result ? "Re-analyze with AI" : "Analyze Fan with AI"}
             </button>
+            {classifying && (
+                <p className="text-[10px] text-violet-400/50 text-center mt-1.5">Reading messages and building fan profile — takes 10-30s</p>
+            )}
 
             {/* Error */}
             {error && (

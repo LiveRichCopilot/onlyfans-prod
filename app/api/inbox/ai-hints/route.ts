@@ -28,7 +28,8 @@ export const maxDuration = 25;
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { creatorId, chatId, fanOfapiId } = body;
+        const { creatorId, chatId, fanOfapiId: rawFanId } = body;
+        const fanOfapiId = rawFanId != null ? String(rawFanId) : null;
 
         if (!creatorId || !chatId || !fanOfapiId) {
             return NextResponse.json(
