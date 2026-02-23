@@ -148,7 +148,9 @@ export async function listAllFans(
     options?: { minSpend?: number; maxSpend?: number; online?: boolean; limit?: number; offset?: number }
 ) {
     const params = new URLSearchParams();
-    params.set("limit", String(options?.limit || 50));
+    // OFAPI enforces max limit=20 when filter.online=1
+    const defaultLimit = options?.online ? 20 : 50;
+    params.set("limit", String(options?.limit || defaultLimit));
     params.set("offset", String(options?.offset || 0));
     if (options?.minSpend !== undefined) params.set("filter.total_spent", String(options.minSpend));
     if (options?.online !== undefined) params.set("filter.online", options.online ? "1" : "0");
