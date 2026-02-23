@@ -326,7 +326,7 @@ export async function getStatisticsOverview(account: string, apiKey: string, sta
  * GET /api/{account}/chats
  */
 export async function listChats(accountName: string, apiKey: string, limit: number = 50, offset: number = 0) {
-    return ofapiRequest(`/api/${accountName}/chats?limit=${limit}&offset=${offset}&order=recent&skip_users=all`, apiKey);
+    return ofapiRequest(`/api/${accountName}/chats?limit=${limit}&offset=${offset}&order=recent&skip_users=none`, apiKey);
 }
 
 /**

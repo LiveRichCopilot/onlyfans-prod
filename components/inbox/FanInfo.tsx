@@ -28,7 +28,7 @@ export function FanInfo({ chat, fanData, loading }: Props) {
     ];
 
     return (
-        <div className="bg-black/20 border border-white/10 rounded-2xl p-4">
+        <div className="border border-white/[0.08] rounded-2xl p-4">
             <h4 className="text-sm font-bold tracking-tight text-white/90 mb-4">Info</h4>
 
             {loading ? (
