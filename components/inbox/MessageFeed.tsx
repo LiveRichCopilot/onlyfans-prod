@@ -57,7 +57,7 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
     }, [onLoadOlder, hasMore, loading, loadingOlder]);
 
     return (
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-4 md:px-6 flex flex-col gap-1.5 relative custom-scrollbar">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-4 md:px-6 flex flex-col gap-1.5 relative custom-scrollbar" style={{ backgroundColor: "#1a1a1a" }}>
             {/* Sentinel + loading spinner at top for infinite scroll up */}
             {hasMore && !loading && (
                 <div ref={sentinelRef} className="flex justify-center py-2 shrink-0">

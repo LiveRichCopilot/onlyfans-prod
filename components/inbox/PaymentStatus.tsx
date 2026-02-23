@@ -1,7 +1,5 @@
 "use client";
 
-import { Lock, DollarSign } from "lucide-react";
-
 type Props = {
     price: number;
     isPaid: boolean;
@@ -13,7 +11,6 @@ export function PaymentStatus({ price, isPaid, paidAt, isTip }: Props) {
     if (isTip) {
         return (
             <div className="flex items-center gap-1.5 px-3 py-2 rounded-b-[20px] -mx-3.5 -mb-2 mt-1.5 bg-[#1a3a2a] border-t border-white/[0.08]">
-                <DollarSign size={12} className="text-emerald-400" />
                 <span className="text-[12px] font-semibold text-emerald-400">
                     ${price.toFixed(2)} tip
                 </span>
@@ -27,7 +24,7 @@ export function PaymentStatus({ price, isPaid, paidAt, isTip }: Props) {
             : "";
         return (
             <div className="flex items-center gap-1.5 px-3 py-2 rounded-b-[20px] -mx-3.5 -mb-2 mt-1.5 bg-[#1a3a2a] border-t border-white/[0.08]">
-                <Lock size={11} className="text-emerald-400" />
+                <img src="/OF_essentials_paid.png" alt="" className="w-3 h-3 opacity-80" />
                 <span className="text-[12px] font-semibold text-emerald-400">
                     ${price.toFixed(2)} paid
                 </span>
@@ -36,10 +33,9 @@ export function PaymentStatus({ price, isPaid, paidAt, isTip }: Props) {
         );
     }
 
-    // Not paid yet — muted maroon
     return (
         <div className="flex items-center gap-1.5 px-3 py-2 rounded-b-[20px] -mx-3.5 -mb-2 mt-1.5 bg-[#3a1a1a] border-t border-white/[0.08]">
-            <Lock size={11} className="text-[#c27a7a]" />
+            <img src="/OF_essentials_locked.png" alt="" className="w-3 h-3 opacity-80" />
             <span className="text-[12px] font-semibold text-[#c27a7a]">
                 ${price.toFixed(2)} not paid yet
             </span>

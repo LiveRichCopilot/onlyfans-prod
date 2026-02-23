@@ -23,11 +23,15 @@ function timeAgo(dateStr: string): string {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// Short creator name for the badge (first name only)
-function shortName(name: string): string {
-    if (!name) return "?";
-    const first = name.replace(/[^\w\s]/g, "").trim().split(/\s+/)[0];
-    return first.length > 10 ? first.substring(0, 10) : first;
+// Spend tier dot color
+function spendDotColor(spend: number): string | null {
+    if (spend >= 10000) return "#00ff88"; // neon green — whale
+    if (spend >= 5000) return "#22c55e";  // green — great spender
+    if (spend >= 1000) return "#86efac";  // light green — solid
+    if (spend >= 500) return "#facc15";   // yellow — moderate
+    if (spend >= 100) return "#f59e0b";   // amber — light spender
+    if (spend > 0) return "#a3a3a3";      // grey — minimal
+    return null;                           // no spend, no dot
 }
 
 export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
@@ -36,6 +40,7 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
         ? `/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`
         : null;
     const spend = chat.totalSpend ?? 0;
+    const dotColor = spendDotColor(spend);
 
     return (
         <div
@@ -65,12 +70,18 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
                 )}
             </div>
 
-            {/* Name + spend + preview */}
+            {/* Name + spend dot + spend amount + preview */}
             <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline">
-                    <h3 className={`text-[15px] truncate ${isUnread ? "font-semibold text-white" : "font-medium text-white/80"}`}>
-                        {chat.withUser.name || `@${chat.withUser.username}`}
-                    </h3>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className={`text-[15px] truncate ${isUnread ? "font-semibold text-white" : "font-medium text-white/80"}`}>
+                            {chat.withUser.name || `@${chat.withUser.username}`}
+                        </h3>
+                        {/* Spend tier dot next to name */}
+                        {dotColor && (
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+                        )}
+                    </div>
                     <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-[#2d786e]" : "text-white/30"}`}>
                         {chat.lastMessage.createdAt ? timeAgo(chat.lastMessage.createdAt) : ""}
                     </span>
@@ -87,7 +98,7 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
                 </div>
             </div>
 
-            {/* Unread dot */}
+            {/* Unanswered dot — teal, only when message is unread */}
             {isUnread && (
                 <div className="w-2.5 h-2.5 rounded-full bg-[#2d786e] flex-shrink-0 ml-2" />
             )}
