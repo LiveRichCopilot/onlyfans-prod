@@ -593,6 +593,14 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             mimeType = "audio/ogg";
         }
 
+        // Telegram Bot API limits getFile to 20MB — reject early with a helpful message
+        const fileSize = ctx.message.video?.file_size || ctx.message.photo?.[ctx.message.photo.length - 1]?.file_size || ctx.message.voice?.file_size || 0;
+        if (fileSize > 20 * 1024 * 1024) {
+            const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
+            await ctx.reply(`That file is ${sizeMB}MB — Telegram limits bot downloads to 20MB. Please upload this through the OF HQ dashboard instead.`);
+            return;
+        }
+
         const file = await ctx.api.getFile(fileId);
         const fileLink = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
 
