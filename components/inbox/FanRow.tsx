@@ -56,14 +56,14 @@ function fanTemperature(lastPurchaseAt?: string): { color: string; opacity: numb
         const heat = Math.max(0.15, 1 - (minAgo / 30));
         return { color: "#00ff88", opacity: heat, glow: minAgo < 15 };
     }
-    // WARM — recently active (30 min - 7 days), subtle green
-    if (daysAgo < 7) return { color: "#4ade80", opacity: 0.3, glow: false };
+    // WARM — recently active (30 min - 7 days), green
+    if (daysAgo < 7) return { color: "#4ade80", opacity: 0.6, glow: false };
     // COOLING — 7-14 days, yellow
-    if (daysAgo < 14) return { color: "#facc15", opacity: 0.7, glow: false };
+    if (daysAgo < 14) return { color: "#facc15", opacity: 0.8, glow: false };
     // COLD — 14-30 days, red
-    if (daysAgo < 30) return { color: "#ef4444", opacity: 0.7, glow: false };
+    if (daysAgo < 30) return { color: "#ef4444", opacity: 0.8, glow: false };
     // ICE COLD — 30+ days, blue
-    return { color: "#60a5fa", opacity: 0.6, glow: false };
+    return { color: "#60a5fa", opacity: 0.7, glow: false };
 }
 
 export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
@@ -79,9 +79,9 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
     const temp = fanTemperature(chat._lastPurchaseAt);
     const ringStyle = temp ? {
         boxShadow: temp.glow
-            ? `0 0 ${temp.opacity * 8}px ${hexToRgba(temp.color, temp.opacity * 0.6)}, 0 0 0 ${0.5 + temp.opacity}px ${hexToRgba(temp.color, temp.opacity)}`
-            : `0 0 0 1.5px ${hexToRgba(temp.color, temp.opacity)}`,
-        border: `0.5px solid ${hexToRgba(temp.color, temp.opacity)}`,
+            ? `0 0 ${temp.opacity * 8}px ${hexToRgba(temp.color, temp.opacity * 0.6)}, 0 0 0 ${0.5 + temp.opacity * 1.5}px ${hexToRgba(temp.color, temp.opacity)}`
+            : `0 0 0 2px ${hexToRgba(temp.color, temp.opacity)}`,
+        border: `1px solid ${hexToRgba(temp.color, temp.opacity)}`,
     } : undefined;
 
     return (
