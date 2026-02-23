@@ -5,30 +5,24 @@ import { LayoutGrid, MessageSquare } from "lucide-react";
 
 export function NavBar() {
     return (
-        <aside className="w-16 lg:w-64 glass-panel m-4 mr-0 rounded-3xl p-4 lg:p-6 hidden md:flex flex-col z-10 border-white/10">
-            <div className="flex items-center gap-3 mb-10">
-                <div className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50">
-                    OF
-                </div>
-                <div className="hidden lg:block">
-                    <div className="text-xl font-bold tracking-tight text-white/90">HQ</div>
-                    <div className="text-xs text-white/50">Agency Workspace</div>
-                </div>
-            </div>
+        <aside className="w-14 flex flex-col items-center py-4 gap-6 border-r border-white/[0.06]">
+            <Link href="/" className="h-9 w-9 rounded-lg bg-[#2d786e] flex items-center justify-center font-bold text-xs text-white shadow-sm">
+                OF
+            </Link>
 
-            <nav className="space-y-8 flex-1">
-                <div>
-                    <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2 hidden lg:block">Management</div>
-                    <ul className="space-y-2">
-                        <Link href="/">
-                            <li className="flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <LayoutGrid size={20} /> <span className="hidden lg:inline text-sm">Dashboard</span>
-                            </li>
-                        </Link>
-                        <li className="flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 rounded-xl bg-white/10 text-white shadow-sm border border-white/10">
-                            <MessageSquare size={20} /> <span className="hidden lg:inline text-sm">Live Inbox</span>
-                        </li>
-                    </ul>
+            <nav className="flex flex-col items-center gap-2 flex-1">
+                <Link
+                    href="/"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+                    title="Dashboard"
+                >
+                    <LayoutGrid size={18} />
+                </Link>
+                <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white bg-white/[0.08] border border-white/[0.08]"
+                    title="Live Inbox"
+                >
+                    <MessageSquare size={18} />
                 </div>
             </nav>
         </aside>
