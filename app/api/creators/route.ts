@@ -114,17 +114,15 @@ export async function GET(request: Request) {
         const startParam = searchParams.get("start");
         const endParam = searchParams.get("end");
 
-        let creators = await prisma.creator.findMany({
+        const creators = await prisma.creator.findMany({
             orderBy: { createdAt: "desc" },
         });
 
-        // Auto-sync any creators missing profiles (name, avatar, header)
-        await autoSyncUnsynced(creators);
-
-        // Re-fetch after sync so we return fresh data
-        creators = await prisma.creator.findMany({
-            orderBy: { createdAt: "desc" },
-        });
+        // Auto-sync moved to background — don't block page load
+        // Only fire if explicitly requested via ?sync=true
+        if (searchParams.get("sync") === "true") {
+            autoSyncUnsynced(creators).catch(() => {}); // Fire and forget
+        }
 
         const now = endParam ? new Date(endParam) : new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
