@@ -8,6 +8,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const creatorId = searchParams.get("creatorId");
     const chatId = searchParams.get("chatId");
+    const before = searchParams.get("before") || undefined;
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10) || 50, 100);
 
     if (!creatorId || !chatId) {
         return NextResponse.json({ error: "Missing creatorId or chatId" }, { status: 400 });
@@ -25,12 +27,28 @@ export async function GET(request: Request) {
         }
 
         const accountName = creator.ofapiCreatorId || creator.telegramId;
-        const rawMessages = await getChatMessages(accountName, chatId, apiKey);
+        const rawResponse = await getChatMessages(accountName, chatId, apiKey, limit, before);
 
-        // OFAPI may return data in different shapes
-        const messages = rawMessages?.list || rawMessages?.data?.list || rawMessages?.data || rawMessages || [];
+        // OFAPI messages: { data: [...messages], _pagination: { next_page: "...?id=X" } }
+        // Also handles: { data: { list: [...], hasMore, nextLastId } } (media gallery shape)
+        const messages = rawResponse?.data?.list || rawResponse?.list
+            || (Array.isArray(rawResponse?.data) ? rawResponse.data : null)
+            || rawResponse || [];
+        const hasMore = rawResponse?.data?.hasMore ?? (Array.isArray(messages) && messages.length >= limit);
+        // Primary cursor: _pagination.next_page URL. Fallback: data.nextLastId
+        let nextLastId = rawResponse?.data?.nextLastId || null;
+        if (!nextLastId && rawResponse?._pagination?.next_page) {
+            try {
+                const nextUrl = new URL(rawResponse._pagination.next_page);
+                nextLastId = nextUrl.searchParams.get("id") || null;
+            } catch {}
+        }
 
-        return NextResponse.json({ messages });
+        return NextResponse.json({
+            messages,
+            hasMore,
+            nextLastId,
+        });
     } catch (e: any) {
         console.error("Inbox messages GET error:", e.message);
         return NextResponse.json({ error: e.message }, { status: 500 });

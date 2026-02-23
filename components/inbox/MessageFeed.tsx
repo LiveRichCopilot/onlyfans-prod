@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useRef, useEffect, useCallback } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { DateSeparator } from "./DateSeparator";
 import { MessageLoader } from "./MessageLoader";
@@ -11,6 +11,9 @@ type Props = {
     loading: boolean;
     isSfw: boolean;
     onDisableSfw: () => void;
+    loadingOlder?: boolean;
+    hasMore?: boolean;
+    onLoadOlder?: () => void;
 };
 
 function getDateLabel(dateStr: string): string {
@@ -26,13 +29,46 @@ function getDateLabel(dateStr: string): string {
 }
 
 export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFeed(
-    { messages, loading, isSfw, onDisableSfw },
+    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder },
     ref
 ) {
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const sentinelRef = useRef<HTMLDivElement>(null);
     let lastDate = "";
 
+    // IntersectionObserver: detect when user scrolls near top to load older messages
+    useEffect(() => {
+        if (!onLoadOlder || !hasMore || loading) return;
+        const sentinel = sentinelRef.current;
+        const container = scrollContainerRef.current;
+        if (!sentinel || !container) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && !loadingOlder) {
+                    onLoadOlder();
+                }
+            },
+            { root: container, rootMargin: "200px 0px 0px 0px", threshold: 0 }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [onLoadOlder, hasMore, loading, loadingOlder]);
+
     return (
-        <div className="flex-1 overflow-y-auto min-h-0 px-3 py-4 md:px-6 flex flex-col gap-1.5 relative custom-scrollbar">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-4 md:px-6 flex flex-col gap-1.5 relative custom-scrollbar">
+            {/* Sentinel + loading spinner at top for infinite scroll up */}
+            {hasMore && !loading && (
+                <div ref={sentinelRef} className="flex justify-center py-2 shrink-0">
+                    {loadingOlder && (
+                        <div className="flex items-center gap-2 text-xs text-white/40">
+                            <div className="animate-spin w-4 h-4 rounded-full border-2 border-white/10 border-t-teal-500" />
+                            Loading older messages...
+                        </div>
+                    )}
+                </div>
+            )}
+
             {loading && <MessageLoader />}
 
             {!loading && messages.length === 0 && (

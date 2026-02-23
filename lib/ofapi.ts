@@ -332,9 +332,21 @@ export async function listChats(accountName: string, apiKey: string, limit: numb
 /**
  * Get messages from a specific chat.
  * GET /api/{account}/chats/{chat_id}/messages
+ * Params: limit, id (cursor from nextLastId), order (desc|asc), skip_users (all|none)
+ * Response: { data: { list: Message[], hasMore: bool, nextLastId: string } }
  */
-export async function getChatMessages(accountName: string, chatId: string | number, apiKey: string) {
-    return ofapiRequest(`/api/${accountName}/chats/${chatId}/messages?limit=100`, apiKey);
+export async function getChatMessages(
+    accountName: string,
+    chatId: string | number,
+    apiKey: string,
+    limit: number = 50,
+    beforeId?: string
+) {
+    let endpoint = `/api/${accountName}/chats/${chatId}/messages?limit=${limit}&order=desc&skip_users=all`;
+    if (beforeId) {
+        endpoint += `&id=${beforeId}`;
+    }
+    return ofapiRequest(endpoint, apiKey);
 }
 
 /**

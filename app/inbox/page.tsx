@@ -10,6 +10,29 @@ import { MessageFeed } from "@/components/inbox/MessageFeed";
 import { FloatingChatBar } from "@/components/inbox/FloatingChatBar";
 import { FanSidebar } from "@/components/inbox/FanSidebar";
 
+// Helper: map raw OFAPI chat to our Chat type
+function mapRawChat(c: any): Chat {
+    return {
+        id: c.fan?.id || c.chat_id || c.id || Math.random().toString(),
+        withUser: {
+            id: c.fan?.id || c.withUser?.id || "unknown",
+            username: c.fan?.username || c.withUser?.username || "Fan",
+            name: c.fan?.name || c.withUser?.name || "Anonymous",
+            avatar: c.fan?.avatar || c.withUser?.avatar || "",
+        },
+        lastMessage: {
+            text:
+                c.lastMessage?.text?.replace(/<[^>]*>?/gm, "") ||
+                (c.lastMessage?.media?.length > 0 || c.hasMedia ? "[Media]" : "No message"),
+            createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
+            isRead: c.lastMessage?.isOpened ?? true,
+        },
+        totalSpend: c.totalSpend || 0,
+        _creatorId: c._creatorId || "",
+        _creatorName: c._creatorName || "",
+    };
+}
+
 export default function InboxPage() {
     const [creators, setCreators] = useState<any[]>([]);
     const [selectedCreatorId, setSelectedCreatorId] = useState<string>("all");
@@ -30,6 +53,19 @@ export default function InboxPage() {
     const [unreadFirst, setUnreadFirst] = useState(false);
     const [filters, setFilters] = useState<any>(null);
 
+    // --- Infinite message scroll state ---
+    const [loadingOlder, setLoadingOlder] = useState(false);
+    const [hasMoreMessages, setHasMoreMessages] = useState(true);
+    const nextLastIdRef = useRef<string | null>(null);
+
+    // --- Infinite fan list scroll state ---
+    const [chatOffset, setChatOffset] = useState(0);
+    const [hasMoreChats, setHasMoreChats] = useState(true);
+    const [loadingMoreChats, setLoadingMoreChats] = useState(false);
+
+    // --- Media map ---
+    const [mediaMap, setMediaMap] = useState<Record<string, { src: string; preview: string; type: string }>>({});
+
     // 1. Fetch connected creators on load
     useEffect(() => {
         fetch("/api/creators")
@@ -37,48 +73,30 @@ export default function InboxPage() {
             .then((data) => {
                 const available = data.creators || [];
                 setCreators(available);
-                // Default stays "all" — show all creators' chats merged
             })
             .catch(console.error);
     }, []);
 
-    // 2. Fetch Chat List when a creator is selected (or all)
+    // 2. Fetch initial Chat List when a creator is selected (or all)
     useEffect(() => {
         if (!selectedCreatorId) return;
         setLoading(true);
+        setChatOffset(0);
+        setHasMoreChats(true);
         const chatUrl = selectedCreatorId === "all"
-            ? "/api/inbox/chats?all=true"
-            : `/api/inbox/chats?creatorId=${selectedCreatorId}`;
+            ? "/api/inbox/chats?all=true&limit=50&offset=0"
+            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=50&offset=0`;
         fetch(chatUrl)
             .then((res) => res.json())
             .then((data) => {
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
-                const mappedChats: Chat[] =
-                    typeof rawArray.map === "function"
-                        ? rawArray.map((c: any) => ({
-                              id: c.fan?.id || c.chat_id || c.id || Math.random().toString(),
-                              withUser: {
-                                  id: c.fan?.id || c.withUser?.id || "unknown",
-                                  username: c.fan?.username || c.withUser?.username || "Fan",
-                                  name: c.fan?.name || c.withUser?.name || "Anonymous",
-                                  avatar: c.fan?.avatar || c.withUser?.avatar || "",
-                              },
-                              lastMessage: {
-                                  text:
-                                      c.lastMessage?.text?.replace(/<[^>]*>?/gm, "") ||
-                                      (c.lastMessage?.media?.length > 0 || c.hasMedia ? "[Media]" : "No message"),
-                                  createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
-                                  isRead: c.lastMessage?.isOpened ?? true,
-                              },
-                              totalSpend: c.totalSpend || 0,
-                              _creatorId: c._creatorId || "",
-                              _creatorName: c._creatorName || "",
-                          }))
-                        : [];
+                const mappedChats: Chat[] = Array.isArray(rawArray) ? rawArray.map(mapRawChat) : [];
                 mappedChats.sort(
                     (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
                 );
                 setChats(mappedChats);
+                setChatOffset(mappedChats.length);
+                setHasMoreChats(data.hasMore !== false && mappedChats.length >= 50);
                 setLoading(false);
             })
             .catch((err) => {
@@ -87,81 +105,185 @@ export default function InboxPage() {
             });
     }, [selectedCreatorId]);
 
+    // --- Phase 3: Infinite fan list scroll ---
+    const handleLoadMoreChats = useCallback(() => {
+        if (loadingMoreChats || !hasMoreChats) return;
+        setLoadingMoreChats(true);
+        const chatUrl = selectedCreatorId === "all"
+            ? `/api/inbox/chats?all=true&limit=50&offset=${chatOffset}`
+            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=50&offset=${chatOffset}`;
+        fetch(chatUrl)
+            .then((res) => res.json())
+            .then((data) => {
+                const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
+                const newChats: Chat[] = Array.isArray(rawArray) ? rawArray.map(mapRawChat) : [];
+                if (newChats.length > 0) {
+                    setChats((prev) => {
+                        const existingIds = new Set(prev.map((c) => c.id));
+                        const unique = newChats.filter((c) => !existingIds.has(c.id));
+                        return [...prev, ...unique];
+                    });
+                    setChatOffset((prev) => prev + newChats.length);
+                }
+                setHasMoreChats(data.hasMore !== false && newChats.length >= 50);
+                setLoadingMoreChats(false);
+            })
+            .catch((err) => {
+                console.error("Failed to load more chats", err);
+                setLoadingMoreChats(false);
+            });
+    }, [loadingMoreChats, hasMoreChats, selectedCreatorId, chatOffset]);
+
     // 3. Fetch messages + fresh media, then poll
     const activeCreatorId = activeChat?._creatorId || selectedCreatorId;
-    const [mediaMap, setMediaMap] = useState<Record<string, { src: string; preview: string; type: string }>>({});
+
+    // Keep a ref for the mediaMap so processMessages always sees latest
+    const mediaMapRef = useRef(mediaMap);
+    mediaMapRef.current = mediaMap;
 
     useEffect(() => {
         if (!activeChat || (!activeCreatorId || activeCreatorId === "all")) return;
         setMsgsLoading(true);
         setMediaMap({});
+        setHasMoreMessages(true);
+        nextLastIdRef.current = null;
+
+        const cId = activeChat._creatorId || selectedCreatorId;
 
         // Fetch messages AND fresh media URLs in parallel
-        const cId = activeChat._creatorId || selectedCreatorId;
         Promise.all([
-            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}`).then(r => r.json()).catch(() => ({ messages: [] })),
+            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`).then(r => r.json()).catch(() => ({ messages: [], hasMore: false })),
             fetch(`/api/inbox/media?creatorId=${cId}&chatId=${activeChat.id}`).then(r => r.json()).catch(() => ({ media: {} })),
         ]).then(([msgData, mediaData]) => {
             if (mediaData.media) setMediaMap(mediaData.media);
-            processMessages(msgData);
+            processMessages(msgData, false);
+            setHasMoreMessages(msgData.hasMore !== false);
+            nextLastIdRef.current = msgData.nextLastId || null;
             setMsgsLoading(false);
             setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         });
 
-        // Poll messages only (media URLs stay fresh for a while)
+        // Poll messages every 5s (new messages only, no before param)
         const pollInterval = setInterval(() => {
-            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}`)
+            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`)
                 .then(r => r.json())
-                .then(data => processMessages(data))
+                .then(data => processMessages(data, false))
                 .catch(console.error);
         }, 5000);
-        return () => clearInterval(pollInterval);
+
+        // Phase 1: Auto-refresh media URLs every 60s to prevent CDN expiry
+        const mediaRefreshInterval = setInterval(() => {
+            fetch(`/api/inbox/media?creatorId=${cId}&chatId=${activeChat.id}`)
+                .then(r => r.json())
+                .then(mediaData => {
+                    if (mediaData.media) setMediaMap(mediaData.media);
+                })
+                .catch(console.error);
+        }, 60000);
+
+        return () => {
+            clearInterval(pollInterval);
+            clearInterval(mediaRefreshInterval);
+        };
     }, [activeChat, activeCreatorId]);
 
-    const processMessages = (data: any) => {
-        const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
-        const sortedRaw = [...rawMsgs].sort(
+    // --- Phase 2: Load older messages on scroll-to-top ---
+    const handleLoadOlderMessages = useCallback(() => {
+        if (loadingOlder || !hasMoreMessages || !activeChat) return;
+        const cId = activeChat._creatorId || selectedCreatorId;
+        if (!cId || cId === "all") return;
+
+        // Use OFAPI's nextLastId cursor, fall back to oldest message ID
+        const cursor = nextLastIdRef.current || messages[0]?.id;
+        if (!cursor) return;
+
+        setLoadingOlder(true);
+        fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50&before=${cursor}`)
+            .then(r => r.json())
+            .then(data => {
+                const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
+                const olderMapped = mapRawMessages(rawMsgs);
+                if (olderMapped.length > 0) {
+                    setMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m.id));
+                        const unique = olderMapped.filter(m => !existingIds.has(m.id));
+                        return [...unique, ...prev];
+                    });
+                }
+                // Update cursor for next page
+                nextLastIdRef.current = data.nextLastId || null;
+                setHasMoreMessages(data.hasMore === true);
+                setLoadingOlder(false);
+            })
+            .catch(err => {
+                console.error("Failed to load older messages", err);
+                setLoadingOlder(false);
+            });
+    }, [loadingOlder, hasMoreMessages, activeChat, selectedCreatorId, messages]);
+
+    // Map raw OFAPI messages to our Message type
+    const mapRawMessages = useCallback((rawMsgs: any[]): Message[] => {
+        const sorted = [...rawMsgs].sort(
             (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
-        const mappedMsgs: Message[] =
-            typeof sortedRaw.map === "function"
-                ? sortedRaw.map((m: any) => {
-                      const fromId = m.fromUser?.id || m.author?.id || "unknown";
-                      const isCreator = fromId !== activeChat?.withUser?.id;
-                      const cleanText = (m.text || "").replace(/<[^>]*>?/gm, "");
-                      return {
-                          id: m.id || m.message_id || Math.random().toString(),
-                          text: cleanText,
-                          media: Array.isArray(m.media)
-                              ? m.media.map((med: any) => {
-                                    const medId = med.id?.toString() || "";
-                                    // Use fresh media URLs from getChatMedia if available
-                                    const fresh = mediaMap[medId];
-                                    const src = fresh?.src
-                                        || med.src || med.full || med.source?.source || med.source?.url
-                                        || med.files?.source?.url || med.files?.preview?.url
-                                        || med.video?.url || med.audio?.url
-                                        || med.preview || med.thumb || med.squarePreview || "";
-                                    const preview = fresh?.preview
-                                        || med.preview || med.thumb || med.squarePreview
-                                        || med.files?.preview?.url || src || "";
-                                    return {
-                                        id: medId || Math.random().toString(),
-                                        type: fresh?.type || (med.type === "gif" ? "photo" : (med.type || "photo")),
-                                        canView: med.canView !== false,
-                                        preview,
-                                        src,
-                                    };
-                                }).filter((med: any) => med.src || med.preview)
-                              : [],
-                          createdAt: m.createdAt || new Date().toISOString(),
-                          fromUser: { id: fromId },
-                          isFromCreator: isCreator,
-                          senderName: isCreator ? "Creator" : activeChat?.withUser?.name || "Fan",
-                      };
-                  })
-                : [];
-        setMessages(mappedMsgs);
+        return sorted.map((m: any) => {
+            const fromId = m.fromUser?.id || m.author?.id || "unknown";
+            const isCreator = fromId !== activeChat?.withUser?.id;
+            const cleanText = (m.text || "").replace(/<[^>]*>?/gm, "");
+            const currentMediaMap = mediaMapRef.current;
+            return {
+                id: m.id || m.message_id || Math.random().toString(),
+                text: cleanText,
+                media: Array.isArray(m.media)
+                    ? m.media.map((med: any) => {
+                          const medId = med.id?.toString() || "";
+                          // Fresh URLs from /media endpoint (refreshed every 60s)
+                          const fresh = currentMediaMap[medId];
+                          // OFAPI files structure: files.full.url, files.preview.url, files.thumb.url, files.squarePreview.url
+                          // Note: files.full.url can be NULL for DRM video even when canView=true
+                          const src = fresh?.src
+                              || med.files?.full?.url
+                              || med.files?.preview?.url
+                              || med.files?.thumb?.url
+                              || med.src || med.full
+                              || med.source?.source || med.source?.url
+                              || med.video?.url || med.audio?.url
+                              || med.preview || med.thumb || med.squarePreview || "";
+                          const preview = fresh?.preview
+                              || med.files?.preview?.url
+                              || med.files?.thumb?.url
+                              || med.files?.squarePreview?.url
+                              || med.preview || med.thumb || med.squarePreview
+                              || src || "";
+                          return {
+                              id: medId || Math.random().toString(),
+                              type: fresh?.type || (med.type === "gif" ? "photo" : (med.type || "photo")),
+                              canView: med.canView !== false,
+                              preview,
+                              src,
+                          };
+                      }).filter((med: any) => med.src || med.preview)
+                    : [],
+                createdAt: m.createdAt || new Date().toISOString(),
+                fromUser: { id: fromId },
+                isFromCreator: isCreator,
+                senderName: isCreator ? "Creator" : activeChat?.withUser?.name || "Fan",
+            };
+        });
+    }, [activeChat]);
+
+    const processMessages = (data: any, prepend: boolean) => {
+        const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
+        const mappedMsgs = mapRawMessages(rawMsgs);
+        if (prepend) {
+            setMessages(prev => {
+                const existingIds = new Set(prev.map(m => m.id));
+                const unique = mappedMsgs.filter(m => !existingIds.has(m.id));
+                return [...unique, ...prev];
+            });
+        } else {
+            setMessages(mappedMsgs);
+        }
     };
 
     const handleSelectCreator = (id: string) => {
@@ -228,12 +350,14 @@ export default function InboxPage() {
                     chats={chats}
                     activeChat={activeChat}
                     onSelectChat={handleSelectChat}
-                    loading={loading}
+                    loading={loading || loadingMoreChats}
                     sortBy={sortBy}
                     onSortChange={setSortBy}
                     unreadFirst={unreadFirst}
                     onUnreadFirstChange={setUnreadFirst}
                     onApplyFilters={setFilters}
+                    onLoadMore={handleLoadMoreChats}
+                    hasMoreChats={hasMoreChats}
                 />
             </div>
 
@@ -257,6 +381,9 @@ export default function InboxPage() {
                             loading={msgsLoading}
                             isSfw={isSfw}
                             onDisableSfw={() => setIsSfw(false)}
+                            loadingOlder={loadingOlder}
+                            hasMore={hasMoreMessages}
+                            onLoadOlder={handleLoadOlderMessages}
                         />
                         <FloatingChatBar
                             inputText={inputText}

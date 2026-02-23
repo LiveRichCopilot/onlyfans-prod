@@ -1,6 +1,7 @@
 "use client";
 
-import { Lock, Play } from "lucide-react";
+import { useState } from "react";
+import { Lock, Play, RefreshCw } from "lucide-react";
 
 type MediaItem = {
     id: string;
@@ -17,9 +18,20 @@ type Props = {
 };
 
 export function MediaPreview({ media: med, isSfw, onDisableSfw }: Props) {
+    const [imgLoaded, setImgLoaded] = useState(false);
+    const [imgError, setImgError] = useState(false);
+    const [retryKey, setRetryKey] = useState(0);
+
     const mediaUrl = med.canView ? med.src : med.preview;
     const proxyUrl = mediaUrl ? `/api/proxy-media?url=${encodeURIComponent(mediaUrl)}` : "";
+    const posterUrl = med.preview ? `/api/proxy-media?url=${encodeURIComponent(med.preview)}` : undefined;
     const isBlurred = !med.canView || isSfw;
+
+    const handleRetry = () => {
+        setImgError(false);
+        setImgLoaded(false);
+        setRetryKey((k) => k + 1);
+    };
 
     return (
         <div className="relative overflow-hidden bg-black/40 flex items-center justify-center min-h-[120px] max-h-[300px]">
@@ -27,16 +39,19 @@ export function MediaPreview({ media: med, isSfw, onDisableSfw }: Props) {
                 <>
                     {med.preview && (
                         <img
-                            src={`/api/proxy-media?url=${encodeURIComponent(med.preview)}`}
+                            src={posterUrl}
                             alt=""
                             className={`w-full h-full object-cover ${isBlurred ? "blur-xl scale-110" : ""}`}
                         />
                     )}
                     {!isBlurred && (
                         <video
+                            key={retryKey}
                             src={proxyUrl}
-                            poster={med.preview ? `/api/proxy-media?url=${encodeURIComponent(med.preview)}` : undefined}
+                            poster={posterUrl}
                             controls
+                            playsInline
+                            preload="metadata"
                             controlsList="nodownload"
                             className="w-full h-full max-h-[300px] object-cover"
                         />
@@ -58,26 +73,38 @@ export function MediaPreview({ media: med, isSfw, onDisableSfw }: Props) {
                     />
                 </div>
             ) : (
-                <img
-                    src={proxyUrl}
-                    alt="Media"
-                    referrerPolicy="no-referrer"
-                    className={`w-full h-full max-h-[300px] object-cover ${isBlurred ? "blur-xl scale-110 cursor-pointer" : ""}`}
-                    onClick={() => {
-                        if (isSfw && med.canView) onDisableSfw();
-                    }}
-                    onError={(e) => {
-                        const el = e.currentTarget;
-                        el.style.display = "none";
-                        const parent = el.parentElement;
-                        if (parent) {
-                            const fallback = document.createElement("div");
-                            fallback.className = "flex items-center justify-center h-[80px] text-[11px] text-white/30";
-                            fallback.textContent = "Media expired";
-                            parent.appendChild(fallback);
-                        }
-                    }}
-                />
+                <>
+                    {/* Loading skeleton */}
+                    {!imgLoaded && !imgError && (
+                        <div className="absolute inset-0 bg-white/[0.03] animate-pulse" />
+                    )}
+
+                    {/* Error state with retry */}
+                    {imgError ? (
+                        <div
+                            className="flex flex-col items-center justify-center h-[80px] gap-2 cursor-pointer"
+                            onClick={handleRetry}
+                        >
+                            <RefreshCw size={16} className="text-white/30" />
+                            <span className="text-[11px] text-white/30">Tap to retry</span>
+                        </div>
+                    ) : (
+                        <img
+                            key={retryKey}
+                            src={proxyUrl}
+                            alt="Media"
+                            referrerPolicy="no-referrer"
+                            className={`w-full h-full max-h-[300px] object-cover transition-opacity ${
+                                imgLoaded ? "opacity-100" : "opacity-0"
+                            } ${isBlurred ? "blur-xl scale-110 cursor-pointer" : ""}`}
+                            onLoad={() => setImgLoaded(true)}
+                            onClick={() => {
+                                if (isSfw && med.canView) onDisableSfw();
+                            }}
+                            onError={() => setImgError(true)}
+                        />
+                    )}
+                </>
             )}
 
             {/* Locked PPV overlay */}
