@@ -71,26 +71,33 @@ export async function GET(request: Request) {
         }
 
         // Enrich chats with persistent fan data from DB (lastPurchaseAt, lifetimeSpend)
-        const fanIds = allChats.map(c => c.fan?.id?.toString()).filter(Boolean);
+        // OFAPI chat objects may have fan data at: chat.fan.id, chat.withUser.id, or top-level chat.id
+        const fanIds = allChats.map(c => {
+            const id = c.fan?.id || c.withUser?.id || c.id;
+            return id ? String(id) : null;
+        }).filter(Boolean) as string[];
+
         if (fanIds.length > 0) {
             const fans = await prisma.fan.findMany({
                 where: { ofapiFanId: { in: fanIds } },
                 select: { ofapiFanId: true, lastPurchaseAt: true, lastPurchaseType: true, lastPurchaseAmount: true, lifetimeSpend: true },
             });
             const fanMap = new Map(fans.map(f => [f.ofapiFanId, f]));
+            let matchCount = 0;
             for (const chat of allChats) {
-                const fanId = chat.fan?.id?.toString();
+                const fanId = String(chat.fan?.id || chat.withUser?.id || chat.id || "");
                 if (fanId && fanMap.has(fanId)) {
                     const dbFan = fanMap.get(fanId)!;
                     chat._lastPurchaseAt = dbFan.lastPurchaseAt?.toISOString() || null;
                     chat._lastPurchaseType = dbFan.lastPurchaseType || null;
                     chat._lastPurchaseAmount = dbFan.lastPurchaseAmount || null;
-                    // Use DB lifetimeSpend if available (more accurate than OFAPI snapshot)
                     if (dbFan.lifetimeSpend > 0) {
                         chat._dbLifetimeSpend = dbFan.lifetimeSpend;
                     }
+                    matchCount++;
                 }
             }
+            console.log(`[Chats Enrichment] ${allChats.length} chats, ${fanIds.length} fan IDs extracted, ${fans.length} found in DB, ${matchCount} enriched`);
         }
 
         // Sort by last message time (most recent first)

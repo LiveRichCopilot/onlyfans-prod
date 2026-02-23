@@ -213,9 +213,14 @@ export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jum
                         <CalendarSearch size={18} />
                     </button>
                     {showDatePicker && (
-                        <div className="absolute right-0 top-full mt-1 z-20 bg-[#2a2a2a] border border-white/10 rounded-xl p-4 shadow-2xl">
-                            <CalendarPicker onSelect={handleDateSelect} onClose={() => setShowDatePicker(false)} />
-                        </div>
+                        <>
+                            {/* Backdrop */}
+                            <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setShowDatePicker(false)} />
+                            {/* Calendar modal — fixed center, above everything */}
+                            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#2a2a2a] border border-white/10 rounded-xl p-4 shadow-2xl">
+                                <CalendarPicker onSelect={handleDateSelect} onClose={() => setShowDatePicker(false)} />
+                            </div>
+                        </>
                     )}
                 </div>
                 <button
