@@ -23,7 +23,7 @@ model Creator {
   hourlyTarget   Float         @default(100.0)
   whaleAlertTarget Float       @default(200.0)
   active         Boolean       @default(true)
-  onlineFanCache Json?         // { fanIds: string[], whales: { id, name, spend }[], lastChecked: ISO }
+  // onlineFanCache Json?      // PENDING MIGRATION — uncomment after running prisma db push
 
   fans           Fan[]
   mediaAssets    MediaAsset[]
@@ -108,10 +108,10 @@ model MediaAsset {
   totalRevenue   Float         @default(0.00)
   aiTitle        String?
   aiDescription  String?
-  vaultTags      String?       // JSON array: ["lingerie","tease","bedroom"]
-  priceBand      String?       // "low" | "mid" | "high" | "premium"
-  intensity      String?       // "tease" | "soft" | "medium" | "explicit"
-  sentToFanIds   String?       // JSON array of OFAPI fan IDs (double-sell prevention)
+  // vaultTags      String?    // PENDING MIGRATION
+  // priceBand      String?    // PENDING MIGRATION
+  // intensity      String?    // PENDING MIGRATION
+  // sentToFanIds   String?    // PENDING MIGRATION
 
   transactions   Transaction[]
   createdAt      DateTime      @default(now())
@@ -140,8 +140,8 @@ model Fan {
   activeHours     String?       // JSON array of top active hours e.g. "[22,23,0,1]"
   lastMessageAt   DateTime?     // Last time this fan sent a message
   followUpDueAt   DateTime?     // Next scheduled follow-up
-  followUpType    String?       // "cliffhanger" | "check_in" | "win_back"
-  followUpMessage String?       // Pre-generated follow-up text from AI
+  // followUpType    String?    // PENDING MIGRATION
+  // followUpMessage String?    // PENDING MIGRATION
 
   // --- Purchase behavior profile ---
   buyerType       String?       // ppv_buyer, custom_buyer, tipper, subscriber_only, window_shopper
@@ -332,22 +332,21 @@ model Transaction {
   @@index([date])
 }
 
-// Phase 3: Live Performance Scoring — one record per chatter per creator per day
-model ChatterPerformance {
-  id                    String   @id @default(cuid())
-  userId                String   // User (chatter) ID
-  creatorId             String   // Which creator account
-  date                  DateTime @db.Date
-  liveScore             Int      @default(50)    // 0-100 composite score
-  dailyEarned           Float    @default(0)
-  ppvUnlocks            Int      @default(0)
-  cueAccuracy           Float?                   // % of hints acted on
-  robotPhraseCount      Int      @default(0)
-  creativePhraseCount   Int      @default(0)
-  conversationsHandled  Int      @default(0)
-  avgResponseTime       Int?                     // seconds
-  createdAt             DateTime @default(now())
-
-  @@unique([userId, creatorId, date])
-  @@index([userId, date])
-}
+// PENDING MIGRATION — uncomment after running prisma db push
+// model ChatterPerformance {
+//   id                    String   @id @default(cuid())
+//   userId                String
+//   creatorId             String
+//   date                  DateTime @db.Date
+//   liveScore             Int      @default(50)
+//   dailyEarned           Float    @default(0)
+//   ppvUnlocks            Int      @default(0)
+//   cueAccuracy           Float?
+//   robotPhraseCount      Int      @default(0)
+//   creativePhraseCount   Int      @default(0)
+//   conversationsHandled  Int      @default(0)
+//   avgResponseTime       Int?
+//   createdAt             DateTime @default(now())
+//   @@unique([userId, creatorId, date])
+//   @@index([userId, date])
+// }
