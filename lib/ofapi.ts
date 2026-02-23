@@ -439,40 +439,35 @@ export async function getChatMedia(account: string, chatId: string, apiKey: stri
 
 /** Paginate through all chats for an account using _pagination.next_page */
 export async function fetchAllChats(accountName: string, apiKey: string, maxChats: number = 200) {
-    let allChats: any[] = [];
+    const all: any[] = [];
 
     // First page
-    let res = await listChats(accountName, apiKey, 100, 0).catch(() => null);
-    if (!res) return allChats;
+    const res = await listChats(accountName, apiKey, 100, 0).catch(() => null);
+    if (!res) return all;
 
-    const firstPage = Array.isArray(res?.data) ? res.data : (res?.list || res?.data?.list || []);
-    if (Array.isArray(firstPage)) allChats.push(...firstPage);
+    const firstPage = Array.isArray(res?.data) ? res.data : [];
+    all.push(...firstPage);
 
     // Follow _pagination.next_page until no more pages or maxChats reached
-    let nextPage = res?._pagination?.next_page || res?._meta?._pagination?.next_page || null;
+    let nextPage = res?._pagination?.next_page ?? res?._meta?._pagination?.next_page ?? null;
 
-    while (nextPage && allChats.length < maxChats) {
-        try {
-            const nextRes = await fetch(nextPage, {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${apiKey}`,
-                },
-            });
-            if (!nextRes.ok) break;
-            const nextData = await nextRes.json();
+    while (nextPage && all.length < maxChats) {
+        const r = await fetch(nextPage, {
+            headers: { "Authorization": `Bearer ${apiKey}` },
+        }).catch(() => null);
+        if (!r || !r.ok) break;
 
-            const chatList = Array.isArray(nextData?.data) ? nextData.data : (nextData?.list || []);
-            if (!Array.isArray(chatList) || chatList.length === 0) break;
+        const nextData = await r.json().catch(() => null);
+        if (!nextData) break;
 
-            allChats.push(...chatList);
-            nextPage = nextData?._pagination?.next_page || nextData?._meta?._pagination?.next_page || null;
-        } catch {
-            break;
-        }
+        const nextList = Array.isArray(nextData?.data) ? nextData.data : [];
+        if (nextList.length === 0) break;
+
+        all.push(...nextList);
+        nextPage = nextData?._pagination?.next_page ?? nextData?._meta?._pagination?.next_page ?? null;
     }
 
-    return allChats;
+    return all.slice(0, maxChats);
 }
 
 export async function markChatAsRead(account: string, chatId: string, apiKey: string) {
