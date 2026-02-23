@@ -225,7 +225,8 @@ export async function POST(request: Request) {
             });
         }
         // FIX #3: On incremental, existingFacts are passed so the model has early context even without early window
-        const result = await classifyFan(fanMessages, fanName, existingFacts);
+        const remainingMs = HARD_DEADLINE_MS - (Date.now() - startTime);
+        const result = await classifyFan(fanMessages, fanName, existingFacts, Math.max(remainingMs, 5000));
 
         if (!result) {
             return NextResponse.json({ classified: false, reason: "Classification failed — check Vercel logs" });

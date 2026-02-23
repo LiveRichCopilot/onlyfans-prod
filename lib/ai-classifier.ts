@@ -188,6 +188,7 @@ export async function classifyFan(
     fanMessages: string[],
     fanName?: string,
     existingFacts?: PersonalFact[],
+    timeoutMs?: number,
 ): Promise<Omit<ClassificationResult, "analysis"> | null> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -218,6 +219,9 @@ export async function classifyFan(
     }
 
     try {
+        const controller = new AbortController();
+        const abortTimer = setTimeout(() => controller.abort(), timeoutMs || 12000);
+
         const response = await fetch(OPENAI_BASE, {
             method: "POST",
             headers: {
@@ -234,7 +238,8 @@ export async function classifyFan(
                 max_tokens: 1200, // Expanded for doNotForget + suggestedQuestions + facts
                 response_format: { type: "json_object" },
             }),
-        });
+            signal: controller.signal,
+        }).finally(() => clearTimeout(abortTimer));
 
         if (!response.ok) {
             const errText = await response.text();
