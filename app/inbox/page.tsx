@@ -77,36 +77,69 @@ export default function InboxPage() {
             .catch(console.error);
     }, []);
 
-    // 2. Fetch initial Chat List when a creator is selected (or all)
+    // Helper: enrich chats with creator avatars
+    const enrichWithAvatars = useCallback((chatList: Chat[]) => {
+        const avatarMap: Record<string, string> = {};
+        creators.forEach((c: any) => { if (c.id && c.avatarUrl) avatarMap[c.id] = c.avatarUrl; });
+        chatList.forEach(c => { if (c._creatorId && avatarMap[c._creatorId]) c._creatorAvatar = avatarMap[c._creatorId]; });
+        return chatList;
+    }, [creators]);
+
+    // 2. Fetch initial Chat List, then auto-load remaining pages in background
     useEffect(() => {
         if (!selectedCreatorId) return;
         setLoading(true);
         setChatOffset(0);
         setHasMoreChats(true);
-        const chatUrl = selectedCreatorId === "all"
-            ? "/api/inbox/chats?all=true&limit=10&offset=0"
-            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10&offset=0`;
-        fetch(chatUrl)
+        let cancelled = false;
+
+        const baseUrl = selectedCreatorId === "all"
+            ? "/api/inbox/chats?all=true&limit=10"
+            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10`;
+
+        // First page — show immediately
+        fetch(`${baseUrl}&offset=0`)
             .then((res) => res.json())
-            .then((data) => {
+            .then(async (data) => {
+                if (cancelled) return;
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
-                const mappedChats: Chat[] = Array.isArray(rawArray) ? rawArray.map(mapRawChat) : [];
-                // Enrich with creator avatars
-                const creatorAvatarMap: Record<string, string> = {};
-                creators.forEach((c: any) => { if (c.id && c.avatarUrl) creatorAvatarMap[c.id] = c.avatarUrl; });
-                mappedChats.forEach(c => { if (c._creatorId && creatorAvatarMap[c._creatorId]) c._creatorAvatar = creatorAvatarMap[c._creatorId]; });
-                mappedChats.sort(
-                    (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-                );
-                setChats(mappedChats);
-                setChatOffset(10);
-                setHasMoreChats(data.hasMore === true);
+                const firstPage: Chat[] = enrichWithAvatars(Array.isArray(rawArray) ? rawArray.map(mapRawChat) : []);
+                firstPage.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
+                setChats(firstPage);
                 setLoading(false);
+
+                // Auto-load remaining pages in background
+                let currentOffset = 10;
+                let more = data.hasMore === true;
+                while (more && !cancelled && currentOffset < 200) {
+                    try {
+                        const res = await fetch(`${baseUrl}&offset=${currentOffset}`);
+                        const nextData = await res.json();
+                        if (cancelled) break;
+                        const nextRaw = Array.isArray(nextData.chats) ? nextData.chats : nextData.chats?.data || [];
+                        const nextChats: Chat[] = enrichWithAvatars(Array.isArray(nextRaw) ? nextRaw.map(mapRawChat) : []);
+                        if (nextChats.length > 0) {
+                            setChats(prev => {
+                                const ids = new Set(prev.map(c => c.id));
+                                const unique = nextChats.filter(c => !ids.has(c.id));
+                                const merged = [...prev, ...unique];
+                                merged.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
+                                return merged;
+                            });
+                        }
+                        more = nextData.hasMore === true;
+                        currentOffset += 10;
+                    } catch { break; }
+                }
+                setChatOffset(currentOffset);
+                setHasMoreChats(false);
             })
             .catch((err) => {
                 console.error("Failed to fetch chats", err);
                 setLoading(false);
             });
+
+        return () => { cancelled = true; };
     }, [selectedCreatorId]);
 
     // --- Phase 3: Infinite fan list scroll ---
