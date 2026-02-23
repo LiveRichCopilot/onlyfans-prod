@@ -138,6 +138,23 @@ export async function getActiveFans(account: string, apiKey: string) {
     return ofapiRequest(`/api/${account}/fans/active`, apiKey);
 }
 
+/**
+ * List ALL fans (active + expired) with optional spend + online filters
+ * GET /api/{account}/fans/all?filter.total_spent=X&filter.online=1
+ */
+export async function listAllFans(
+    account: string,
+    apiKey: string,
+    options?: { minSpend?: number; maxSpend?: number; online?: boolean; limit?: number; offset?: number }
+) {
+    const params = new URLSearchParams();
+    params.set("limit", String(options?.limit || 50));
+    params.set("offset", String(options?.offset || 0));
+    if (options?.minSpend !== undefined) params.set("filter.total_spent", String(options.minSpend));
+    if (options?.online !== undefined) params.set("filter.online", options.online ? "1" : "0");
+    return ofapiRequest(`/api/${account}/fans/all?${params.toString()}`, apiKey);
+}
+
 export async function uploadToVault(account: string, apiKey: string, mediaBuffer: Buffer, fileName: string) {
     console.log(`Uploading ${fileName} to OnlyFans Vault via OFAPI...`);
 

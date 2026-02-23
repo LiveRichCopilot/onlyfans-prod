@@ -66,10 +66,15 @@ export async function POST(request: Request) {
         }
 
         // --- 3. Run AI classification ---
+        // Check API key before calling classifier
+        if (!process.env.OPENAI_API_KEY) {
+            return NextResponse.json({ classified: false, reason: "OPENAI_API_KEY not set — add it in Vercel Settings → Environment Variables" });
+        }
+
         const result = await classifyFan(fanMessages, fanName);
 
         if (!result) {
-            return NextResponse.json({ classified: false, reason: "Classification failed (API unavailable)" });
+            return NextResponse.json({ classified: false, reason: "Classification failed — check Vercel logs for details" });
         }
 
         // --- 4. Save results to DB ---

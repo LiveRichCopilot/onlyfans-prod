@@ -9,6 +9,7 @@ import { ChatTopBar } from "@/components/inbox/ChatTopBar";
 import { MessageFeed } from "@/components/inbox/MessageFeed";
 import { FloatingChatBar } from "@/components/inbox/FloatingChatBar";
 import { FanSidebar } from "@/components/inbox/FanSidebar";
+import { SpendBuckets } from "@/components/inbox/SpendBuckets";
 
 // Helper: map raw OFAPI chat to our Chat type
 function mapRawChat(c: any): Chat {
@@ -56,6 +57,12 @@ export default function InboxPage() {
     const [unreadFirst, setUnreadFirst] = useState(false);
     const [filters, setFilters] = useState<any>(null);
 
+    // Spend bucket filter
+    const [spendBucket, setSpendBucket] = useState(0); // 0 = all, 50 = $50+, etc.
+    const [onlineOnly, setOnlineOnly] = useState(false);
+    const [spendFilteredChats, setSpendFilteredChats] = useState<Chat[] | null>(null); // null = use regular chats
+    const [loadingSpendFilter, setLoadingSpendFilter] = useState(false);
+
     // --- Infinite message scroll state ---
     const [loadingOlder, setLoadingOlder] = useState(false);
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
@@ -80,6 +87,49 @@ export default function InboxPage() {
     // --- Jump to date state ---
     const [jumpingToDate, setJumpingToDate] = useState(false);
     const [jumpProgress, setJumpProgress] = useState(0); // number of messages loaded so far
+
+    // --- Spend bucket filter: fetch fans filtered by spend threshold ---
+    useEffect(() => {
+        if (spendBucket === 0 && !onlineOnly) {
+            setSpendFilteredChats(null); // Use regular chat list
+            return;
+        }
+
+        setLoadingSpendFilter(true);
+        const params = new URLSearchParams();
+        params.set("creatorId", selectedCreatorId);
+        params.set("minSpend", String(spendBucket));
+        if (onlineOnly) params.set("online", "true");
+
+        fetch(`/api/inbox/fans-by-spend?${params.toString()}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.error && data.fans) {
+                    // Map OFAPI fan objects to Chat format for the fan list
+                    const mapped: Chat[] = data.fans.map((f: any) => ({
+                        id: f.id,
+                        withUser: {
+                            id: f.id,
+                            username: f.username || "Fan",
+                            name: f.name || "Anonymous",
+                            avatar: f.avatar || "",
+                        },
+                        lastMessage: {
+                            text: f.isOnline ? "Online now" : f.lastSeen ? `Last seen ${new Date(f.lastSeen).toLocaleDateString()}` : "",
+                            createdAt: f.lastSeen || new Date().toISOString(),
+                            isRead: true,
+                        },
+                        totalSpend: f.totalSpend || 0,
+                        _creatorId: f._creatorId,
+                        _creatorName: f._creatorName,
+                        _creatorAvatar: f._creatorAvatar,
+                    }));
+                    setSpendFilteredChats(mapped);
+                }
+                setLoadingSpendFilter(false);
+            })
+            .catch(() => setLoadingSpendFilter(false));
+    }, [spendBucket, onlineOnly, selectedCreatorId]);
 
     // --- Temperature ring tick — re-renders FanRows every 30s so green ring fades in real time ---
     const [tempTick, setTempTick] = useState(0);
@@ -564,21 +614,28 @@ export default function InboxPage() {
                     mobileView === "list" ? "flex" : "hidden"
                 } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06]`}
             >
+                {/* Spend bucket filters */}
+                <SpendBuckets
+                    activeBucket={spendBucket}
+                    onBucketChange={(min) => { setSpendBucket(min); setActiveChat(null); }}
+                    onlineOnly={onlineOnly}
+                    onOnlineToggle={() => { setOnlineOnly(!onlineOnly); setActiveChat(null); }}
+                />
                 <FanList
                     creators={creators}
                     selectedCreatorId={selectedCreatorId}
                     onSelectCreator={handleSelectCreator}
-                    chats={chats}
+                    chats={spendFilteredChats || chats}
                     activeChat={activeChat}
                     onSelectChat={handleSelectChat}
-                    loading={loading || loadingMoreChats}
+                    loading={loading || loadingMoreChats || loadingSpendFilter}
                     sortBy={sortBy}
                     onSortChange={setSortBy}
                     unreadFirst={unreadFirst}
                     onUnreadFirstChange={setUnreadFirst}
                     onApplyFilters={setFilters}
                     onLoadMore={handleLoadMoreChats}
-                    hasMoreChats={hasMoreChats}
+                    hasMoreChats={spendFilteredChats ? false : hasMoreChats}
                     tempTick={tempTick}
                 />
             </div>
