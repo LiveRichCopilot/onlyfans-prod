@@ -119,16 +119,54 @@ model Fan {
   name            String?
   username        String?
   lifetimeSpend   Float         @default(0)
-  lastPurchaseAt  DateTime?     // Last tip/PPV/purchase timestamp — updated by sync
+  lastPurchaseAt  DateTime?     // Last tip/PPV/purchase timestamp
   lastPurchaseType String?      // tip, message, post, subscription
   lastPurchaseAmount Float?     // Amount of last purchase
 
-  // Fan intelligence — detected from messages
+  // --- Fan intelligence (detected from messages) ---
   fanType         String?       // submissive, dominant, romantic, transactional, lonely
   tonePreference  String?       // playful, assertive, romantic, direct
   priceRange      String?       // low (1-10), mid (10-50), high (50+), whale (200+)
   lastIntentAt    DateTime?     // Last time they showed buying intent
   intentScore     Int?          // 0-100 how likely to buy right now
+
+  // --- Responsiveness & timing ---
+  avgReplyTimeSec Int?          // Rolling average reply time in seconds
+  activeHours     String?       // JSON array of top active hours e.g. "[22,23,0,1]"
+  lastMessageAt   DateTime?     // Last time this fan sent a message
+  followUpDueAt   DateTime?     // Next scheduled follow-up
+
+  // --- Purchase behavior profile ---
+  buyerType       String?       // ppv_buyer, custom_buyer, tipper, subscriber_only, window_shopper
+  conversionRate  Float?        // PPV sent → PPV bought ratio
+  avgOrderValue   Float?        // Average purchase amount
+  discountSensitivity String?   // never, sometimes, always
+  chargebackRisk  Boolean       @default(false)
+
+  // --- Objections ---
+  lastObjection   String?       // objection_price, objection_trust, objection_value, etc.
+  topObjection    String?       // Most frequent objection tag
+
+  // --- Relationship stage ---
+  stage           String?       // new, warming, active_buyer, cooling_off, at_risk, churned
+  stageUpdatedAt  DateTime?
+
+  // --- Content format preference ---
+  formatPreference String?      // photo, video, audio, text_chat, bundle
+  lengthPreference String?      // short, medium, long
+  customInterestLevel Int?      // 0-100
+
+  // --- Conversation quality signals ---
+  timeWasterScore Int?          // 0-100
+  toxicityFlag    Boolean       @default(false)
+  toxicityReason  String?
+  agentEffortMinutes Float?     // Estimated minutes spent on this fan
+
+  // --- Identity & context (only if volunteered) ---
+  language        String?
+  timezone        String?
+  relationshipStatus String?
+  occupationCategory String?
 
   creator         Creator       @relation(fields: [creatorId], references: [id])
   transactions    Transaction[]
@@ -141,6 +179,11 @@ model Fan {
   @@index([creatorId])
   @@index([lastPurchaseAt])
   @@index([fanType])
+  @@index([stage])
+  @@index([buyerType])
+  @@index([followUpDueAt])
+  @@index([timeWasterScore])
+  @@index([lastMessageAt])
 }
 
 // What a fan is into — tags with evidence
