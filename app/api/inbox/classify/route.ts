@@ -226,10 +226,24 @@ export async function POST(request: Request) {
         }
         // FIX #3: On incremental, existingFacts are passed so the model has early context even without early window
         const remainingMs = HARD_DEADLINE_MS - (Date.now() - startTime);
+        console.log(`[Classify] Calling OpenAI: ${fanMessages.length} fan msgs, ${remainingMs}ms budget remaining, ${apiCallsMade} API calls made`);
         const result = await classifyFan(fanMessages, fanName, existingFacts, Math.max(remainingMs, 5000));
 
         if (!result) {
-            return NextResponse.json({ classified: false, reason: "Classification failed — check Vercel logs" });
+            return NextResponse.json({
+                classified: false,
+                reason: "Classification returned null — OpenAI may have timed out or returned an error",
+                debug: {
+                    fanMessagesCount: fanMessages.length,
+                    totalMessagesFound: allMessages.length,
+                    earlyWindowCount: earlyMessages.length,
+                    recentWindowCount: recentMessages.length,
+                    apiCallsMade,
+                    runtimeMs: Date.now() - startTime,
+                    remainingMsForOpenAI: remainingMs,
+                    openAiKeySet: !!process.env.OPENAI_API_KEY,
+                },
+            });
         }
 
         // Build full result with analysis metadata

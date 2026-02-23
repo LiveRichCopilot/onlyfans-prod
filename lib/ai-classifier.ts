@@ -243,15 +243,24 @@ export async function classifyFan(
 
         if (!response.ok) {
             const errText = await response.text();
-            console.error("[AI Classifier] OpenAI error:", response.status, errText);
+            console.error("[AI Classifier] OpenAI HTTP error:", response.status, errText.slice(0, 500));
             return null;
         }
 
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content;
-        if (!content) return null;
+        if (!content) {
+            console.error("[AI Classifier] OpenAI returned no content. finish_reason:", data.choices?.[0]?.finish_reason, "usage:", JSON.stringify(data.usage));
+            return null;
+        }
 
-        const raw = JSON.parse(content);
+        let raw;
+        try {
+            raw = JSON.parse(content);
+        } catch (parseErr) {
+            console.error("[AI Classifier] JSON parse failed:", content.slice(0, 300));
+            return null;
+        }
 
         // Validate + default all fields (LLM may omit arrays)
         return {
@@ -274,7 +283,8 @@ export async function classifyFan(
             doNotForget: Array.isArray(raw.doNotForget) ? raw.doNotForget : [],
         };
     } catch (e: any) {
-        console.error("[AI Classifier] Failed:", e.message);
+        const isAbort = e.name === "AbortError";
+        console.error(`[AI Classifier] ${isAbort ? "TIMEOUT" : "FAILED"}:`, e.message);
         return null;
     }
 }

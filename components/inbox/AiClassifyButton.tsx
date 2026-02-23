@@ -70,7 +70,9 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                 setResult(data.result);
                 onClassified?.(); // Refresh sidebar data
             } else {
-                setError(data.reason || data.error || "Classification failed");
+                const debugInfo = data.debug ? ` [${data.debug.fanMessagesCount} fan msgs, ${data.debug.apiCallsMade} calls, ${Math.round((data.debug.runtimeMs || 0) / 1000)}s, key=${data.debug.openAiKeySet}]` : "";
+                setError((data.reason || data.error || "Classification failed") + debugInfo);
+                if (data.debug) console.log("[Classify debug]", data.debug);
             }
         } catch (e: any) {
             setError(e.message || "Failed to classify");
