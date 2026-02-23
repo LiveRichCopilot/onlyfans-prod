@@ -116,6 +116,40 @@ export function FanInfo({ chat, fanData, loading }: Props) {
                         </>
                     )}
 
+                    {/* Buy patterns */}
+                    {fanData?.buyPatterns && (
+                        <>
+                            <div className="border-t border-white/[0.06] my-3" />
+                            <div className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Buy Patterns</div>
+                            <div className="space-y-2.5 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-white/50">Favorite day</span>
+                                    <span className="text-white/80">{fanData.buyPatterns.favoriteDayOfWeek}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-white/50">Favorite time</span>
+                                    <span className="text-white/80">{fanData.buyPatterns.favoriteHour}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-white/50">Buys every</span>
+                                    <span className="text-white/80">~{fanData.buyPatterns.avgDaysBetweenPurchases}d</span>
+                                </div>
+                                {fanData.buyPatterns.typeBreakdown.length > 0 && (
+                                    <div className="space-y-1 pt-1">
+                                        {fanData.buyPatterns.typeBreakdown
+                                            .sort((a, b) => b.total - a.total)
+                                            .map(tb => (
+                                                <div key={tb.type} className="flex justify-between items-center text-[12px]">
+                                                    <span className="text-white/40 capitalize">{tb.type}</span>
+                                                    <span className="text-white/60">{tb.count}x (${tb.total.toLocaleString()})</span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+
                     {/* Narrative summary */}
                     {intel?.narrativeSummary && (
                         <div className="mt-3 text-[12px] text-white/40 italic leading-relaxed">

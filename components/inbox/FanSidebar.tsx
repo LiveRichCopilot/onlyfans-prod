@@ -49,6 +49,16 @@ type Fact = {
     source: string | null;
 };
 
+export type BuyPatterns = {
+    favoriteDayOfWeek: string;
+    favoriteDayCount: number;
+    favoriteHour: string;
+    favoriteHourCount: number;
+    avgDaysBetweenPurchases: number;
+    totalPurchases: number;
+    typeBreakdown: { type: string; count: number; total: number }[];
+};
+
 export type FanData = {
     found: boolean;
     totalSpend: number;
@@ -61,6 +71,7 @@ export type FanData = {
     intelligence: Intelligence | null;
     preferences: Preference[];
     facts: Fact[];
+    buyPatterns: BuyPatterns | null;
 };
 
 type Props = {
