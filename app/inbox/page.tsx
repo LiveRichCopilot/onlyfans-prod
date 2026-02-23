@@ -84,8 +84,8 @@ export default function InboxPage() {
         setChatOffset(0);
         setHasMoreChats(true);
         const chatUrl = selectedCreatorId === "all"
-            ? "/api/inbox/chats?all=true&limit=50&offset=0"
-            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=50&offset=0`;
+            ? "/api/inbox/chats?all=true&limit=10&offset=0"
+            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10&offset=0`;
         fetch(chatUrl)
             .then((res) => res.json())
             .then((data) => {
@@ -95,8 +95,8 @@ export default function InboxPage() {
                     (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
                 );
                 setChats(mappedChats);
-                setChatOffset(mappedChats.length);
-                setHasMoreChats(data.hasMore !== false && mappedChats.length >= 50);
+                setChatOffset(10); // OFAPI pages at 10
+                setHasMoreChats(data.hasMore === true);
                 setLoading(false);
             })
             .catch((err) => {
@@ -110,8 +110,8 @@ export default function InboxPage() {
         if (loadingMoreChats || !hasMoreChats) return;
         setLoadingMoreChats(true);
         const chatUrl = selectedCreatorId === "all"
-            ? `/api/inbox/chats?all=true&limit=50&offset=${chatOffset}`
-            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=50&offset=${chatOffset}`;
+            ? `/api/inbox/chats?all=true&limit=10&offset=${chatOffset}`
+            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10&offset=${chatOffset}`;
         fetch(chatUrl)
             .then((res) => res.json())
             .then((data) => {
@@ -123,9 +123,9 @@ export default function InboxPage() {
                         const unique = newChats.filter((c) => !existingIds.has(c.id));
                         return [...prev, ...unique];
                     });
-                    setChatOffset((prev) => prev + newChats.length);
+                    setChatOffset((prev) => prev + 10); // OFAPI pages at 10
                 }
-                setHasMoreChats(data.hasMore !== false && newChats.length >= 50);
+                setHasMoreChats(data.hasMore === true);
                 setLoadingMoreChats(false);
             })
             .catch((err) => {

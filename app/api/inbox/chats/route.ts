@@ -46,13 +46,17 @@ export async function GET(request: Request) {
             return NextResponse.json({ chats: [], hasMore: false });
         }
 
-        // Fetch all chats (auto-paginating via _pagination.next_page) from all creators
+        // Fetch one page of chats per creator (fast — single API call each)
+        let hasMorePages = false;
         const results = await Promise.allSettled(
             creatorsToFetch.map(async (creator) => {
                 const accountName = creator.ofapiCreatorId || creator.telegramId;
-                const allChats = await fetchAllChats(accountName, apiKey, 200);
-                console.log(`[CHATS] account=${accountName} fetched=${allChats.length} chats`);
-                return allChats.map((chat: any) => ({
+                const res = await listChats(accountName, apiKey, limit, offset);
+                const chatList = Array.isArray(res?.data) ? res.data : [];
+                // Check if OFAPI says there are more pages
+                const nextPage = res?._pagination?.next_page ?? res?._meta?._pagination?.next_page ?? null;
+                if (nextPage) hasMorePages = true;
+                return chatList.map((chat: any) => ({
                     ...chat,
                     _creatorId: creator.id,
                     _creatorName: creator.name || creator.ofUsername || accountName,
@@ -76,7 +80,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             chats: allChats,
-            hasMore: allChats.length >= limit,
+            hasMore: hasMorePages,
         });
     } catch (e: any) {
         console.error("Inbox chats error:", e.message);
