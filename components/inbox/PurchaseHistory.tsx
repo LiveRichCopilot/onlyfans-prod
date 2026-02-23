@@ -1,52 +1,62 @@
 "use client";
 
-import { useState } from "react";
-
 type Purchase = {
     id: string;
     amount: number;
     type: string;
     date: string;
-    description?: string;
 };
 
 type Props = {
     purchases: Purchase[];
+    txCount: number;
+    totalSpend: number;
     loading: boolean;
 };
 
-function FilterButton({ label, active, color, onClick }: { label: string; active: boolean; color: string; onClick: () => void }) {
-    const activeClass = color === "teal"
-        ? "bg-teal-500/20 text-teal-400 border border-teal-500/30"
-        : "bg-purple-500/20 text-purple-400 border border-purple-500/30";
-    return (
-        <button
-            onClick={onClick}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${active ? activeClass : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"}`}
-        >
-            {label}
-        </button>
-    );
+// Type label + color
+function txLabel(type: string): { label: string; color: string } {
+    const t = type?.toLowerCase() || "";
+    if (t.includes("tip")) return { label: "Tip", color: "#F472B6" };         // pink
+    if (t.includes("message") || t.includes("ppv")) return { label: "PPV Message", color: "#A78BFA" }; // violet
+    if (t.includes("post")) return { label: "Paid Post", color: "#22D3EE" };  // cyan
+    if (t.includes("subscri") || t.includes("renew")) return { label: "Subscription", color: "#2DD4BF" }; // teal
+    if (t.includes("stream")) return { label: "Stream", color: "#FBBF24" };   // yellow
+    if (t.includes("referral")) return { label: "Referral", color: "#34D399" }; // green
+    return { label: type || "Transaction", color: "#94A3B8" };                 // gray
 }
 
-export function PurchaseHistory({ purchases, loading }: Props) {
-    const [purchaseFilter, setPurchaseFilter] = useState<"all" | "purchased" | "not_purchased">("all");
-    const [typeFilter, setTypeFilter] = useState<"all" | "mass" | "direct">("all");
+function fmtDate(d: string): string {
+    const date = new Date(d);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
 
-    const fmt = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    if (diffDays === 0) {
+        return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    }
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
+function fmt(n: number): string {
+    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function PurchaseHistory({ purchases, txCount, totalSpend, loading }: Props) {
     return (
         <div>
-            <div className="flex gap-2 flex-wrap mb-4">
-                <FilterButton label="All" active={purchaseFilter === "all"} color="teal" onClick={() => setPurchaseFilter("all")} />
-                <FilterButton label="Purchased" active={purchaseFilter === "purchased"} color="teal" onClick={() => setPurchaseFilter("purchased")} />
-                <FilterButton label="Not Purchased" active={purchaseFilter === "not_purchased"} color="teal" onClick={() => setPurchaseFilter("not_purchased")} />
-                <div className="w-px bg-white/10 mx-1" />
-                <FilterButton label="All" active={typeFilter === "all"} color="purple" onClick={() => setTypeFilter("all")} />
-                <FilterButton label="Mass" active={typeFilter === "mass"} color="purple" onClick={() => setTypeFilter("mass")} />
-                <FilterButton label="Direct" active={typeFilter === "direct"} color="purple" onClick={() => setTypeFilter("direct")} />
-            </div>
+            {/* Summary bar */}
+            {!loading && txCount > 0 && (
+                <div className="flex items-center justify-between mb-4 px-1">
+                    <div>
+                        <span className="text-lg font-bold text-white">{fmt(totalSpend)}</span>
+                        <span className="text-[11px] text-white/40 ml-1.5">lifetime</span>
+                    </div>
+                    <span className="text-[11px] text-white/40">{txCount} purchase{txCount !== 1 ? "s" : ""}</span>
+                </div>
+            )}
 
             {loading ? (
                 <div className="flex items-center justify-center py-8">
@@ -54,19 +64,45 @@ export function PurchaseHistory({ purchases, loading }: Props) {
                 </div>
             ) : purchases.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
-                    <p className="text-xs text-white/40">No purchase history found for this fan.</p>
+                    <p className="text-xs text-white/40">No purchase history yet.</p>
+                    <p className="text-[10px] text-white/25 mt-1">Purchases will appear after sync runs.</p>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    {purchases.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.1] transition-colors">
-                            <div className="min-w-0">
-                                <div className="text-sm text-white/80 truncate">{p.type || "Transaction"}</div>
-                                <div className="text-[11px] text-white/35">{fmtDate(p.date)}</div>
+                <div className="space-y-1.5">
+                    {purchases.map((p) => {
+                        const { label, color } = txLabel(p.type);
+                        return (
+                            <div
+                                key={p.id}
+                                className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.1] transition-colors"
+                            >
+                                <div className="min-w-0 flex items-center gap-2">
+                                    {/* Type dot */}
+                                    <div
+                                        className="w-2 h-2 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: color }}
+                                    />
+                                    <div>
+                                        <div className="text-sm text-white/80">{label}</div>
+                                        <div className="text-[11px] text-white/35">{fmtDate(p.date)}</div>
+                                    </div>
+                                </div>
+                                <span
+                                    className="text-sm font-semibold flex-shrink-0 ml-3"
+                                    style={{ color }}
+                                >
+                                    {fmt(p.amount)}
+                                </span>
                             </div>
-                            <span className="text-sm font-semibold text-teal-400 flex-shrink-0 ml-3">{fmt(p.amount)}</span>
-                        </div>
-                    ))}
+                        );
+                    })}
+
+                    {/* "Showing X of Y" indicator */}
+                    {txCount > purchases.length && (
+                        <p className="text-[10px] text-white/30 text-center pt-2">
+                            Showing {purchases.length} of {txCount} purchases
+                        </p>
+                    )}
                 </div>
             )}
         </div>

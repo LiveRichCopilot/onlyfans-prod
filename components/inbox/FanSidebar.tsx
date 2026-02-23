@@ -1,19 +1,66 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { InsightsTabs } from "./InsightsTabs";
 import { FanPreferences } from "./FanPreferences";
 import { FanNotes } from "./FanNotes";
 import { FanInfo } from "./FanInfo";
 import { PurchaseHistory } from "./PurchaseHistory";
+import { AiClassifyButton } from "./AiClassifyButton";
 import type { Chat } from "./types";
 
-type FanData = {
+type Purchase = {
+    id: string;
+    amount: number;
+    type: string;
+    date: string;
+};
+
+type Intelligence = {
+    stage: string | null;
+    fanType: string | null;
+    tonePreference: string | null;
+    priceRange: string | null;
+    buyerType: string | null;
+    intentScore: number | null;
+    timeWasterScore: number | null;
+    conversionRate: number | null;
+    avgOrderValue: number | null;
+    formatPreference: string | null;
+    nextBestAction: string | null;
+    nextBestActionReason: string | null;
+    emotionalDrivers: string | null;
+    emotionalNeeds: string | null;
+    narrativeSummary: string | null;
+    lastMessageAt: string | null;
+    followUpDueAt: string | null;
+};
+
+type Preference = {
+    tag: string;
+    weight: number;
+    source: string | null;
+};
+
+type Fact = {
+    key: string;
+    value: string;
+    confidence: number;
+    source: string | null;
+};
+
+export type FanData = {
+    found: boolean;
     totalSpend: number;
     lastPaid: string | null;
+    lastPurchaseType: string | null;
+    lastPurchaseAmount: number | null;
     fanSince: string | null;
     txCount: number;
-    purchases: any[];
+    purchases: Purchase[];
+    intelligence: Intelligence | null;
+    preferences: Preference[];
+    facts: Fact[];
 };
 
 type Props = {
@@ -25,21 +72,33 @@ export function FanSidebar({ chat, width }: Props) {
     const [activeTab, setActiveTab] = useState<"insights" | "purchases">("insights");
     const [fanData, setFanData] = useState<FanData | null>(null);
     const [loading, setLoading] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
-    useEffect(() => {
-        if (!chat?._creatorId || !chat?.withUser?.id) {
+    const fanOfapiId = chat?.withUser?.id;
+    const creatorId = chat?._creatorId;
+
+    const fetchFanData = useCallback(() => {
+        if (!creatorId || !fanOfapiId) {
             setFanData(null);
             return;
         }
         setLoading(true);
-        fetch(`/api/inbox/fan-details?creatorId=${chat._creatorId}&fanId=${chat.withUser.id}`)
+        fetch(`/api/inbox/fan-details?creatorId=${creatorId}&fanId=${fanOfapiId}`)
             .then((r) => r.json())
             .then((data) => {
                 if (!data.error) setFanData(data);
                 setLoading(false);
             })
             .catch(() => setLoading(false));
-    }, [chat?.id, chat?._creatorId, chat?.withUser?.id]);
+    }, [creatorId, fanOfapiId]);
+
+    useEffect(() => {
+        fetchFanData();
+    }, [fetchFanData, refreshKey]);
+
+    const handleUpdate = useCallback(() => {
+        setRefreshKey(k => k + 1);
+    }, []);
 
     return (
         <div
@@ -50,12 +109,38 @@ export function FanSidebar({ chat, width }: Props) {
 
             {activeTab === "insights" ? (
                 <div className="space-y-6">
-                    <FanPreferences />
-                    <FanNotes />
+                    {/* AI Classify button — analyzes last 50 messages to detect fan type + intent */}
+                    <AiClassifyButton
+                        creatorId={creatorId}
+                        chatId={chat?.id}
+                        fanOfapiId={fanOfapiId}
+                        fanName={chat?.withUser?.name}
+                        onClassified={handleUpdate}
+                    />
+                    <FanPreferences
+                        preferences={fanData?.preferences || []}
+                        intelligence={fanData?.intelligence || null}
+                        loading={loading}
+                        fanOfapiId={fanOfapiId}
+                        creatorId={creatorId}
+                        onUpdate={handleUpdate}
+                    />
+                    <FanNotes
+                        facts={fanData?.facts || []}
+                        loading={loading}
+                        fanOfapiId={fanOfapiId}
+                        creatorId={creatorId}
+                        onUpdate={handleUpdate}
+                    />
                     <FanInfo chat={chat} fanData={fanData} loading={loading} />
                 </div>
             ) : (
-                <PurchaseHistory purchases={fanData?.purchases || []} loading={loading} />
+                <PurchaseHistory
+                    purchases={fanData?.purchases || []}
+                    txCount={fanData?.txCount || 0}
+                    totalSpend={fanData?.totalSpend || 0}
+                    loading={loading}
+                />
             )}
         </div>
     );
