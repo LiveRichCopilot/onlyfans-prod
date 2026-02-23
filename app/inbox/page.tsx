@@ -699,7 +699,7 @@ export default function InboxPage() {
             <div
                 className={`${
                     mobileView === "chat" ? "flex" : "hidden"
-                } md:flex flex-1 flex-col min-w-0`}
+                } md:flex flex-1 flex-col min-w-0 h-screen overflow-hidden`}
                 style={{ backgroundColor: "#1a1a1a" }}
             >
                 {activeChat ? (
@@ -707,7 +707,7 @@ export default function InboxPage() {
                         <WhaleOnlineAlert
                             creatorId={activeChat._creatorId || selectedCreatorId}
                             onNavigateToFan={(fanId) => {
-                                const targetChat = chats.find(c => c.withUser?.id === fanId);
+                                const targetChat = chats.find(c => String(c.withUser?.id) === String(fanId));
                                 if (targetChat) handleSelectChat(targetChat);
                             }}
                         />
