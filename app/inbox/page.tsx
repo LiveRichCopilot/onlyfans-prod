@@ -58,6 +58,9 @@ export default function InboxPage() {
     const [hasMoreMessages, setHasMoreMessages] = useState(true);
     const nextLastIdRef = useRef<string | null>(null);
 
+    // Guard: track which creator selection is active to prevent stale appends
+    const activeCreatorSelectionRef = useRef<string>("");
+
     // --- Infinite fan list scroll state ---
     const [chatOffset, setChatOffset] = useState(0);
     const [hasMoreChats, setHasMoreChats] = useState(true);
@@ -89,9 +92,13 @@ export default function InboxPage() {
     useEffect(() => {
         if (!selectedCreatorId) return;
         setLoading(true);
+        setChats([]); // Clear immediately to prevent stale chats from other creators
         setChatOffset(0);
         setHasMoreChats(true);
-        let cancelled = false;
+
+        // Use a unique key for this selection so stale appends get rejected
+        const selectionKey = `${selectedCreatorId}_${Date.now()}`;
+        activeCreatorSelectionRef.current = selectionKey;
 
         const baseUrl = selectedCreatorId === "all"
             ? "/api/inbox/chats?all=true&limit=10"
@@ -101,7 +108,7 @@ export default function InboxPage() {
         fetch(`${baseUrl}&offset=0`)
             .then((res) => res.json())
             .then(async (data) => {
-                if (cancelled) return;
+                if (activeCreatorSelectionRef.current !== selectionKey) return;
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
                 const firstPage: Chat[] = enrichWithAvatars(Array.isArray(rawArray) ? rawArray.map(mapRawChat) : []);
                 firstPage.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
@@ -111,15 +118,16 @@ export default function InboxPage() {
                 // Auto-load remaining pages in background
                 let currentOffset = 10;
                 let more = data.hasMore === true;
-                while (more && !cancelled && currentOffset < 200) {
+                while (more && activeCreatorSelectionRef.current === selectionKey && currentOffset < 200) {
                     try {
                         const res = await fetch(`${baseUrl}&offset=${currentOffset}`);
                         const nextData = await res.json();
-                        if (cancelled) break;
+                        if (activeCreatorSelectionRef.current !== selectionKey) break;
                         const nextRaw = Array.isArray(nextData.chats) ? nextData.chats : nextData.chats?.data || [];
                         const nextChats: Chat[] = enrichWithAvatars(Array.isArray(nextRaw) ? nextRaw.map(mapRawChat) : []);
                         if (nextChats.length > 0) {
                             setChats(prev => {
+                                if (activeCreatorSelectionRef.current !== selectionKey) return prev;
                                 const ids = new Set(prev.map(c => c.id));
                                 const unique = nextChats.filter(c => !ids.has(c.id));
                                 const merged = [...prev, ...unique];
@@ -139,7 +147,6 @@ export default function InboxPage() {
                 setLoading(false);
             });
 
-        return () => { cancelled = true; };
     }, [selectedCreatorId]);
 
     // --- Phase 3: Infinite fan list scroll ---
@@ -411,6 +418,7 @@ export default function InboxPage() {
                 className={`${
                     mobileView === "chat" ? "flex" : "hidden"
                 } md:flex flex-1 flex-col min-w-0`}
+                style={{ backgroundColor: "#1a1a1a" }}
             >
                 {activeChat ? (
                     <>
