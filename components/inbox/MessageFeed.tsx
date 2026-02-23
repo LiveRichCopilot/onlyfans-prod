@@ -62,7 +62,7 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
                 <div ref={sentinelRef} className="flex justify-center py-2 shrink-0">
                     {loadingOlder && (
                         <div className="flex items-center gap-2 text-xs text-white/40">
-                            <div className="animate-spin w-4 h-4 rounded-full border-2 border-white/10 border-t-teal-500" />
+                            <div className="animate-spin w-4 h-4 rounded-full border-2 border-white/10 border-t-[#2d786e]" />
                             Loading older messages...
                         </div>
                     )}

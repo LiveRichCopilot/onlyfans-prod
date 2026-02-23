@@ -15,7 +15,7 @@ export function SendButton({ onClick, disabled, hasText }: Props) {
             disabled={!hasText || disabled}
             className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                 hasText
-                    ? "bg-[#0D9488] text-white shadow-lg shadow-teal-500/25 scale-100"
+                    ? "bg-[#2d786e] text-white shadow-lg shadow-[#2d786e]/25 scale-100"
                     : "bg-white/[0.06] text-white/20 scale-95"
             }`}
         >
