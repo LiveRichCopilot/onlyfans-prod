@@ -1,108 +1,167 @@
 "use client";
 
-type Purchase = {
-    id: string;
-    amount: number;
-    type: string;
-    date: string;
+import { useState, useEffect, useCallback } from "react";
+import { BuyRateBar } from "./BuyRateBar";
+import { PpvFilters } from "./PpvFilters";
+import { PpvCard } from "./PpvCard";
+
+type PpvItem = {
+    messageId: string;
+    createdAt: string;
+    price: number;
+    purchased: boolean;
+    isMass: boolean;
+    mediaCount: number;
+    thumbnails: { id: string; type: string; thumb: string; preview: string }[];
+    totalThumbs: number;
+    text: string;
+    mediaIds: number[];
+};
+
+type PpvStats = {
+    totalPpv: number;
+    purchasedCount: number;
+    notPurchasedCount: number;
+    buyRate: number;
+    totalRevenue: number;
+    highestPrice: number;
+    lowestPrice: number;
+    massCount: number;
+    directCount: number;
+    messagesScanned: number;
 };
 
 type Props = {
-    purchases: Purchase[];
-    txCount: number;
-    totalSpend: number;
-    loading: boolean;
+    creatorId?: string;
+    chatId?: string;
 };
 
-// Type label + color
-function txLabel(type: string): { label: string; color: string } {
-    const t = type?.toLowerCase() || "";
-    if (t.includes("tip")) return { label: "Tip", color: "#F472B6" };         // pink
-    if (t.includes("message") || t.includes("ppv")) return { label: "PPV Message", color: "#A78BFA" }; // violet
-    if (t.includes("post")) return { label: "Paid Post", color: "#22D3EE" };  // cyan
-    if (t.includes("subscri") || t.includes("renew")) return { label: "Subscription", color: "#2DD4BF" }; // teal
-    if (t.includes("stream")) return { label: "Stream", color: "#FBBF24" };   // yellow
-    if (t.includes("referral")) return { label: "Referral", color: "#34D399" }; // green
-    return { label: type || "Transaction", color: "#94A3B8" };                 // gray
-}
-
-function fmtDate(d: string): string {
-    const date = new Date(d);
+function formatDateHeader(dateStr: string): string {
+    const d = new Date(dateStr);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86400000);
+    const msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-    if (diffDays === 0) {
-        return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    if (msgDate.getTime() === today.getTime()) return "Today";
+    if (msgDate.getTime() === yesterday.getTime()) return "Yesterday";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function dateKey(dateStr: string): string {
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export function PurchaseHistory({ creatorId, chatId }: Props) {
+    const [ppvs, setPpvs] = useState<PpvItem[]>([]);
+    const [stats, setStats] = useState<PpvStats | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [purchaseFilter, setPurchaseFilter] = useState<"all" | "purchased" | "not_purchased">("all");
+    const [typeFilter, setTypeFilter] = useState<"all" | "mass" | "direct">("all");
+
+    const fetchPpvHistory = useCallback(() => {
+        if (!creatorId || !chatId) return;
+        setLoading(true);
+        fetch(`/api/inbox/ppv-history?creatorId=${creatorId}&chatId=${chatId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.error) {
+                    setPpvs(data.ppvs || []);
+                    setStats(data.stats || null);
+                }
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
+    }, [creatorId, chatId]);
+
+    useEffect(() => {
+        fetchPpvHistory();
+    }, [fetchPpvHistory]);
+
+    // Apply filters
+    const filtered = ppvs.filter(p => {
+        if (purchaseFilter === "purchased" && !p.purchased) return false;
+        if (purchaseFilter === "not_purchased" && p.purchased) return false;
+        if (typeFilter === "mass" && !p.isMass) return false;
+        if (typeFilter === "direct" && p.isMass) return false;
+        return true;
+    });
+
+    // Group by date
+    const groups: { date: string; label: string; items: PpvItem[] }[] = [];
+    let lastKey = "";
+    for (const ppv of filtered) {
+        const key = dateKey(ppv.createdAt);
+        if (key !== lastKey) {
+            groups.push({ date: key, label: formatDateHeader(ppv.createdAt), items: [] });
+            lastKey = key;
+        }
+        groups[groups.length - 1].items.push(ppv);
     }
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
-function fmt(n: number): string {
-    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-export function PurchaseHistory({ purchases, txCount, totalSpend, loading }: Props) {
     return (
         <div>
-            {/* Summary bar */}
-            {!loading && txCount > 0 && (
-                <div className="flex items-center justify-between mb-4 px-1">
-                    <div>
-                        <span className="text-lg font-bold text-white">{fmt(totalSpend)}</span>
-                        <span className="text-[11px] text-white/40 ml-1.5">lifetime</span>
-                    </div>
-                    <span className="text-[11px] text-white/40">{txCount} purchase{txCount !== 1 ? "s" : ""}</span>
-                </div>
-            )}
-
             {loading ? (
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin w-5 h-5 rounded-full border-2 border-white/10 border-t-teal-500" />
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <div className="animate-spin w-6 h-6 rounded-full border-2 border-white/10 border-t-teal-500" />
+                    <span className="text-xs text-white/40">Scanning messages for PPVs...</span>
                 </div>
-            ) : purchases.length === 0 ? (
-                <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
-                    <p className="text-xs text-white/40">No purchase history yet.</p>
-                    <p className="text-[10px] text-white/25 mt-1">Purchases will appear after sync runs.</p>
-                </div>
-            ) : (
-                <div className="space-y-1.5">
-                    {purchases.map((p) => {
-                        const { label, color } = txLabel(p.type);
-                        return (
-                            <div
-                                key={p.id}
-                                className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.1] transition-colors"
-                            >
-                                <div className="min-w-0 flex items-center gap-2">
-                                    {/* Type dot */}
-                                    <div
-                                        className="w-2 h-2 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: color }}
-                                    />
-                                    <div>
-                                        <div className="text-sm text-white/80">{label}</div>
-                                        <div className="text-[11px] text-white/35">{fmtDate(p.date)}</div>
-                                    </div>
-                                </div>
-                                <span
-                                    className="text-sm font-semibold flex-shrink-0 ml-3"
-                                    style={{ color }}
-                                >
-                                    {fmt(p.amount)}
-                                </span>
-                            </div>
-                        );
-                    })}
+            ) : stats && stats.totalPpv > 0 ? (
+                <>
+                    <BuyRateBar
+                        purchasedCount={stats.purchasedCount}
+                        totalPpv={stats.totalPpv}
+                        buyRate={stats.buyRate}
+                        highestPrice={stats.highestPrice}
+                        lowestPrice={stats.lowestPrice}
+                        totalRevenue={stats.totalRevenue}
+                    />
 
-                    {/* "Showing X of Y" indicator */}
-                    {txCount > purchases.length && (
-                        <p className="text-[10px] text-white/30 text-center pt-2">
-                            Showing {purchases.length} of {txCount} purchases
-                        </p>
+                    <PpvFilters
+                        purchaseFilter={purchaseFilter}
+                        typeFilter={typeFilter}
+                        onPurchaseFilterChange={setPurchaseFilter}
+                        onTypeFilterChange={setTypeFilter}
+                        purchasedCount={stats.purchasedCount}
+                        notPurchasedCount={stats.notPurchasedCount}
+                        massCount={stats.massCount}
+                        directCount={stats.directCount}
+                    />
+
+                    {/* PPV cards grouped by date */}
+                    <div className="space-y-1">
+                        {groups.map(group => (
+                            <div key={group.date}>
+                                <div className="text-[11px] text-white/30 font-medium py-2 sticky top-0 bg-black/30 backdrop-blur-sm">
+                                    {group.label}
+                                </div>
+                                <div className="divide-y divide-white/[0.04]">
+                                    {group.items.map(ppv => (
+                                        <PpvCard key={ppv.messageId} ppv={ppv} creatorId={creatorId} />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {filtered.length === 0 && (
+                        <div className="text-center py-8">
+                            <p className="text-xs text-white/40">No PPVs match this filter.</p>
+                        </div>
                     )}
+
+                    {/* Footer */}
+                    <div className="text-center py-4">
+                        <p className="text-[10px] text-white/25">
+                            {stats.totalPpv} PPVs found across {stats.messagesScanned || "?"} messages
+                        </p>
+                    </div>
+                </>
+            ) : (
+                <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
+                    <p className="text-xs text-white/40">No PPV messages found in this conversation.</p>
+                    <p className="text-[10px] text-white/25 mt-1">PPVs are messages with price &gt; $0</p>
                 </div>
             )}
         </div>

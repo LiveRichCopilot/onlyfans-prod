@@ -147,10 +147,8 @@ export function FanSidebar({ chat, width }: Props) {
                 </div>
             ) : (
                 <PurchaseHistory
-                    purchases={fanData?.purchases || []}
-                    txCount={fanData?.txCount || 0}
-                    totalSpend={fanData?.totalSpend || 0}
-                    loading={loading}
+                    creatorId={creatorId}
+                    chatId={chat?.id}
                 />
             )}
         </div>
