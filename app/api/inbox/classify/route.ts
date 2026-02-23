@@ -19,7 +19,8 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { creatorId, chatId, fanOfapiId, fanName } = body;
+        const { creatorId, chatId, fanOfapiId: rawFanId, fanName } = body;
+        const fanOfapiId = rawFanId != null ? String(rawFanId) : null;
 
         if (!creatorId || !chatId || !fanOfapiId) {
             return NextResponse.json({ error: "Missing creatorId, chatId, or fanOfapiId" }, { status: 400 });

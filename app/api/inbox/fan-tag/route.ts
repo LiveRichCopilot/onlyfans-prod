@@ -20,7 +20,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { fanOfapiId, creatorId, action } = body;
+        const { fanOfapiId: rawFanId, creatorId, action } = body;
+        const fanOfapiId = rawFanId != null ? String(rawFanId) : null;
 
         if (!fanOfapiId || !creatorId || !action) {
             return NextResponse.json({ error: "Missing fanOfapiId, creatorId, or action" }, { status: 400 });

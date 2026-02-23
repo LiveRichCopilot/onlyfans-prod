@@ -159,12 +159,8 @@ export function FanInfo({ chat, fanData, loading }: Props) {
                 </>
             )}
 
-            <div className="flex justify-between items-center bg-white/5 -mx-4 -mb-4 mt-4 px-4 py-3 rounded-b-2xl border-t border-white/5">
-                <span className="text-white/50 text-xs">Data source</span>
-                <span className="text-xs text-white/80 flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(52,211,153,1)]" />
-                    Supabase
-                </span>
+            <div className="flex justify-center items-center bg-white/5 -mx-4 -mb-4 mt-4 px-4 py-2 rounded-b-2xl border-t border-white/5">
+                <span className="text-[10px] text-white/20">Based on conversation history and purchase activity</span>
             </div>
         </div>
     );
