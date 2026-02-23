@@ -276,6 +276,10 @@ export default function InboxPage() {
                 fromUser: { id: fromId },
                 isFromCreator: isCreator,
                 senderName: isCreator ? "Creator" : activeChat?.withUser?.name || "Fan",
+                price: m.price || 0,
+                isTip: m.isTip === true,
+                isOpened: m.isOpened === true,
+                isFree: m.isFree !== false,
             };
         });
     }, [activeChat]);

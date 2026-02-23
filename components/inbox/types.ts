@@ -34,4 +34,8 @@ export type Message = {
     };
     isFromCreator: boolean;
     senderName: string;
+    price?: number;
+    isTip?: boolean;
+    isOpened?: boolean;
+    isFree?: boolean;
 };
