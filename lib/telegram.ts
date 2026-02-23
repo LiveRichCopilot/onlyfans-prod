@@ -593,11 +593,18 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
             mimeType = "audio/ogg";
         }
 
-        // Telegram Bot API limits getFile to 20MB — reject early with a helpful message
+        // Telegram Bot API hard limit: getFile() only works for files under 20MB.
+        // For larger files, give a direct dashboard upload link instead of a cryptic error.
         const fileSize = ctx.message.video?.file_size || ctx.message.photo?.[ctx.message.photo.length - 1]?.file_size || ctx.message.voice?.file_size || 0;
         if (fileSize > 20 * 1024 * 1024) {
             const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
-            await ctx.reply(`That file is ${sizeMB}MB — Telegram limits bot downloads to 20MB. Please upload this through the OF HQ dashboard instead.`);
+            const dashUrl = `https://onlyfans-prod.vercel.app/inbox`;
+            await ctx.reply(
+                `That file is ${sizeMB}MB — Telegram's bot API caps downloads at 20MB.\n\n` +
+                `Upload it directly through your dashboard instead:\n${dashUrl}\n\n` +
+                `Just drag and drop the file into any chat's Vault attachment.`,
+                { parse_mode: undefined }
+            );
             return;
         }
 
