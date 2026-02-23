@@ -12,12 +12,19 @@
 
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 
+export type PersonalFact = {
+    key: string;                      // hobby, pet_name, favorite_drink, body_preference, etc.
+    value: string;                    // "gaming", "Max (golden retriever)", "Starbucks", "booty"
+};
+
 export type ClassificationResult = {
     fanType: string | null;           // submissive, dominant, romantic, transactional, lonely
     tonePreference: string | null;    // playful, assertive, romantic, direct, calm, witty
     intentTags: IntentTag[];          // Detected buying/behavioral signals
     emotionalDrivers: string[];       // validation, companionship, escapism, entertainment, status
     buyingKeywords: string[];         // Extracted keywords indicating purchase interest
+    personalFacts: PersonalFact[];    // Extracted personal facts (hobbies, pets, preferences)
+    contentPreferences: string[];     // What content they like: "booty", "boobs", "feet", "lingerie", etc.
     confidence: number;               // 0-1 overall confidence
     summary: string;                  // 1-2 sentence narrative summary
 };
@@ -67,10 +74,37 @@ You will receive the last 20 messages from a fan (text only). Analyze them and r
 Extract specific words/phrases from messages that indicate purchase interest or content preferences.
 Examples: "video", "custom", "tonight", "exclusive", "just for me", "PPV", "tip"
 
+## Personal Facts (IMPORTANT — extract everything the fan reveals about themselves)
+Look for ANY personal details the fan mentions:
+- Hobbies: gaming, sports, fishing, gym, etc.
+- Pets: dog name, cat name, type of pet
+- Food/drink: "I love Starbucks", "just had pizza"
+- Work: job type, schedule, "I work nights"
+- Location: city, country, timezone clues
+- Relationship: single, married, divorced
+- Body preferences: what they find attractive ("I'm an ass man", "love your boobs")
+- Kinks/interests: specific content they react to
+- Name/nickname: if they share their real name
+- Age clues: "I'm 35", college references
+- Sports teams: "Go Lakers"
+- Music/TV: favorite shows, artists
+
+Return as key-value pairs. Examples:
+- { "key": "pet_name", "value": "Max (golden retriever)" }
+- { "key": "hobby", "value": "gaming, basketball" }
+- { "key": "body_preference", "value": "booty, thick" }
+- { "key": "favorite_drink", "value": "Starbucks iced coffee" }
+- { "key": "work_schedule", "value": "night shift, off weekends" }
+
+## Content Preferences
+What type of content does this fan react to or request?
+Examples: "booty", "boobs", "feet", "lingerie", "nude", "tease", "POV", "JOI", "roleplay", "GFE", "dom", "sub"
+
 ## Rules
 - Only analyze FAN messages (not creator messages)
 - If there aren't enough messages to classify, set confidence low
-- Be conservative — only tag intents you're fairly sure about
+- Be conservative with intent tags — only tag if fairly sure
+- Be AGGRESSIVE with personal facts — capture EVERYTHING they reveal
 - The summary should be actionable for a chatter (what to do next)
 
 Return ONLY valid JSON matching this schema:
@@ -80,6 +114,8 @@ Return ONLY valid JSON matching this schema:
   "intentTags": [{ "tag": "string", "confidence": 0.0-1.0, "evidence": "short quote" }],
   "emotionalDrivers": ["string"],
   "buyingKeywords": ["string"],
+  "personalFacts": [{ "key": "string", "value": "string" }],
+  "contentPreferences": ["string"],
   "confidence": 0.0-1.0,
   "summary": "1-2 sentence actionable summary"
 }`;
@@ -104,10 +140,12 @@ export async function classifyFan(
         return null;
     }
 
-    // Build the message context (limit to last 20 fan messages, max ~2000 chars each)
+    // Send more messages to GPT for deeper analysis
+    // GPT-4o-mini has 128K context — we can fit ~100 messages easily
+    const maxMsgs = Math.min(fanMessages.length, 100);
     const trimmedMessages = fanMessages
-        .slice(-20)
-        .map((m, i) => `[${i + 1}] ${m.slice(0, 2000)}`)
+        .slice(-maxMsgs)
+        .map((m, i) => `[${i + 1}] ${m.slice(0, 500)}`) // Truncate each to 500 chars
         .join("\n");
 
     const userPrompt = fanName
@@ -152,6 +190,8 @@ export async function classifyFan(
             intentTags: Array.isArray(result.intentTags) ? result.intentTags : [],
             emotionalDrivers: Array.isArray(result.emotionalDrivers) ? result.emotionalDrivers : [],
             buyingKeywords: Array.isArray(result.buyingKeywords) ? result.buyingKeywords : [],
+            personalFacts: Array.isArray(result.personalFacts) ? result.personalFacts : [],
+            contentPreferences: Array.isArray(result.contentPreferences) ? result.contentPreferences : [],
             confidence: typeof result.confidence === "number" ? result.confidence : 0.5,
             summary: result.summary || "",
         };

@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { InsightsTabs } from "./InsightsTabs";
 import { FanPreferences } from "./FanPreferences";
 import { FanNotes } from "./FanNotes";
 import { FanInfo } from "./FanInfo";
 import { PurchaseHistory } from "./PurchaseHistory";
-import { AiClassifyButton } from "./AiClassifyButton";
 import type { Chat } from "./types";
 
 type Purchase = {
@@ -84,6 +83,8 @@ export function FanSidebar({ chat, width }: Props) {
     const [fanData, setFanData] = useState<FanData | null>(null);
     const [loading, setLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [classifying, setClassifying] = useState(false);
+    const autoClassifiedRef = useRef<string | null>(null); // Track which fan we already auto-classified
 
     const fanOfapiId = chat?.withUser?.id;
     const creatorId = chat?._creatorId;
@@ -107,6 +108,44 @@ export function FanSidebar({ chat, width }: Props) {
         fetchFanData();
     }, [fetchFanData, refreshKey]);
 
+    // --- AUTO-CLASSIFY: runs automatically when fan data loads ---
+    // Only classifies if: fan has no fanType yet, or last classification was >24h ago
+    // Runs in background — doesn't block the UI
+    useEffect(() => {
+        if (!fanData || !creatorId || !fanOfapiId || !chat?.id) return;
+        if (classifying) return;
+
+        // Don't re-classify the same fan in this session
+        const key = `${creatorId}:${fanOfapiId}`;
+        if (autoClassifiedRef.current === key) return;
+
+        // Skip if fan already has AI-detected type (classified recently)
+        const intel = fanData.intelligence;
+        if (intel?.fanType && intel?.narrativeSummary) return;
+
+        // Skip fans with no spend (not worth classifying yet)
+        if ((fanData.totalSpend || 0) < 1) return;
+
+        // Auto-classify in background
+        autoClassifiedRef.current = key;
+        setClassifying(true);
+
+        fetch("/api/inbox/classify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ creatorId, chatId: chat.id, fanOfapiId, fanName: chat.withUser?.name }),
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.classified) {
+                    // Refresh fan data to show new classification
+                    setRefreshKey(k => k + 1);
+                }
+                setClassifying(false);
+            })
+            .catch(() => setClassifying(false));
+    }, [fanData, creatorId, fanOfapiId, chat?.id]);
+
     const handleUpdate = useCallback(() => {
         setRefreshKey(k => k + 1);
     }, []);
@@ -120,14 +159,13 @@ export function FanSidebar({ chat, width }: Props) {
 
             {activeTab === "insights" ? (
                 <div className="space-y-6">
-                    {/* AI Classify button — analyzes last 50 messages to detect fan type + intent */}
-                    <AiClassifyButton
-                        creatorId={creatorId}
-                        chatId={chat?.id}
-                        fanOfapiId={fanOfapiId}
-                        fanName={chat?.withUser?.name}
-                        onClassified={handleUpdate}
-                    />
+                    {/* Auto-classifying indicator */}
+                    {classifying && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-500/10 border border-violet-500/20">
+                            <div className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-violet-500/20 border-t-violet-400" />
+                            <span className="text-[11px] text-violet-400">Analyzing fan...</span>
+                        </div>
+                    )}
                     <FanPreferences
                         preferences={fanData?.preferences || []}
                         intelligence={fanData?.intelligence || null}
