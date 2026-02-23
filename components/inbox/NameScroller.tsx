@@ -34,7 +34,7 @@ export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorI
     if (loading && chats.length === 0) {
         return (
             <div className="p-6 text-center text-sm text-white/50 flex flex-col items-center">
-                <div className="animate-spin w-6 h-6 rounded-full border-t-2 border-teal-500 mb-3" />
+                <div className="animate-spin w-6 h-6 rounded-full border-t-2 border-[#2d786e] mb-3" />
                 Loading chats...
             </div>
         );
@@ -47,7 +47,7 @@ export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorI
     return (
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
             {chats.map((chat) => (
-                <FanRow key={chat.id} chat={chat} isActive={activeChat?.id === chat.id} onClick={() => onSelectChat(chat)} />
+                <FanRow key={chat.id} chat={chat} isActive={activeChat?.id === chat.id} onClick={() => onSelectChat(chat)} showCreatorBadge={selectedCreatorId === "all"} />
             ))}
             {loading && (
                 <div className="py-4 text-center">

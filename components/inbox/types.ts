@@ -13,8 +13,9 @@ export type Chat = {
         isRead: boolean;
     };
     totalSpend?: number;
-    _creatorId?: string;   // Which creator this chat belongs to
-    _creatorName?: string; // Creator display name
+    _creatorId?: string;    // Which creator this chat belongs to
+    _creatorName?: string;  // Creator display name
+    _creatorAvatar?: string; // Creator profile photo URL
 };
 
 export type Message = {

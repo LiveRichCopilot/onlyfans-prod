@@ -27,7 +27,7 @@ function mapRawChat(c: any): Chat {
             createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
             isRead: c.lastMessage?.isOpened ?? true,
         },
-        totalSpend: c.totalSpend || 0,
+        totalSpend: c.fan?.subscribedOnData?.totalSumm || c.totalSpend || 0,
         _creatorId: c._creatorId || "",
         _creatorName: c._creatorName || "",
     };
@@ -91,11 +91,15 @@ export default function InboxPage() {
             .then((data) => {
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
                 const mappedChats: Chat[] = Array.isArray(rawArray) ? rawArray.map(mapRawChat) : [];
+                // Enrich with creator avatars
+                const creatorAvatarMap: Record<string, string> = {};
+                creators.forEach((c: any) => { if (c.id && c.avatarUrl) creatorAvatarMap[c.id] = c.avatarUrl; });
+                mappedChats.forEach(c => { if (c._creatorId && creatorAvatarMap[c._creatorId]) c._creatorAvatar = creatorAvatarMap[c._creatorId]; });
                 mappedChats.sort(
                     (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
                 );
                 setChats(mappedChats);
-                setChatOffset(10); // OFAPI pages at 10
+                setChatOffset(10);
                 setHasMoreChats(data.hasMore === true);
                 setLoading(false);
             })
@@ -117,13 +121,17 @@ export default function InboxPage() {
             .then((data) => {
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
                 const newChats: Chat[] = Array.isArray(rawArray) ? rawArray.map(mapRawChat) : [];
+                // Enrich with creator avatars
+                const creatorAvatarMap: Record<string, string> = {};
+                creators.forEach((c: any) => { if (c.id && c.avatarUrl) creatorAvatarMap[c.id] = c.avatarUrl; });
+                newChats.forEach(c => { if (c._creatorId && creatorAvatarMap[c._creatorId]) c._creatorAvatar = creatorAvatarMap[c._creatorId]; });
                 if (newChats.length > 0) {
                     setChats((prev) => {
                         const existingIds = new Set(prev.map((c) => c.id));
                         const unique = newChats.filter((c) => !existingIds.has(c.id));
                         return [...prev, ...unique];
                     });
-                    setChatOffset((prev) => prev + 10); // OFAPI pages at 10
+                    setChatOffset((prev) => prev + 10);
                 }
                 setHasMoreChats(data.hasMore === true);
                 setLoadingMoreChats(false);
