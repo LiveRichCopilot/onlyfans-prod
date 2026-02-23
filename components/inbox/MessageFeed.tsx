@@ -14,6 +14,7 @@ type Props = {
     loadingOlder?: boolean;
     hasMore?: boolean;
     onLoadOlder?: () => void;
+    creatorId?: string;
 };
 
 function getDateLabel(dateStr: string): string {
@@ -29,7 +30,7 @@ function getDateLabel(dateStr: string): string {
 }
 
 export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFeed(
-    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder },
+    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder, creatorId },
     ref
 ) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -91,7 +92,7 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
                         <div key={msg.id}>
                             {showDate && <DateSeparator label={dateLabel} />}
                             <div className={gapClass}>
-                                <MessageBubble message={msg} isSfw={isSfw} onDisableSfw={onDisableSfw} showTail={!sameSender || showDate} />
+                                <MessageBubble message={msg} isSfw={isSfw} onDisableSfw={onDisableSfw} showTail={!sameSender || showDate} creatorId={creatorId} />
                             </div>
                         </div>
                     );

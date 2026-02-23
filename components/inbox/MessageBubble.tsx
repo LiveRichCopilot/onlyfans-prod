@@ -9,9 +9,10 @@ type Props = {
     isSfw: boolean;
     onDisableSfw: () => void;
     showTail?: boolean;
+    creatorId?: string;
 };
 
-export function MessageBubble({ message: msg, isSfw, onDisableSfw, showTail = true }: Props) {
+export function MessageBubble({ message: msg, isSfw, onDisableSfw, showTail = true, creatorId }: Props) {
     const isSelf = msg.isFromCreator;
     const time = msg.createdAt
         ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -24,8 +25,8 @@ export function MessageBubble({ message: msg, isSfw, onDisableSfw, showTail = tr
                 <div
                     className={`rounded-[20px] px-3.5 py-2 text-[15px] leading-relaxed shadow-sm ${
                         isSelf
-                            ? "bg-[#0D9488] text-white rounded-br-[6px]"
-                            : "bg-white/[0.08] backdrop-blur-md text-white/95 rounded-bl-[6px] border border-white/[0.06]"
+                            ? "bg-[#2d786e] text-white rounded-br-[6px]"
+                            : "bg-[#1f1f1f] text-white/95 rounded-bl-[6px] border border-white/[0.06]"
                     }`}
                 >
                     {/* Media attachments */}
@@ -33,7 +34,7 @@ export function MessageBubble({ message: msg, isSfw, onDisableSfw, showTail = tr
                         <div className={`${msg.text ? "mb-1.5" : ""} -mx-1.5 -mt-0.5 ${msg.text ? "" : "-mb-0.5"} ${msg.media.length > 1 ? "grid grid-cols-2 gap-1" : ""}`}>
                             {msg.media.map((med) => (
                                 <div key={med.id} className="rounded-2xl overflow-hidden">
-                                    <MediaPreview media={med} isSfw={isSfw} onDisableSfw={onDisableSfw} />
+                                    <MediaPreview media={med} isSfw={isSfw} onDisableSfw={onDisableSfw} creatorId={creatorId} />
                                 </div>
                             ))}
                         </div>

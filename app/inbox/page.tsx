@@ -384,6 +384,7 @@ export default function InboxPage() {
                             loadingOlder={loadingOlder}
                             hasMore={hasMoreMessages}
                             onLoadOlder={handleLoadOlderMessages}
+                            creatorId={activeChat?._creatorId || selectedCreatorId}
                         />
                         <FloatingChatBar
                             inputText={inputText}

@@ -15,16 +15,24 @@ type Props = {
     media: MediaItem;
     isSfw: boolean;
     onDisableSfw: () => void;
+    creatorId?: string;
 };
 
-export function MediaPreview({ media: med, isSfw, onDisableSfw }: Props) {
+function buildProxyUrl(url: string, creatorId?: string): string {
+    if (!url) return "";
+    let proxy = `/api/proxy-media?url=${encodeURIComponent(url)}`;
+    if (creatorId) proxy += `&creatorId=${encodeURIComponent(creatorId)}`;
+    return proxy;
+}
+
+export function MediaPreview({ media: med, isSfw, onDisableSfw, creatorId }: Props) {
     const [imgLoaded, setImgLoaded] = useState(false);
     const [imgError, setImgError] = useState(false);
     const [retryKey, setRetryKey] = useState(0);
 
     const mediaUrl = med.canView ? med.src : med.preview;
-    const proxyUrl = mediaUrl ? `/api/proxy-media?url=${encodeURIComponent(mediaUrl)}` : "";
-    const posterUrl = med.preview ? `/api/proxy-media?url=${encodeURIComponent(med.preview)}` : undefined;
+    const proxyUrl = buildProxyUrl(mediaUrl, creatorId);
+    const posterUrl = med.preview ? buildProxyUrl(med.preview, creatorId) : undefined;
     const isBlurred = !med.canView || isSfw;
 
     const handleRetry = () => {
