@@ -96,7 +96,7 @@ export default function InboxPage() {
     // --- Resizable sidebar ---
     const [sidebarWidth, setSidebarWidth] = useState(300);
     const handleSidebarResize = useCallback((deltaX: number) => {
-        setSidebarWidth((prev) => Math.max(220, Math.min(500, prev - deltaX)));
+        setSidebarWidth((prev) => Math.max(220, Math.min(500, prev + deltaX)));
     }, []);
 
     // --- Mobile sidebar toggle ---

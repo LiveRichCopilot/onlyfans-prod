@@ -36,7 +36,7 @@ export function FanInfo({ chat, fanData, loading }: Props) {
         { label: "Fan since", value: fanData?.fanSince || "-" },
         { label: "Total spend", value: `$${spend.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, highlight: spend > 0 },
         { label: "Last paid", value: fanData?.lastPaid || "-" },
-        { label: "Last type", value: fanData?.lastPurchaseType || "-" },
+        { label: "Last type", value: (fanData?.lastPurchaseType || "-").replace(/<[^>]*>/g, "").slice(0, 30) },
         { label: "Transactions", value: fanData?.txCount?.toString() || "-" },
     ];
 

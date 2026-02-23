@@ -65,7 +65,7 @@ export function ClosingHints({ chat, onSuggestMessage }: Props) {
     const [rateLimited, setRateLimited] = useState(false);
 
     const creatorId = chat?._creatorId;
-    const fanOfapiId = chat?.withUser?.id;
+    const fanOfapiId = chat?.withUser?.id != null ? String(chat.withUser.id) : undefined;
 
     const fetchHints = useCallback(() => {
         if (!creatorId || !fanOfapiId) return;

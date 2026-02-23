@@ -91,7 +91,7 @@ export function FanSidebar({ chat, width, onSuggestMessage }: Props) {
     const [classifying, setClassifying] = useState(false);
     const autoClassifiedRef = useRef<string | null>(null); // Track which fan we already auto-classified
 
-    const fanOfapiId = chat?.withUser?.id;
+    const fanOfapiId = chat?.withUser?.id != null ? String(chat.withUser.id) : undefined;
     const creatorId = chat?._creatorId;
 
     const fetchFanData = useCallback(() => {
