@@ -6,14 +6,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * GET /api/cron/sync-transactions — Round-robin sync, ONE creator per invocation
+ * GET /api/cron/sync-transactions — Sync ALL creators per invocation
  *
  * Runs every 5 min via Vercel Cron.
- * Picks the creator with the oldest lastSyncCursor (or never synced).
- * Syncs fans + transactions (24h lookback) for that ONE creator.
- * With 9 creators at 5-min intervals, each gets synced ~every 45 min.
+ * Syncs fans + transactions (24h lookback) for ALL active creators.
  *
- * ?creatorId=xxx — force sync a specific creator (for manual/debug)
+ * ?creatorId=xxx — force sync a specific creator only (for manual/debug)
  * ?backfill=true — 30-day lookback instead of 24h
  */
 export async function GET(req: NextRequest) {
@@ -34,31 +32,34 @@ export async function GET(req: NextRequest) {
     const backfill = req.nextUrl.searchParams.get("backfill") === "true";
     const forceCreatorId = req.nextUrl.searchParams.get("creatorId");
     const hoursBack = backfill ? 30 * 24 : 24;
-    const maxTx = backfill ? 5000 : 2000;
+    const maxTx = backfill ? 5000 : 500; // Lower per-creator limit when syncing all
 
     try {
-        let creator: any;
+        let creators: any[];
 
         if (forceCreatorId) {
-            // Forced creator
-            creator = await prisma.creator.findUnique({ where: { id: forceCreatorId } });
+            const c = await prisma.creator.findUnique({ where: { id: forceCreatorId } });
+            creators = c ? [c] : [];
         } else {
-            // Round-robin: pick creator with oldest sync (or never synced)
-            creator = await prisma.creator.findFirst({
+            creators = await prisma.creator.findMany({
                 where: {
                     AND: [
                         { ofapiToken: { not: null } },
                         { ofapiToken: { not: "unlinked" } },
                     ],
                 },
-                orderBy: [
-                    { lastSyncCursor: "asc" }, // nulls first (never synced), then oldest
-                ],
             });
         }
 
+        if (creators.length === 0) {
+            return NextResponse.json({ status: "no_creators_to_sync" });
+        }
+
+        const allResults: any[] = [];
+
+        for (const creator of creators) {
         if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return NextResponse.json({ status: "no_creator_to_sync" });
+            continue;
         }
 
         const accountName = creator.ofapiCreatorId || creator.telegramId;
@@ -328,16 +329,25 @@ export async function GET(req: NextRequest) {
             data: { lastSyncCursor: new Date().toISOString() },
         });
 
+        console.log(`[Cron Sync] ${result.name}: ${result.fansUpserted} fans, ${result.txUpserted} tx`, timing);
+        allResults.push(result);
+
+        // Safety: if we're running long, stop and finish the rest next cycle
+        if (Date.now() - startTime > 50000) {
+            console.log(`[Cron Sync] Time limit reached after ${allResults.length} creators`);
+            break;
+        }
+
+        } // end for-each creator
+
         const durationMs = Date.now() - startTime;
-
-        console.log(`[Cron Sync] ${result.name}: ${result.fansUpserted} fans, ${result.txUpserted} tx, ${durationMs}ms`, timing);
-
         return NextResponse.json({
             status: "ok",
             mode: backfill ? "backfill_30d" : "standard_24h",
+            creatorsProcessed: allResults.length,
+            totalCreators: creators.length,
             durationMs,
-            timing,
-            ...result,
+            results: allResults,
         });
     } catch (err: any) {
         console.error("Cron sync error:", err.message);
