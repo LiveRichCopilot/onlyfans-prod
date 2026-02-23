@@ -331,7 +331,7 @@ export default function InboxPage() {
     };
 
     return (
-        <div className="flex h-screen text-white/90 overflow-hidden bg-black">
+        <div className="flex h-screen text-white/90 overflow-hidden" style={{ backgroundColor: "#2d2d2d" }}>
             {/* Nav sidebar — hidden on mobile */}
             <div className="hidden md:block">
                 <NavBar />
@@ -341,7 +341,7 @@ export default function InboxPage() {
             <div
                 className={`${
                     mobileView === "list" ? "flex" : "hidden"
-                } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06] bg-black/40`}
+                } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06]`}
             >
                 <FanList
                     creators={creators}
@@ -365,7 +365,7 @@ export default function InboxPage() {
             <div
                 className={`${
                     mobileView === "chat" ? "flex" : "hidden"
-                } md:flex flex-1 flex-col min-w-0 bg-black/20`}
+                } md:flex flex-1 flex-col min-w-0`}
             >
                 {activeChat ? (
                     <>
