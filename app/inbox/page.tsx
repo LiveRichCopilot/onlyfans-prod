@@ -27,9 +27,12 @@ function mapRawChat(c: any): Chat {
             createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
             isRead: c.lastMessage?.isOpened ?? true,
         },
-        totalSpend: c.fan?.subscribedOnData?.totalSumm || c.totalSpend || 0,
+        // Use DB lifetimeSpend if available (persistent), fallback to OFAPI snapshot
+        totalSpend: c._dbLifetimeSpend || c.fan?.subscribedOnData?.totalSumm || c.totalSpend || 0,
         _creatorId: c._creatorId || "",
         _creatorName: c._creatorName || "",
+        // lastPurchaseAt comes from DB (persistent) — set by /api/sync
+        _lastPurchaseAt: c._lastPurchaseAt || undefined,
     };
 }
 
@@ -69,6 +72,17 @@ export default function InboxPage() {
     // --- Media map ---
     const [mediaMap, setMediaMap] = useState<Record<string, { src: string; preview: string; type: string }>>({});
 
+    // --- Jump to date state ---
+    const [jumpingToDate, setJumpingToDate] = useState(false);
+    const [jumpProgress, setJumpProgress] = useState(0); // number of messages loaded so far
+
+    // --- Temperature ring tick — re-renders FanRows every 30s so green ring fades in real time ---
+    const [tempTick, setTempTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setTempTick(t => t + 1), 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     // 1. Fetch connected creators on load
     useEffect(() => {
         fetch("/api/creators")
@@ -80,11 +94,20 @@ export default function InboxPage() {
             .catch(console.error);
     }, []);
 
-    // Helper: enrich chats with creator avatars
+    // Helper: enrich chats with creator avatars and names
     const enrichWithAvatars = useCallback((chatList: Chat[]) => {
         const avatarMap: Record<string, string> = {};
-        creators.forEach((c: any) => { if (c.id && c.avatarUrl) avatarMap[c.id] = c.avatarUrl; });
-        chatList.forEach(c => { if (c._creatorId && avatarMap[c._creatorId]) c._creatorAvatar = avatarMap[c._creatorId]; });
+        const nameMap: Record<string, string> = {};
+        creators.forEach((c: any) => {
+            if (c.id && c.avatarUrl) avatarMap[c.id] = c.avatarUrl;
+            if (c.id && c.name) nameMap[c.id] = c.name;
+        });
+        chatList.forEach(c => {
+            if (c._creatorId) {
+                if (avatarMap[c._creatorId]) c._creatorAvatar = avatarMap[c._creatorId];
+                if (nameMap[c._creatorId]) c._creatorName = nameMap[c._creatorId];
+            }
+        });
         return chatList;
     }, [creators]);
 
@@ -148,6 +171,25 @@ export default function InboxPage() {
             });
 
     }, [selectedCreatorId]);
+
+    // Re-enrich chats with creator avatars/names when creators load after chats
+    useEffect(() => {
+        if (creators.length === 0 || chats.length === 0) return;
+        const avatarMap: Record<string, string> = {};
+        const nameMap: Record<string, string> = {};
+        creators.forEach((c: any) => {
+            if (c.id && c.avatarUrl) avatarMap[c.id] = c.avatarUrl;
+            if (c.id && c.name) nameMap[c.id] = c.name;
+        });
+        // Only update if any chat is missing creator data
+        const needsUpdate = chats.some(c => c._creatorId && (!c._creatorAvatar || !c._creatorName));
+        if (!needsUpdate) return;
+        setChats(prev => prev.map(c => ({
+            ...c,
+            _creatorAvatar: c._creatorId && avatarMap[c._creatorId] ? avatarMap[c._creatorId] : c._creatorAvatar,
+            _creatorName: c._creatorId && nameMap[c._creatorId] ? nameMap[c._creatorId] : c._creatorName,
+        })));
+    }, [creators, chats.length]);
 
     // --- Phase 3: Infinite fan list scroll ---
     const handleLoadMoreChats = useCallback(() => {
@@ -338,6 +380,91 @@ export default function InboxPage() {
         }
     };
 
+    // Jump to date: rapid-paginate backwards until we reach messages from the target date
+    // OFAPI has no date filter — we page with id cursor until createdAt crosses targetDate
+    const handleJumpToDate = useCallback(async (targetDate: Date) => {
+        if (!activeChat) return;
+        const cId = activeChat._creatorId || selectedCreatorId;
+        if (!cId || cId === "all") return;
+
+        setJumpingToDate(true);
+        setJumpProgress(0);
+        setMessages([]);
+
+        const targetDayStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+        let cursor: string | undefined = undefined;
+        const allMessages: any[] = [];
+        let reachedTarget = false;
+        let iterations = 0;
+        const maxIterations = 30; // Safety cap: 30 pages x 100 = 3000 messages max
+        let lastNextLastId: string | null = null;
+        let canLoadOlder = true; // Track if there are still older messages beyond what we fetched
+
+        try {
+            while (!reachedTarget && iterations < maxIterations) {
+                iterations++;
+                let fetchUrl = `/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=100`;
+                if (cursor) fetchUrl += `&before=${cursor}`;
+                const res = await fetch(fetchUrl);
+                const data = await res.json();
+                const rawMsgs: any[] = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
+
+                if (rawMsgs.length === 0) {
+                    canLoadOlder = false;
+                    break;
+                }
+
+                allMessages.push(...rawMsgs);
+                setJumpProgress(allMessages.length);
+
+                // OFAPI returns order=desc (newest first), so last element is oldest in page
+                const oldestMsg = rawMsgs[rawMsgs.length - 1];
+                const oldestTime = new Date(oldestMsg.createdAt).getTime();
+                if (oldestTime <= targetDayStart) {
+                    reachedTarget = true;
+                }
+
+                // Use the server's nextLastId cursor (extracted from _pagination.next_page)
+                lastNextLastId = data.nextLastId || null;
+                cursor = lastNextLastId || undefined;
+                if (!cursor || data.hasMore === false) {
+                    canLoadOlder = data.hasMore !== false && !!cursor;
+                    break;
+                }
+            }
+
+            // Sort all collected messages chronologically (ascending) for slicing
+            allMessages.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+            // Find the first message on or after the target date
+            const idx = allMessages.findIndex((m: any) => new Date(m.createdAt).getTime() >= targetDayStart);
+
+            let windowMsgs: any[];
+            if (idx >= 0) {
+                // Show context: 50 messages before target + 150 after (clamped to bounds)
+                const start = Math.max(0, idx - 50);
+                const end = Math.min(allMessages.length, idx + 150);
+                windowMsgs = allMessages.slice(start, end);
+            } else {
+                // Didn't reach the date — show the oldest chunk we have
+                windowMsgs = allMessages.slice(-200);
+            }
+
+            const mapped = mapRawMessages(windowMsgs);
+            setMessages(mapped);
+
+            // Set "load older" cursor = oldest message in the window (asc order, so index 0)
+            // mapRawMessages sorts asc internally, so messages[0] is oldest displayed
+            nextLastIdRef.current = windowMsgs[0]?.id ?? lastNextLastId;
+            // Only allow "load older" if we didn't exhaust the chat history
+            setHasMoreMessages(canLoadOlder);
+        } catch (err) {
+            console.error("Jump to date failed:", err);
+        } finally {
+            setJumpingToDate(false);
+        }
+    }, [activeChat, selectedCreatorId, mapRawMessages]);
+
     const handleSelectCreator = (id: string) => {
         setSelectedCreatorId(id);
         setChats([]);
@@ -410,6 +537,7 @@ export default function InboxPage() {
                     onApplyFilters={setFilters}
                     onLoadMore={handleLoadMoreChats}
                     hasMoreChats={hasMoreChats}
+                    tempTick={tempTick}
                 />
             </div>
 
@@ -427,6 +555,8 @@ export default function InboxPage() {
                             isSfw={isSfw}
                             onToggleSfw={() => setIsSfw(!isSfw)}
                             onBack={handleBack}
+                            onJumpToDate={handleJumpToDate}
+                            jumpingToDate={jumpingToDate}
                         />
                         <MessageFeed
                             ref={messagesEndRef}
@@ -438,6 +568,8 @@ export default function InboxPage() {
                             hasMore={hasMoreMessages}
                             onLoadOlder={handleLoadOlderMessages}
                             creatorId={activeChat?._creatorId || selectedCreatorId}
+                            jumpingToDate={jumpingToDate}
+                            jumpProgress={jumpProgress}
                         />
                         <FloatingChatBar
                             inputText={inputText}

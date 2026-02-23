@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useRef, useEffect, useCallback } from "react";
+import { forwardRef, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { DateSeparator } from "./DateSeparator";
 import { MessageLoader } from "./MessageLoader";
@@ -15,6 +15,8 @@ type Props = {
     hasMore?: boolean;
     onLoadOlder?: () => void;
     creatorId?: string;
+    jumpingToDate?: boolean;
+    jumpProgress?: number;
 };
 
 function getDateLabel(dateStr: string): string {
@@ -30,12 +32,56 @@ function getDateLabel(dateStr: string): string {
 }
 
 export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFeed(
-    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder, creatorId },
+    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder, creatorId, jumpingToDate, jumpProgress },
     ref
 ) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
+    // Scroll preservation: record scrollHeight/scrollTop before prepend, restore after
+    const pendingPrependAdjustRef = useRef<null | { prevHeight: number; prevTop: number }>(null);
+    const prevFirstMsgIdRef = useRef<string | null>(null);
     let lastDate = "";
+
+    // Wrapper: capture scroll position before triggering onLoadOlder
+    const handleLoadOlder = useCallback(() => {
+        const el = scrollContainerRef.current;
+        if (!el || !onLoadOlder) return;
+        pendingPrependAdjustRef.current = {
+            prevHeight: el.scrollHeight,
+            prevTop: el.scrollTop,
+        };
+        onLoadOlder();
+    }, [onLoadOlder]);
+
+    // After messages change, restore scroll position so the same message stays anchored
+    // Only adjusts on actual prepend (handleLoadOlder sets the ref). Chat switch / jump-to-date
+    // are detected by the first message ID changing, which clears the pending adjustment.
+    useLayoutEffect(() => {
+        const el = scrollContainerRef.current;
+        const pending = pendingPrependAdjustRef.current;
+        const currentFirstId = messages[0]?.id ?? null;
+        const prevFirstId = prevFirstMsgIdRef.current;
+
+        // If the first message changed, this was a full list replacement (not a prepend)
+        // Clear any stale pending adjustment
+        if (pending && prevFirstId !== null && currentFirstId !== prevFirstId) {
+            // First message is different = list was replaced, not prepended
+            // But if messages grew AND the previous first is still in the list, it was a prepend
+            const isPrepend = messages.some(m => m.id === prevFirstId);
+            if (!isPrepend) {
+                pendingPrependAdjustRef.current = null;
+                prevFirstMsgIdRef.current = currentFirstId;
+                return;
+            }
+        }
+
+        prevFirstMsgIdRef.current = currentFirstId;
+
+        if (!el || !pending) return;
+        const newHeight = el.scrollHeight;
+        el.scrollTop = pending.prevTop + (newHeight - pending.prevHeight);
+        pendingPrependAdjustRef.current = null;
+    }, [messages]);
 
     // IntersectionObserver: detect when user scrolls near top to load older messages
     useEffect(() => {
@@ -46,15 +92,15 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
 
         const observer = new IntersectionObserver(
             ([entry]) => {
-                if (entry.isIntersecting && !loadingOlder) {
-                    onLoadOlder();
+                if (entry.isIntersecting && !loadingOlder && hasMore) {
+                    handleLoadOlder();
                 }
             },
             { root: container, rootMargin: "200px 0px 0px 0px", threshold: 0 }
         );
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [onLoadOlder, hasMore, loading, loadingOlder]);
+    }, [handleLoadOlder, hasMore, loading, loadingOlder]);
 
     return (
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 px-3 py-4 md:px-6 flex flex-col gap-1.5 relative custom-scrollbar">
@@ -70,9 +116,22 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
                 </div>
             )}
 
-            {loading && <MessageLoader />}
+            {/* Jump to date loading overlay with progress */}
+            {jumpingToDate && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-10 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="animate-spin w-6 h-6 rounded-full border-2 border-white/10 border-t-[#2d786e]" />
+                        <span className="text-sm text-white/60">Jumping to date...</span>
+                        {(jumpProgress ?? 0) > 0 && (
+                            <span className="text-[11px] text-white/35">Scanned {jumpProgress?.toLocaleString()} messages</span>
+                        )}
+                    </div>
+                </div>
+            )}
 
-            {!loading && messages.length === 0 && (
+            {loading && !jumpingToDate && <MessageLoader />}
+
+            {!loading && !jumpingToDate && messages.length === 0 && (
                 <div className="flex-1 flex items-center justify-center">
                     <p className="text-sm text-white/30">No messages yet</p>
                 </div>

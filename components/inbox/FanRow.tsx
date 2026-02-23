@@ -7,6 +7,7 @@ type Props = {
     isActive: boolean;
     onClick: () => void;
     showCreatorBadge?: boolean;
+    _tick?: number; // Temperature ring refresh — triggers re-render every 30s
 };
 
 function timeAgo(dateStr: string): string {
@@ -34,6 +35,37 @@ function spendColor(spend: number): string | null {
     return null;                           // no spend
 }
 
+// Convert hex color + alpha to rgba string
+function hexToRgba(hex: string, alpha: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Fan temperature — ring color based on how recently they spent money
+// Returns null = never bought (no ring)
+function fanTemperature(lastPurchaseAt?: string): { color: string; opacity: number; glow: boolean } | null {
+    if (!lastPurchaseAt) return null;
+    const msAgo = Date.now() - new Date(lastPurchaseAt).getTime();
+    const minAgo = msAgo / 60000;
+    const daysAgo = msAgo / 86400000;
+
+    // HOT — just bought, fading green (0-30 min)
+    if (minAgo <= 30) {
+        const heat = Math.max(0.15, 1 - (minAgo / 30));
+        return { color: "#00ff88", opacity: heat, glow: minAgo < 15 };
+    }
+    // WARM — recently active (30 min - 7 days), subtle green
+    if (daysAgo < 7) return { color: "#4ade80", opacity: 0.3, glow: false };
+    // COOLING — 7-14 days, yellow
+    if (daysAgo < 14) return { color: "#facc15", opacity: 0.7, glow: false };
+    // COLD — 14-30 days, red
+    if (daysAgo < 30) return { color: "#ef4444", opacity: 0.7, glow: false };
+    // ICE COLD — 30+ days, blue
+    return { color: "#60a5fa", opacity: 0.6, glow: false };
+}
+
 export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
     const isUnread = !chat.lastMessage.isRead;
     const avatarUrl = chat.withUser.avatar
@@ -41,6 +73,16 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
         : null;
     const spend = chat.totalSpend ?? 0;
     const tierColor = spendColor(spend);
+    // Creator first name for the badge
+    const creatorFirstName = chat._creatorName?.split(" ")[0] || "";
+    // Temperature ring — based on last purchase recency
+    const temp = fanTemperature(chat._lastPurchaseAt);
+    const ringStyle = temp ? {
+        boxShadow: temp.glow
+            ? `0 0 ${temp.opacity * 8}px ${hexToRgba(temp.color, temp.opacity * 0.6)}, 0 0 0 ${0.5 + temp.opacity}px ${hexToRgba(temp.color, temp.opacity)}`
+            : `0 0 0 1.5px ${hexToRgba(temp.color, temp.opacity)}`,
+        border: `0.5px solid ${hexToRgba(temp.color, temp.opacity)}`,
+    } : undefined;
 
     return (
         <div
@@ -53,7 +95,10 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
         >
             {/* Avatar */}
             <div className="relative w-12 h-12 flex-shrink-0 mr-3">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-white/[0.08] flex items-center justify-center">
+                <div
+                    className="w-12 h-12 rounded-full overflow-hidden bg-white/[0.08] flex items-center justify-center"
+                    style={ringStyle}
+                >
                     {avatarUrl ? (
                         <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -62,15 +107,9 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
                         </span>
                     )}
                 </div>
-                {/* Creator avatar badge — shows which model this chat belongs to */}
-                {showCreatorBadge && chat._creatorAvatar && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden border-2 border-[#2d2d2d]">
-                        <img src={`/api/proxy-media?url=${encodeURIComponent(chat._creatorAvatar)}`} alt="" className="w-full h-full object-cover" />
-                    </div>
-                )}
             </div>
 
-            {/* Name + spend dot + spend amount + preview */}
+            {/* Name + spend dot + spend amount + preview + time */}
             <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline">
                     <div className="flex items-center gap-1.5 min-w-0">
@@ -98,10 +137,23 @@ export function FanRow({ chat, isActive, onClick, showCreatorBadge }: Props) {
                 </div>
             </div>
 
-            {/* Unanswered dot — teal, only when message is unread */}
-            {isUnread && (
-                <div className="w-2.5 h-2.5 rounded-full bg-[#2d786e] flex-shrink-0 ml-2" />
-            )}
+            {/* Right side: creator avatar (large, visible) OR unread dot */}
+            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                {/* Unanswered dot — teal, only when message is unread */}
+                {isUnread && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#2d786e] flex-shrink-0" />
+                )}
+                {/* Creator avatar — right side, clearly shows which model this fan belongs to */}
+                {showCreatorBadge && (chat._creatorAvatar || creatorFirstName) && (
+                    <div className="w-9 h-9 rounded-full overflow-hidden border border-white/[0.08] bg-white/[0.08] flex items-center justify-center flex-shrink-0">
+                        {chat._creatorAvatar ? (
+                            <img src={`/api/proxy-media?url=${encodeURIComponent(chat._creatorAvatar)}`} alt={creatorFirstName} className="w-full h-full object-cover" />
+                        ) : (
+                            <span className="text-[11px] font-semibold text-white/50">{creatorFirstName.charAt(0)}</span>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

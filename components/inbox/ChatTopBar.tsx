@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronLeft, Eye, EyeOff, Phone, Video } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { ChevronLeft, Eye, EyeOff, Phone, Video, CalendarSearch } from "lucide-react";
 import type { Chat } from "./types";
 
 type Props = {
@@ -8,12 +9,36 @@ type Props = {
     isSfw: boolean;
     onToggleSfw: () => void;
     onBack?: () => void;
+    onJumpToDate?: (date: Date) => void;
+    jumpingToDate?: boolean;
 };
 
-export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack }: Props) {
+export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jumpingToDate }: Props) {
     const avatarUrl = chat.withUser.avatar
         ? `/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`
         : null;
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const datePickerRef = useRef<HTMLDivElement>(null);
+
+    // Close date picker when clicking outside
+    useEffect(() => {
+        if (!showDatePicker) return;
+        const handler = (e: MouseEvent) => {
+            if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+                setShowDatePicker(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, [showDatePicker]);
+
+    const handleDateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        if (!val || !onJumpToDate) return;
+        const targetDate = new Date(val + "T00:00:00");
+        onJumpToDate(targetDate);
+        setShowDatePicker(false);
+    };
 
     return (
         <div className="h-14 px-3 md:px-5 border-b border-white/[0.08] flex items-center justify-between shrink-0 backdrop-blur-xl">
@@ -44,6 +69,35 @@ export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack }: Props) {
             </div>
 
             <div className="flex items-center gap-1">
+                {/* Jump to date */}
+                <div className="relative" ref={datePickerRef}>
+                    <button
+                        onClick={() => setShowDatePicker(!showDatePicker)}
+                        disabled={jumpingToDate}
+                        className={`p-2 rounded-full transition-colors ${
+                            jumpingToDate
+                                ? "text-[#2d786e] animate-pulse"
+                                : showDatePicker
+                                    ? "text-[#2d786e] bg-[#2d786e]/10"
+                                    : "text-white/40 hover:text-white/60 hover:bg-white/5"
+                        }`}
+                        title="Jump to date"
+                    >
+                        <CalendarSearch size={18} />
+                    </button>
+                    {showDatePicker && (
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-[#2a2a2a] border border-white/10 rounded-lg p-3 shadow-xl">
+                            <p className="text-[11px] text-white/50 mb-2">Jump to date</p>
+                            <input
+                                type="date"
+                                max={new Date().toISOString().split("T")[0]}
+                                onChange={handleDateSelect}
+                                className="bg-[#1a1a1a] border border-white/10 rounded-md px-3 py-1.5 text-sm text-white/80 outline-none focus:border-[#2d786e] [color-scheme:dark]"
+                                autoFocus
+                            />
+                        </div>
+                    )}
+                </div>
                 <button
                     onClick={onToggleSfw}
                     className={`p-2 rounded-full transition-colors ${isSfw ? "text-[#2d786e] bg-[#2d786e]/10" : "text-white/40 hover:text-white/60 hover:bg-white/5"}`}

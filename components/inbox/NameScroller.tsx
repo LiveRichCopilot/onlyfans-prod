@@ -12,9 +12,10 @@ type Props = {
     loading: boolean;
     onLoadMore?: () => void;
     hasMore?: boolean;
+    tempTick?: number;
 };
 
-export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorId, loading, onLoadMore, hasMore }: Props) {
+export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorId, loading, onLoadMore, hasMore, tempTick }: Props) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const handleScroll = useCallback(() => {
@@ -47,7 +48,7 @@ export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorI
     return (
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
             {chats.map((chat) => (
-                <FanRow key={chat.id} chat={chat} isActive={activeChat?.id === chat.id} onClick={() => onSelectChat(chat)} showCreatorBadge={selectedCreatorId === "all"} />
+                <FanRow key={chat.id} chat={chat} isActive={activeChat?.id === chat.id} onClick={() => onSelectChat(chat)} showCreatorBadge={selectedCreatorId === "all"} _tick={tempTick} />
             ))}
             {loading && (
                 <div className="py-4 text-center">

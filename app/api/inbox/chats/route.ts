@@ -70,6 +70,29 @@ export async function GET(request: Request) {
             }
         }
 
+        // Enrich chats with persistent fan data from DB (lastPurchaseAt, lifetimeSpend)
+        const fanIds = allChats.map(c => c.fan?.id?.toString()).filter(Boolean);
+        if (fanIds.length > 0) {
+            const fans = await prisma.fan.findMany({
+                where: { ofapiFanId: { in: fanIds } },
+                select: { ofapiFanId: true, lastPurchaseAt: true, lastPurchaseType: true, lastPurchaseAmount: true, lifetimeSpend: true },
+            });
+            const fanMap = new Map(fans.map(f => [f.ofapiFanId, f]));
+            for (const chat of allChats) {
+                const fanId = chat.fan?.id?.toString();
+                if (fanId && fanMap.has(fanId)) {
+                    const dbFan = fanMap.get(fanId)!;
+                    chat._lastPurchaseAt = dbFan.lastPurchaseAt?.toISOString() || null;
+                    chat._lastPurchaseType = dbFan.lastPurchaseType || null;
+                    chat._lastPurchaseAmount = dbFan.lastPurchaseAmount || null;
+                    // Use DB lifetimeSpend if available (more accurate than OFAPI snapshot)
+                    if (dbFan.lifetimeSpend > 0) {
+                        chat._dbLifetimeSpend = dbFan.lifetimeSpend;
+                    }
+                }
+            }
+        }
+
         // Sort by last message time (most recent first)
         allChats.sort((a, b) => {
             const aTime = new Date(a.lastMessage?.createdAt || 0).getTime();

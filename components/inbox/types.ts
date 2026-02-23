@@ -16,6 +16,7 @@ export type Chat = {
     _creatorId?: string;    // Which creator this chat belongs to
     _creatorName?: string;  // Creator display name
     _creatorAvatar?: string; // Creator profile photo URL
+    _lastPurchaseAt?: string; // ISO timestamp of last tip/purchase in this chat
 };
 
 export type Message = {
