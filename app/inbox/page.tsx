@@ -64,6 +64,11 @@ export default function InboxPage() {
     // Guard: track which creator selection is active to prevent stale appends
     const activeCreatorSelectionRef = useRef<string>("");
 
+    // Guard: after jump-to-date, suppress the 5s poll from overwriting historical messages
+    // Reset when user switches chat or new chat is opened
+    const isJumpedRef = useRef(false);
+    const [isJumped, setIsJumped] = useState(false); // State version for UI rendering
+
     // --- Infinite fan list scroll state ---
     const [chatOffset, setChatOffset] = useState(0);
     const [hasMoreChats, setHasMoreChats] = useState(true);
@@ -237,6 +242,7 @@ export default function InboxPage() {
         setMediaMap({});
         setHasMoreMessages(true);
         nextLastIdRef.current = null;
+        isJumpedRef.current = false; setIsJumped(false); // Reset jump guard when opening a new chat
 
         const cId = activeChat._creatorId || selectedCreatorId;
 
@@ -250,11 +256,16 @@ export default function InboxPage() {
             setHasMoreMessages(msgData.hasMore !== false);
             nextLastIdRef.current = msgData.nextLastId || null;
             setMsgsLoading(false);
-            setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+            // Only scroll to bottom on initial chat open (not after jump-to-date)
+            if (!isJumpedRef.current) {
+                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+            }
         });
 
         // Poll messages every 5s (new messages only, no before param)
+        // Skip poll when viewing historical messages (jump-to-date) to prevent snap-back
         const pollInterval = setInterval(() => {
+            if (isJumpedRef.current) return; // Don't overwrite jumped-to messages
             fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`)
                 .then(r => r.json())
                 .then(data => processMessages(data, false))
@@ -390,6 +401,7 @@ export default function InboxPage() {
         setJumpingToDate(true);
         setJumpProgress(0);
         setMessages([]);
+        isJumpedRef.current = true; setIsJumped(true); // Suppress poll from overwriting historical messages
 
         const targetDayStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
         let cursor: string | undefined = undefined;
@@ -464,6 +476,29 @@ export default function InboxPage() {
             setJumpingToDate(false);
         }
     }, [activeChat, selectedCreatorId, mapRawMessages]);
+
+    // Return to latest messages — clears the jumped state and reloads fresh messages
+    const handleReturnToLatest = useCallback(() => {
+        isJumpedRef.current = false; setIsJumped(false);
+        if (!activeChat) return;
+        const cId = activeChat._creatorId || selectedCreatorId;
+        if (!cId || cId === "all") return;
+
+        setMsgsLoading(true);
+        nextLastIdRef.current = null;
+        setHasMoreMessages(true);
+
+        fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`)
+            .then(r => r.json())
+            .then(data => {
+                processMessages(data, false);
+                setHasMoreMessages(data.hasMore !== false);
+                nextLastIdRef.current = data.nextLastId || null;
+                setMsgsLoading(false);
+                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+            })
+            .catch(() => setMsgsLoading(false));
+    }, [activeChat, selectedCreatorId, processMessages]);
 
     const handleSelectCreator = (id: string) => {
         setSelectedCreatorId(id);
@@ -570,6 +605,8 @@ export default function InboxPage() {
                             creatorId={activeChat?._creatorId || selectedCreatorId}
                             jumpingToDate={jumpingToDate}
                             jumpProgress={jumpProgress}
+                            isJumped={isJumped}
+                            onReturnToLatest={handleReturnToLatest}
                         />
                         <FloatingChatBar
                             inputText={inputText}

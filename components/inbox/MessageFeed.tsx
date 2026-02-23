@@ -17,6 +17,8 @@ type Props = {
     creatorId?: string;
     jumpingToDate?: boolean;
     jumpProgress?: number;
+    isJumped?: boolean;
+    onReturnToLatest?: () => void;
 };
 
 function getDateLabel(dateStr: string): string {
@@ -32,7 +34,7 @@ function getDateLabel(dateStr: string): string {
 }
 
 export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFeed(
-    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder, creatorId, jumpingToDate, jumpProgress },
+    { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder, creatorId, jumpingToDate, jumpProgress, isJumped, onReturnToLatest },
     ref
 ) {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -126,6 +128,18 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
                             <span className="text-[11px] text-white/35">Scanned {jumpProgress?.toLocaleString()} messages</span>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* "Return to latest" banner when viewing historical messages */}
+            {isJumped && !jumpingToDate && onReturnToLatest && (
+                <div className="sticky top-0 z-10 flex justify-center py-2">
+                    <button
+                        onClick={onReturnToLatest}
+                        className="px-4 py-1.5 rounded-full bg-[#2d786e]/90 text-white text-xs font-semibold shadow-lg hover:bg-[#2d786e] transition-colors backdrop-blur-sm"
+                    >
+                        Return to latest messages
+                    </button>
                 </div>
             )}
 
