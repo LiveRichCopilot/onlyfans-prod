@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, MessageSquare } from "lucide-react";
+import { LayoutGrid, MessageSquare, Zap } from "lucide-react";
+import { HustleMeter } from "./HustleMeter";
 
 export function NavBar() {
     return (
@@ -24,7 +25,17 @@ export function NavBar() {
                 >
                     <MessageSquare size={18} />
                 </div>
+                <Link
+                    href="/performance"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.06] transition-colors"
+                    title="Performance"
+                >
+                    <Zap size={18} />
+                </Link>
             </nav>
+
+            {/* Hustle Meter at bottom */}
+            <HustleMeter />
         </aside>
     );
 }

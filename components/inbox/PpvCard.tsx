@@ -30,7 +30,7 @@ function formatTime(dateStr: string): string {
     return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-export function PpvCard({ ppv, onCopyDraft }: Props) {
+export function PpvCard({ ppv, creatorId, onCopyDraft }: Props) {
     const lockColor = ppv.purchased ? "#22c55e" : "#ef4444";
     const lockBg = ppv.purchased ? "bg-green-500/15" : "bg-red-500/15";
 
@@ -69,9 +69,10 @@ export function PpvCard({ ppv, onCopyDraft }: Props) {
                     >
                         {thumb.thumb || thumb.preview ? (
                             <img
-                                src={`/api/proxy-media?url=${encodeURIComponent(thumb.thumb || thumb.preview)}`}
+                                src={`/api/proxy-media?url=${encodeURIComponent(thumb.thumb || thumb.preview)}${creatorId ? `&creatorId=${creatorId}` : ""}`}
                                 alt=""
                                 className="w-full h-full object-cover"
+                                loading="lazy"
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white/20 text-[10px]">

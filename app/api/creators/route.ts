@@ -124,21 +124,63 @@ export async function GET(request: Request) {
             autoSyncUnsynced(creators).catch(() => {}); // Fire and forget
         }
 
-        // Return creators from DB immediately — no OFAPI calls to block page load
-        // Live revenue is fetched separately by dashboard components that need it
-        const enrichedCreators = creators.map((c: any) => ({
-            ...c,
-            name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
-            handle: `@${c.ofUsername || c.ofapiCreatorId || c.telegramId}`,
-            ofUsername: c.ofUsername || null,
-            headerUrl: c.headerUrl || null,
-            hourlyRev: 0,
-            todayRev: 0,
-            topFans: [],
-            txCount: 0,
-            target: c.hourlyTarget || 100,
-            whaleAlertTarget: c.whaleAlertTarget || 200,
-        }));
+        // Compute today's revenue from DB (populated by sync-transactions cron every 5 min)
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const now = new Date();
+        const hoursSinceStart = Math.max(1, (now.getTime() - todayStart.getTime()) / 3600000);
+
+        // Single query: today's transactions grouped by creator
+        const todayTx = await prisma.transaction.groupBy({
+            by: ["creatorId"],
+            where: { date: { gte: todayStart } },
+            _sum: { amount: true },
+            _count: true,
+        });
+        const txMap = new Map(todayTx.map((t) => [t.creatorId, { sum: t._sum.amount || 0, count: t._count }]));
+
+        // Top fan per creator (highest spend today)
+        const topFanRows = await prisma.transaction.groupBy({
+            by: ["creatorId", "fanId"],
+            where: { date: { gte: todayStart } },
+            _sum: { amount: true },
+            orderBy: { _sum: { amount: "desc" } },
+        });
+        const topFanMap = new Map<string, { fanId: string; spend: number }>();
+        for (const row of topFanRows) {
+            if (!topFanMap.has(row.creatorId || "")) {
+                topFanMap.set(row.creatorId || "", { fanId: row.fanId, spend: row._sum.amount || 0 });
+            }
+        }
+
+        // Fetch fan names for top fans
+        const topFanIds = [...topFanMap.values()].map((f) => f.fanId);
+        const topFans = topFanIds.length > 0
+            ? await prisma.fan.findMany({ where: { id: { in: topFanIds } }, select: { id: true, name: true, username: true } })
+            : [];
+        const fanNameMap = new Map(topFans.map((f) => [f.id, f.username || f.name || "Fan"]));
+
+        const enrichedCreators = creators.map((c: any) => {
+            const tx = txMap.get(c.id);
+            const todayRev = tx?.sum || 0;
+            const txCount = tx?.count || 0;
+            const hourlyRev = todayRev / hoursSinceStart;
+            const topFan = topFanMap.get(c.id);
+
+            return {
+                ...c,
+                name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
+                handle: `@${c.ofUsername || c.ofapiCreatorId || c.telegramId}`,
+                ofUsername: c.ofUsername || null,
+                headerUrl: c.headerUrl || null,
+                hourlyRev: Math.round(hourlyRev * 100) / 100,
+                todayRev: Math.round(todayRev * 100) / 100,
+                topFans: topFan ? [{ username: fanNameMap.get(topFan.fanId) || "Fan", spend: topFan.spend }] : [],
+                txCount,
+                target: c.hourlyTarget || 100,
+                whaleAlertTarget: c.whaleAlertTarget || 200,
+            };
+        });
 
         return NextResponse.json({ creators: enrichedCreators });
     } catch (error: any) {

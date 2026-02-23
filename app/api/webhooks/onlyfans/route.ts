@@ -154,7 +154,31 @@ async function handlePurchaseEvent(payload: any) {
         }
     }
 
-    // --- 5. Telegram alert ---
+    // --- 5. Double-sell prevention: track which media was sent to which fan ---
+    if (payload.event === "messages.ppv.unlocked" && fan) {
+        const mediaId = payload.data?.media_id || payload.data?.mediaId;
+        if (mediaId) {
+            try {
+                const asset = await prisma.mediaAsset.findFirst({
+                    where: { ofapiMediaId: String(mediaId) },
+                });
+                if (asset) {
+                    const existing: string[] = asset.sentToFanIds ? JSON.parse(asset.sentToFanIds) : [];
+                    if (!existing.includes(String(fanId))) {
+                        existing.push(String(fanId));
+                        await prisma.mediaAsset.update({
+                            where: { id: asset.id },
+                            data: { sentToFanIds: JSON.stringify(existing) },
+                        });
+                    }
+                }
+            } catch (e: any) {
+                console.warn("Double-sell tracking failed:", e.message);
+            }
+        }
+    }
+
+    // --- 6. Telegram alert ---
     if (creator.telegramGroupId) {
         await sendTelegramAlert(creator, payload.event, fanName, amount, purchaseType);
     }

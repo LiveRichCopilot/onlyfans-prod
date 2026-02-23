@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { InsightsTabs } from "./InsightsTabs";
+import type { TabId } from "./InsightsTabs";
 import { FanPreferences } from "./FanPreferences";
 import { FanNotes } from "./FanNotes";
 import { FanInfo } from "./FanInfo";
 import { PurchaseHistory } from "./PurchaseHistory";
 import { AiClassifyButton } from "./AiClassifyButton";
+import { ClosingHints } from "./ClosingHints";
+import { AnchorNotifications } from "./AnchorNotifications";
 import type { Chat } from "./types";
 
 type Purchase = {
@@ -77,10 +80,11 @@ export type FanData = {
 type Props = {
     chat: Chat;
     width: number;
+    onSuggestMessage?: (text: string) => void;
 };
 
-export function FanSidebar({ chat, width }: Props) {
-    const [activeTab, setActiveTab] = useState<"insights" | "purchases">("insights");
+export function FanSidebar({ chat, width, onSuggestMessage }: Props) {
+    const [activeTab, setActiveTab] = useState<TabId>("insights");
     const [fanData, setFanData] = useState<FanData | null>(null);
     const [loading, setLoading] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -125,6 +129,17 @@ export function FanSidebar({ chat, width }: Props) {
         >
             <InsightsTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
+            {/* Follow-up reminder banner */}
+            {fanData?.intelligence?.followUpDueAt &&
+                new Date(fanData.intelligence.followUpDueAt) <= new Date() && (
+                    <div className="mb-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        <span>Follow-up overdue — check Hints tab for suggested message</span>
+                    </div>
+                )}
+
             {activeTab === "insights" ? (
                 <div className="space-y-6">
                     {/* Manual AI analysis button — auto-classify disabled to prevent DB overload */}
@@ -151,6 +166,14 @@ export function FanSidebar({ chat, width }: Props) {
                         onUpdate={handleUpdate}
                     />
                     <FanInfo chat={chat} fanData={fanData} loading={loading} />
+                </div>
+            ) : activeTab === "hints" ? (
+                <div className="space-y-4">
+                    <AnchorNotifications facts={fanData?.facts || []} />
+                    <ClosingHints
+                        chat={chat}
+                        onSuggestMessage={onSuggestMessage || (() => {})}
+                    />
                 </div>
             ) : (
                 <PurchaseHistory

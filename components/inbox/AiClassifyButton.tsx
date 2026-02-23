@@ -48,13 +48,24 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onCla
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ creatorId, chatId, fanOfapiId, fanName }),
             });
+
+            // Handle non-JSON responses (timeouts, 500 HTML pages, etc.)
+            const contentType = res.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                const text = await res.text();
+                setError(res.status === 504 ? "Timed out — too many messages. Try again." : `Server error (${res.status})`);
+                console.error("[Classify] Non-JSON response:", res.status, text.slice(0, 200));
+                setClassifying(false);
+                return;
+            }
+
             const data = await res.json();
 
             if (data.classified && data.result) {
                 setResult(data.result);
                 onClassified?.(); // Refresh sidebar data
             } else {
-                setError(data.reason || "Classification failed");
+                setError(data.reason || data.error || "Classification failed");
             }
         } catch (e: any) {
             setError(e.message || "Failed to classify");

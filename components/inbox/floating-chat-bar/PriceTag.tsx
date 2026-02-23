@@ -5,9 +5,10 @@ import { useState } from "react";
 type Props = {
     price: string;
     onPriceChange: (price: string) => void;
+    suggestedPrice?: number; // AI-suggested price from elastic pricing engine
 };
 
-export function PriceTag({ price, onPriceChange }: Props) {
+export function PriceTag({ price, onPriceChange, suggestedPrice }: Props) {
     const [editing, setEditing] = useState(false);
 
     return (
@@ -37,6 +38,14 @@ export function PriceTag({ price, onPriceChange }: Props) {
                 >
                     <span className="font-bold">$</span>
                     <span>{price || "0"}</span>
+                </button>
+            )}
+            {suggestedPrice && suggestedPrice > 0 && (
+                <button
+                    onClick={() => onPriceChange(String(suggestedPrice))}
+                    className="absolute -bottom-5 left-0 right-0 text-center text-[9px] text-amber-400/60 hover:text-amber-400 transition-colors whitespace-nowrap"
+                >
+                    AI: ${suggestedPrice}
                 </button>
             )}
         </div>

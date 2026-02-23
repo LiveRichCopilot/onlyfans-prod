@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, Eye, EyeOff, Phone, Video, CalendarSearch } from "lucide-react";
+import { ChevronLeft, Eye, EyeOff, Phone, Video, CalendarSearch, PanelRightOpen } from "lucide-react";
 import { CalendarPicker } from "./CalendarPicker";
 import type { Chat } from "./types";
 
@@ -12,9 +12,10 @@ type Props = {
     onBack?: () => void;
     onJumpToDate?: (date: Date) => void;
     jumpingToDate?: boolean;
+    onShowInsights?: () => void;
 };
 
-export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jumpingToDate }: Props) {
+export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jumpingToDate, onShowInsights }: Props) {
     const avatarUrl = chat.withUser.avatar
         ? `/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`
         : null;
@@ -91,6 +92,16 @@ export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jum
                 <button className="p-2 rounded-full text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors">
                     <Video size={18} />
                 </button>
+                {/* Insights sidebar — opens drawer on mobile, hidden on xl (sidebar visible) */}
+                {onShowInsights && (
+                    <button
+                        onClick={onShowInsights}
+                        className="xl:hidden p-2 rounded-full text-[#2d786e] hover:bg-[#2d786e]/10 transition-colors"
+                        title="Fan Insights"
+                    >
+                        <PanelRightOpen size={18} />
+                    </button>
+                )}
             </div>
         </div>
     );

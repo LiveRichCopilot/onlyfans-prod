@@ -7,6 +7,22 @@
         {
             "path": "/api/cron/sync-transactions",
             "schedule": "*/5 * * * *"
+        },
+        {
+            "path": "/api/cron/stage-decay",
+            "schedule": "0 6 * * *"
+        },
+        {
+            "path": "/api/cron/online-poll",
+            "schedule": "*/2 * * * *"
+        },
+        {
+            "path": "/api/cron/follow-ups",
+            "schedule": "0 */6 * * *"
+        },
+        {
+            "path": "/api/cron/performance-score",
+            "schedule": "*/15 * * * *"
         }
     ]
 }

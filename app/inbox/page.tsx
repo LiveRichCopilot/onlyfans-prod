@@ -10,6 +10,8 @@ import { MessageFeed } from "@/components/inbox/MessageFeed";
 import { FloatingChatBar } from "@/components/inbox/FloatingChatBar";
 import { FanSidebar } from "@/components/inbox/FanSidebar";
 import { SpendBuckets } from "@/components/inbox/SpendBuckets";
+import { WhaleOnlineAlert } from "@/components/inbox/WhaleOnlineAlert";
+import { PanelSlider } from "@/components/inbox/PanelSlider";
 
 // Helper: map raw OFAPI chat to our Chat type
 function mapRawChat(c: any): Chat {
@@ -87,6 +89,18 @@ export default function InboxPage() {
     // --- Jump to date state ---
     const [jumpingToDate, setJumpingToDate] = useState(false);
     const [jumpProgress, setJumpProgress] = useState(0); // number of messages loaded so far
+
+    // --- AI Suggest state ---
+    const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
+
+    // --- Resizable sidebar ---
+    const [sidebarWidth, setSidebarWidth] = useState(300);
+    const handleSidebarResize = useCallback((deltaX: number) => {
+        setSidebarWidth((prev) => Math.max(220, Math.min(500, prev - deltaX)));
+    }, []);
+
+    // --- Mobile sidebar toggle ---
+    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
     // --- Spend bucket filter: fetch fans filtered by spend threshold ---
     useEffect(() => {
@@ -554,6 +568,40 @@ export default function InboxPage() {
             .catch(() => setMsgsLoading(false));
     }, [activeChat, selectedCreatorId, processMessages]);
 
+    // AI Suggest — calls /api/inbox/ai-hints and pre-fills the chat input
+    const handleAiSuggest = useCallback(async () => {
+        if (!activeChat || aiSuggestLoading) return;
+        const cId = activeChat._creatorId;
+        const fanId = activeChat.withUser?.id;
+        if (!cId || !fanId) return;
+
+        setAiSuggestLoading(true);
+        try {
+            const res = await fetch("/api/inbox/ai-hints", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    creatorId: cId,
+                    chatId: activeChat.id,
+                    fanOfapiId: fanId,
+                }),
+            });
+            const data = await res.json();
+            if (data.hints?.draftMessage) {
+                setInputText(data.hints.draftMessage);
+            }
+        } catch (e) {
+            console.error("AI Suggest failed:", e);
+        } finally {
+            setAiSuggestLoading(false);
+        }
+    }, [activeChat, aiSuggestLoading]);
+
+    // Callback from sidebar hints — pre-fill chat input with suggested text
+    const handleSuggestMessage = useCallback((text: string) => {
+        setInputText(text);
+    }, []);
+
     const handleSelectCreator = (id: string) => {
         setSelectedCreatorId(id);
         setChats([]);
@@ -656,10 +704,18 @@ export default function InboxPage() {
             >
                 {activeChat ? (
                     <>
+                        <WhaleOnlineAlert
+                            creatorId={activeChat._creatorId || selectedCreatorId}
+                            onNavigateToFan={(fanId) => {
+                                const targetChat = chats.find(c => c.withUser?.id === fanId);
+                                if (targetChat) handleSelectChat(targetChat);
+                            }}
+                        />
                         <ChatTopBar
                             chat={activeChat}
                             isSfw={isSfw}
                             onToggleSfw={() => setIsSfw(!isSfw)}
+                            onShowInsights={() => setShowMobileSidebar(true)}
                             onBack={handleBack}
                             onJumpToDate={handleJumpToDate}
                             jumpingToDate={jumpingToDate}
@@ -685,6 +741,8 @@ export default function InboxPage() {
                             onSend={handleSend}
                             onSetText={setInputText}
                             disabled={msgsLoading}
+                            onAiSuggest={handleAiSuggest}
+                            aiSuggestLoading={aiSuggestLoading}
                         />
                     </>
                 ) : (
@@ -700,11 +758,43 @@ export default function InboxPage() {
                 )}
             </div>
 
-            {/* Fan Sidebar — desktop only */}
+            {/* Fan Sidebar — desktop: resizable with slider, mobile: slide-over */}
             {activeChat && (
-                <div className="hidden xl:block">
-                    <FanSidebar chat={activeChat} width={300} />
-                </div>
+                <>
+                    {/* Desktop sidebar with drag-resize */}
+                    <div className="hidden xl:flex">
+                        <PanelSlider onResize={handleSidebarResize} side="left" />
+                        <FanSidebar chat={activeChat} width={sidebarWidth} onSuggestMessage={handleSuggestMessage} />
+                    </div>
+
+                    {/* Mobile sidebar overlay */}
+                    {showMobileSidebar && (
+                        <div className="xl:hidden fixed inset-0 z-50 flex">
+                            <div
+                                className="flex-1 bg-black/60 backdrop-blur-sm"
+                                onClick={() => setShowMobileSidebar(false)}
+                            />
+                            <div className="w-[85vw] max-w-[380px] animate-in slide-in-from-right">
+                                <div className="h-full flex flex-col bg-[#1a1a1a] border-l border-white/[0.06]">
+                                    <div className="flex items-center justify-between p-3 border-b border-white/[0.06]">
+                                        <span className="text-sm font-semibold text-white/80">Fan Insights</span>
+                                        <button
+                                            onClick={() => setShowMobileSidebar(false)}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/40"
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto">
+                                        <FanSidebar chat={activeChat} width={9999} onSuggestMessage={(text) => { handleSuggestMessage(text); setShowMobileSidebar(false); }} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

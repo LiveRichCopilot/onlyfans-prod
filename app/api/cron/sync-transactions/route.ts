@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
             fansUpserted: 0,
             txUpserted: 0,
             lastPurchaseUpdated: 0,
+            computedFieldsUpdated: 0,
             errors: [] as string[],
         };
 
@@ -217,7 +218,111 @@ export async function GET(req: NextRequest) {
             result.errors.push(`lastPurchaseAt update: ${e.message}`);
         }
 
-        // --- 4. Mark sync time ---
+        // --- 4. Update computed fields (bulk SQL) ---
+        t0 = Date.now();
+
+        // 4a. Average Order Value
+        try {
+            await prisma.$executeRaw`
+                UPDATE "Fan" f SET
+                    "avgOrderValue" = sub."avg"
+                FROM (
+                    SELECT "fanId", AVG("amount") as "avg"
+                    FROM "Transaction"
+                    WHERE "creatorId" = ${creator.id}
+                    GROUP BY "fanId"
+                ) sub
+                WHERE f."id" = sub."fanId"
+            `;
+        } catch (e: any) {
+            result.errors.push(`avgOrderValue update: ${e.message}`);
+        }
+
+        // 4b. Biggest Purchase
+        try {
+            await prisma.$executeRaw`
+                UPDATE "Fan" f SET
+                    "biggestPurchase" = sub."max"
+                FROM (
+                    SELECT "fanId", MAX("amount") as "max"
+                    FROM "Transaction"
+                    WHERE "creatorId" = ${creator.id}
+                    GROUP BY "fanId"
+                ) sub
+                WHERE f."id" = sub."fanId"
+            `;
+        } catch (e: any) {
+            result.errors.push(`biggestPurchase update: ${e.message}`);
+        }
+
+        // 4c. First Purchase Date (only if not already set)
+        try {
+            await prisma.$executeRaw`
+                UPDATE "Fan" f SET
+                    "firstPurchaseAt" = sub."first_date"
+                FROM (
+                    SELECT "fanId", MIN("date") as "first_date"
+                    FROM "Transaction"
+                    WHERE "creatorId" = ${creator.id}
+                    GROUP BY "fanId"
+                ) sub
+                WHERE f."id" = sub."fanId"
+                AND f."firstPurchaseAt" IS NULL
+            `;
+        } catch (e: any) {
+            result.errors.push(`firstPurchaseAt update: ${e.message}`);
+        }
+
+        // 4d. Buyer Type (dominant transaction type in last 30 days)
+        try {
+            await prisma.$executeRaw`
+                UPDATE "Fan" f SET
+                    "buyerType" = sub."dominant_type"
+                FROM (
+                    SELECT DISTINCT ON ("fanId")
+                        "fanId",
+                        CASE
+                            WHEN "type" = 'tip' THEN 'tipper'
+                            WHEN "type" = 'message' THEN 'ppv_buyer'
+                            WHEN "type" = 'subscription' THEN 'subscriber_only'
+                            ELSE 'subscriber_only'
+                        END as "dominant_type"
+                    FROM (
+                        SELECT "fanId", "type", COUNT(*) as cnt
+                        FROM "Transaction"
+                        WHERE "creatorId" = ${creator.id}
+                        AND "date" >= NOW() - INTERVAL '30 days'
+                        GROUP BY "fanId", "type"
+                        ORDER BY "fanId", cnt DESC
+                    ) ranked
+                ) sub
+                WHERE f."id" = sub."fanId"
+            `;
+        } catch (e: any) {
+            result.errors.push(`buyerType update: ${e.message}`);
+        }
+
+        // 4e. Price Range (based on lifetimeSpend)
+        try {
+            await prisma.$executeRaw`
+                UPDATE "Fan" f SET
+                    "priceRange" = CASE
+                        WHEN f."lifetimeSpend" >= 200 THEN 'whale'
+                        WHEN f."lifetimeSpend" >= 50 THEN 'high'
+                        WHEN f."lifetimeSpend" >= 10 THEN 'mid'
+                        WHEN f."lifetimeSpend" > 0 THEN 'low'
+                        ELSE 'none'
+                    END
+                WHERE f."creatorId" = ${creator.id}
+            `;
+        } catch (e: any) {
+            result.errors.push(`priceRange update: ${e.message}`);
+        }
+
+        timing.computedFieldsMs = Date.now() - t0;
+        result.computedFieldsUpdated = 1;
+
+        // --- 5. Mark sync time ---
         await prisma.creator.update({
             where: { id: creator.id },
             data: { lastSyncCursor: new Date().toISOString() },

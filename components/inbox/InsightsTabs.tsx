@@ -1,9 +1,13 @@
 "use client";
 
+type TabId = "insights" | "purchases" | "hints";
+
 type Props = {
-    activeTab: "insights" | "purchases";
-    onTabChange: (tab: "insights" | "purchases") => void;
+    activeTab: TabId;
+    onTabChange: (tab: TabId) => void;
 };
+
+export type { TabId };
 
 export function InsightsTabs({ activeTab, onTabChange }: Props) {
     return (
@@ -18,10 +22,13 @@ export function InsightsTabs({ activeTab, onTabChange }: Props) {
                 onClick={() => onTabChange("purchases")}
                 className={`pb-3 -mb-3 font-semibold text-sm tracking-wide transition-colors ${activeTab === "purchases" ? "text-purple-400 border-b-2 border-purple-400" : "text-white/40 hover:text-white"}`}
             >
-                Purchase History
+                Purchases
             </button>
-            <button className="text-white/30 hover:text-white transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <button
+                onClick={() => onTabChange("hints")}
+                className={`pb-3 -mb-3 font-semibold text-sm tracking-wide transition-colors ${activeTab === "hints" ? "text-amber-400 border-b-2 border-amber-400" : "text-white/40 hover:text-white"}`}
+            >
+                Hints
             </button>
         </div>
     );
