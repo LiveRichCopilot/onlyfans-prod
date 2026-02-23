@@ -124,70 +124,21 @@ export async function GET(request: Request) {
             autoSyncUnsynced(creators).catch(() => {}); // Fire and forget
         }
 
-        const now = endParam ? new Date(endParam) : new Date();
-        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        const todayStart = startParam ? new Date(startParam) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        // Fetch live revenue from OFAPI for each linked creator in parallel
-        const liveDataPromises = creators
-            .filter((c) => c.ofapiToken && c.ofapiToken !== "unlinked")
-            .map(async (creator) => {
-                const accountName = creator.ofapiCreatorId || creator.telegramId;
-                const apiKey = creator.ofapiToken!;
-
-                const payloadToday = {
-                    account_ids: [accountName],
-                    start_date: todayStart.toISOString(),
-                    end_date: now.toISOString(),
-                };
-
-                const [summaryToday, txResponse] = await Promise.all([
-                    getTransactionsSummary(apiKey, payloadToday, accountName).catch(() => null),
-                    getTransactions(accountName, apiKey).catch(() => null),
-                ]);
-
-                const todayRev = parseFloat(summaryToday?.data?.total_gross || summaryToday?.total_gross || "0");
-
-                const allTx = txResponse?.data?.list || txResponse?.list || txResponse?.transactions || [];
-                const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayStart);
-                const recentTx = allTx.filter((t: any) => new Date(t.createdAt) >= oneHourAgo);
-                const hourlyRev = recentTx.reduce((sum: number, t: any) => sum + (parseFloat(t.amount) || 0), 0);
-                const topFans = calculateTopFans(todayTx, 0).slice(0, 3);
-
-                return {
-                    creatorId: creator.id,
-                    hourlyRev,
-                    todayRev,
-                    topFans,
-                    txCount: todayTx.length,
-                };
-            });
-
-        const liveResults = await Promise.allSettled(liveDataPromises);
-
-        const liveMap: Record<string, any> = {};
-        liveResults.forEach((r) => {
-            if (r.status === "fulfilled" && r.value) {
-                liveMap[r.value.creatorId] = r.value;
-            }
-        });
-
-        const enrichedCreators = creators.map((c: any) => {
-            const live = liveMap[c.id];
-            return {
-                ...c,
-                name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
-                handle: `@${c.ofUsername || c.ofapiCreatorId || c.telegramId}`,
-                ofUsername: c.ofUsername || null,
-                headerUrl: c.headerUrl || null,
-                hourlyRev: live?.hourlyRev || 0,
-                todayRev: live?.todayRev || 0,
-                topFans: live?.topFans || [],
-                txCount: live?.txCount || 0,
-                target: c.hourlyTarget || 100,
-                whaleAlertTarget: c.whaleAlertTarget || 200,
-            };
-        });
+        // Return creators from DB immediately — no OFAPI calls to block page load
+        // Live revenue is fetched separately by dashboard components that need it
+        const enrichedCreators = creators.map((c: any) => ({
+            ...c,
+            name: c.name || c.ofapiCreatorId || c.telegramId || "Unknown Creator",
+            handle: `@${c.ofUsername || c.ofapiCreatorId || c.telegramId}`,
+            ofUsername: c.ofUsername || null,
+            headerUrl: c.headerUrl || null,
+            hourlyRev: 0,
+            todayRev: 0,
+            topFans: [],
+            txCount: 0,
+            target: c.hourlyTarget || 100,
+            whaleAlertTarget: c.whaleAlertTarget || 200,
+        }));
 
         return NextResponse.json({ creators: enrichedCreators });
     } catch (error: any) {
