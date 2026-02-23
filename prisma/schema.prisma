@@ -187,6 +187,11 @@ model Fan {
   // --- Narrative summary (rolling AI/human summary) ---
   narrativeSummary String?      // "Prefers playful banter, replies late nights, likes gaming..."
 
+  // --- AI Analysis cursor (scan once, update later) ---
+  lastAnalyzedMessageId String?   // OFAPI message ID — fetch only newer msgs next time
+  lastAnalyzedAt        DateTime? // When last AI analysis completed
+  messagesAnalyzed      Int?      // Count of messages processed in last analysis
+
   // --- Relationship timeline ---
   firstContactAt  DateTime?
   firstPurchaseAt DateTime?

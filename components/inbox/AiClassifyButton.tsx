@@ -1,22 +1,15 @@
 "use client";
 
 import { useState } from "react";
-
-type ClassificationResult = {
-    fanType: string | null;
-    tonePreference: string | null;
-    intentTags: { tag: string; confidence: number; evidence: string }[];
-    emotionalDrivers: string[];
-    buyingKeywords: string[];
-    confidence: number;
-    summary: string;
-};
+import type { ClassificationResult } from "@/lib/ai-classifier";
 
 type Props = {
     creatorId?: string;
     chatId?: string;
     fanOfapiId?: string;
     fanName?: string;
+    lastAnalyzedAt?: string | null;
+    messagesAnalyzed?: number | null;
     onClassified?: () => void;
 };
 
@@ -29,12 +22,24 @@ function intentColor(tag: string): string {
     return "#94A3B8"; // gray
 }
 
-export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onClassified }: Props) {
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+}
+
+export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastAnalyzedAt, messagesAnalyzed, onClassified }: Props) {
     const [classifying, setClassifying] = useState(false);
     const [result, setResult] = useState<ClassificationResult | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const canClassify = Boolean(creatorId && chatId && fanOfapiId);
+    const hasBeenAnalyzed = !!lastAnalyzedAt;
 
     const handleClassify = async () => {
         if (!canClassify) return;
@@ -92,10 +97,21 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onCla
                         <div className="w-4 h-4 rounded-full border-2 border-violet-400/30 border-t-violet-400 animate-spin" />
                         <span>Scanning chat history...</span>
                     </>
-                ) : result ? "Re-analyze with AI" : "Analyze Fan with AI"}
+                ) : hasBeenAnalyzed && !result
+                    ? "Update analysis"
+                    : result ? "Re-analyze with AI" : "Analyze Fan with AI"}
             </button>
+
+            {/* Loading subtitle */}
             {classifying && (
-                <p className="text-[10px] text-violet-400/50 text-center mt-1.5">Reading messages and building fan profile — takes 10-30s</p>
+                <p className="text-[10px] text-violet-400/50 text-center mt-1.5">Reading messages and building fan profile — takes 5-15s</p>
+            )}
+
+            {/* Previous analysis metadata */}
+            {hasBeenAnalyzed && !result && !classifying && (
+                <p className="text-[10px] text-white/25 text-center mt-1.5">
+                    {messagesAnalyzed ? `${messagesAnalyzed} messages analyzed` : "Analyzed"} · {timeAgo(lastAnalyzedAt!)}
+                </p>
             )}
 
             {/* Error */}
@@ -109,8 +125,8 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onCla
                     {/* Summary */}
                     <p className="text-[12px] text-white/70 leading-relaxed">{result.summary}</p>
 
-                    {/* Fan type + tone */}
-                    <div className="flex gap-2">
+                    {/* Fan type + tone + confidence */}
+                    <div className="flex flex-wrap gap-1.5">
                         {result.fanType && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">
                                 {result.fanType}
@@ -125,6 +141,48 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onCla
                             {Math.round(result.confidence * 100)}% confident
                         </span>
                     </div>
+
+                    {/* Do Not Forget bullets */}
+                    {result.doNotForget.length > 0 && (
+                        <div>
+                            <div className="text-[9px] text-amber-400/60 font-semibold uppercase tracking-wider mb-1">Do Not Forget</div>
+                            <ul className="space-y-0.5">
+                                {result.doNotForget.map((item, i) => (
+                                    <li key={i} className="text-[11px] text-white/60 flex items-start gap-1.5">
+                                        <span className="text-amber-400 mt-0.5">•</span>
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {/* Personal facts (top-level) */}
+                    {(result.nickname || result.job || result.location || result.relationshipStatus || result.pets.length > 0 || result.hobbies.length > 0) && (
+                        <div>
+                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Personal Info</div>
+                            <div className="grid grid-cols-2 gap-1">
+                                {result.nickname && <InfoChip label="Name" value={result.nickname} />}
+                                {result.job && <InfoChip label="Job" value={result.job} />}
+                                {result.location && <InfoChip label="Location" value={result.location} />}
+                                {result.relationshipStatus && <InfoChip label="Status" value={result.relationshipStatus} />}
+                                {result.pets.length > 0 && <InfoChip label="Pets" value={result.pets.join(", ")} />}
+                                {result.hobbies.length > 0 && <InfoChip label="Hobbies" value={result.hobbies.join(", ")} />}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Suggested questions (when facts are missing) */}
+                    {result.suggestedQuestions.length > 0 && (
+                        <div>
+                            <div className="text-[9px] text-cyan-400/60 font-semibold uppercase tracking-wider mb-1">Ask Next</div>
+                            <ul className="space-y-0.5">
+                                {result.suggestedQuestions.map((q, i) => (
+                                    <li key={i} className="text-[11px] text-cyan-400/70 italic">&ldquo;{q}&rdquo;</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     {/* Intent tags */}
                     {result.intentTags.length > 0 && (
@@ -168,21 +226,40 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, onCla
                         </div>
                     )}
 
-                    {/* Buying keywords */}
-                    {result.buyingKeywords.length > 0 && (
+                    {/* Content preferences */}
+                    {result.contentPreferences.length > 0 && (
                         <div>
-                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Buying Keywords</div>
+                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Content Preferences</div>
                             <div className="flex flex-wrap gap-1">
-                                {result.buyingKeywords.map(k => (
-                                    <span key={k} className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                {result.contentPreferences.map(k => (
+                                    <span key={k} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20">
                                         {k}
                                     </span>
                                 ))}
                             </div>
                         </div>
                     )}
+
+                    {/* Analysis metadata */}
+                    {result.analysis && (
+                        <div className="pt-2 border-t border-white/[0.06] flex flex-wrap gap-x-3 gap-y-0.5">
+                            <span className="text-[9px] text-white/20">{result.analysis.totalMessagesUsed} msgs analyzed</span>
+                            <span className="text-[9px] text-white/20">{result.analysis.apiCallsMade} API calls</span>
+                            <span className="text-[9px] text-white/20">{Math.round(result.analysis.runtimeMs / 1000)}s runtime</span>
+                            {result.analysis.isIncremental && <span className="text-[9px] text-teal-400/40">incremental</span>}
+                        </div>
+                    )}
                 </div>
             )}
+        </div>
+    );
+}
+
+function InfoChip({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="text-[10px] px-2 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+            <span className="text-white/30">{label}: </span>
+            <span className="text-white/60">{value}</span>
         </div>
     );
 }

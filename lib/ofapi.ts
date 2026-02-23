@@ -359,9 +359,10 @@ export async function getChatMessages(
     chatId: string | number,
     apiKey: string,
     limit: number = 50,
-    beforeId?: string
+    beforeId?: string,
+    order: "asc" | "desc" = "desc"
 ) {
-    let endpoint = `/api/${accountName}/chats/${chatId}/messages?limit=${limit}&order=desc&skip_users=all`;
+    let endpoint = `/api/${accountName}/chats/${chatId}/messages?limit=${limit}&order=${order}&skip_users=all`;
     if (beforeId) {
         endpoint += `&id=${beforeId}`;
     }

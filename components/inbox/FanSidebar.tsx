@@ -37,6 +37,8 @@ type Intelligence = {
     narrativeSummary: string | null;
     lastMessageAt: string | null;
     followUpDueAt: string | null;
+    lastAnalyzedAt: string | null;
+    messagesAnalyzed: number | null;
 };
 
 type Preference = {
@@ -148,6 +150,8 @@ export function FanSidebar({ chat, width, onSuggestMessage }: Props) {
                         chatId={chat?.id}
                         fanOfapiId={fanOfapiId}
                         fanName={chat?.withUser?.name}
+                        lastAnalyzedAt={fanData?.intelligence?.lastAnalyzedAt || null}
+                        messagesAnalyzed={fanData?.intelligence?.messagesAnalyzed || null}
                         onClassified={handleUpdate}
                     />
                     <FanPreferences

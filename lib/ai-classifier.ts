@@ -1,32 +1,28 @@
 /**
- * AI Fan Classifier — analyzes fan messages to detect:
+ * AI Fan Classifier v2 — "scan once, remember forever"
+ *
+ * Analyzes fan messages using windowed fetch (early + recent) to detect:
  * 1. Fan type (submissive, dominant, romantic, transactional, lonely)
  * 2. Buying intent (ready_to_buy, wants_custom, price_question, etc.)
  * 3. Tone preference (playful, assertive, romantic, direct)
  * 4. Emotional drivers (validation, companionship, escapism, etc.)
+ * 5. Personal facts (job, pets, hobbies, location, relationship, etc.)
+ * 6. Suggested questions when facts are missing
+ * 7. "Do not forget" bullets for chatters
  *
- * Uses GPT-5 mini for cost efficiency (~$0.0005 per classification).
- * Input: last N fan messages (text only, stripped HTML).
- * Output: structured JSON with detected signals.
+ * Uses GPT-4o-mini for cost efficiency (~$0.0005 per classification).
+ * Budget: max 400 messages, 4-6 API calls, 20-30s runtime.
  */
 
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 
+// --- Types ---
+
 export type PersonalFact = {
     key: string;                      // hobby, pet_name, favorite_drink, body_preference, etc.
     value: string;                    // "gaming", "Max (golden retriever)", "Starbucks", "booty"
-};
-
-export type ClassificationResult = {
-    fanType: string | null;           // submissive, dominant, romantic, transactional, lonely
-    tonePreference: string | null;    // playful, assertive, romantic, direct, calm, witty
-    intentTags: IntentTag[];          // Detected buying/behavioral signals
-    emotionalDrivers: string[];       // validation, companionship, escapism, entertainment, status
-    buyingKeywords: string[];         // Extracted keywords indicating purchase interest
-    personalFacts: PersonalFact[];    // Extracted personal facts (hobbies, pets, preferences)
-    contentPreferences: string[];     // What content they like: "booty", "boobs", "feet", "lingerie", etc.
-    confidence: number;               // 0-1 overall confidence
-    summary: string;                  // 1-2 sentence narrative summary
+    confidence?: number;              // 0-1 how sure we are about this fact
+    sourceMessageId?: string;         // OFAPI message ID where this was detected
 };
 
 export type IntentTag = {
@@ -35,9 +31,55 @@ export type IntentTag = {
     evidence: string;                 // Short excerpt that triggered this detection
 };
 
-const SYSTEM_PROMPT = `You are an expert fan behavior analyst for an OnlyFans agency. You analyze fan messages to classify their personality, buying intent, and communication preferences.
+export type AnalysisMetadata = {
+    earlyWindowCount: number;         // msgs from order=asc window
+    recentWindowCount: number;        // msgs from order=desc window
+    purchaseContextCount: number;     // msgs around purchases (from already-fetched set)
+    totalMessagesUsed: number;        // early+recent (after dedupe)
+    lastMessageIdUsed?: string;       // cursor → store as Fan.lastAnalyzedMessageId
+    lastMessageAtUsed?: string;       // ISO timestamp of newest msg analyzed
+    apiCallsMade: number;             // OFAPI calls made (budget tracking)
+    runtimeMs: number;                // total classify duration
+    isIncremental: boolean;           // true = delta update, false = first scan
+};
 
-You will receive the last 20 messages from a fan (text only). Analyze them and return a JSON object.
+export type ClassificationResult = {
+    // --- Identity & personality ---
+    fanType: string | null;           // submissive, dominant, romantic, transactional, lonely
+    tonePreference: string | null;    // playful, assertive, romantic, direct, calm, witty
+    emotionalDrivers: string[];       // validation, companionship, escapism, entertainment, status
+
+    // --- Personal facts (structured top-level for UI) ---
+    nickname: string | null;          // what they go by / asked to be called
+    location: string | null;          // city/country/timezone if mentioned
+    job: string | null;               // occupation if mentioned
+    relationshipStatus: string | null; // single/married/partnered/unknown
+    pets: string[];                   // ["Max (golden retriever)", "cat"]
+    hobbies: string[];                // ["gaming", "gym", "travel", "basketball"]
+
+    // --- All facts (key-value, maps directly to FanFact table) ---
+    facts: PersonalFact[];            // everything extracted — DB storage format
+
+    // --- Buying behavior ---
+    intentTags: IntentTag[];          // detected buying/behavioral signals
+    buyingKeywords: string[];         // words indicating purchase interest
+    contentPreferences: string[];     // "booty", "feet", "lingerie", "POV", "GFE", etc.
+
+    // --- Output for chatters ---
+    confidence: number;               // 0-1 overall confidence
+    summary: string;                  // 1-2 sentence actionable summary
+    suggestedQuestions: string[];     // questions to ask when facts are missing
+    doNotForget: string[];            // 3-8 bullet points the chatter should always remember
+
+    // --- Analysis metadata (for UI + cursor) ---
+    analysis: AnalysisMetadata;
+};
+
+// --- System prompt ---
+
+const SYSTEM_PROMPT = `You are an expert fan behavior analyst for an OnlyFans agency. You analyze fan messages to classify their personality, buying intent, communication preferences, and extract personal facts.
+
+You will receive messages from two windows: EARLY messages (from the start of the conversation) and RECENT messages (latest). Analyze them and return a JSON object.
 
 ## Fan Types (pick ONE that best fits)
 - "submissive": Uses phrases like "I'll do anything", "Tell me what to do", "Yes ma'am", seeks direction
@@ -70,66 +112,83 @@ You will receive the last 20 messages from a fan (text only). Analyze them and r
 - "status": Wants to feel like a VIP/top fan
 - "exclusivity": Wants content no one else has
 
-## Buying Keywords
-Extract specific words/phrases from messages that indicate purchase interest or content preferences.
-Examples: "video", "custom", "tonight", "exclusive", "just for me", "PPV", "tip"
+## Personal Facts — EXTRACT EVERYTHING
+Look for ANY personal details the fan mentions. Return as key-value pairs in the "facts" array AND fill the top-level fields.
 
-## Personal Facts (IMPORTANT — extract everything the fan reveals about themselves)
-Look for ANY personal details the fan mentions:
-- Hobbies: gaming, sports, fishing, gym, etc.
-- Pets: dog name, cat name, type of pet
-- Food/drink: "I love Starbucks", "just had pizza"
-- Work: job type, schedule, "I work nights"
-- Location: city, country, timezone clues
-- Relationship: single, married, divorced
-- Body preferences: what they find attractive ("I'm an ass man", "love your boobs")
-- Kinks/interests: specific content they react to
-- Name/nickname: if they share their real name
-- Age clues: "I'm 35", college references
-- Sports teams: "Go Lakers"
-- Music/TV: favorite shows, artists
+Top-level fields to fill:
+- "nickname": their real name or what they asked to be called
+- "location": city, country, timezone clues
+- "job": occupation, work schedule
+- "relationshipStatus": single, married, divorced, partnered, or "unknown"
+- "pets": array of pet descriptions
+- "hobbies": array of interests
 
-Return as key-value pairs. Examples:
-- { "key": "pet_name", "value": "Max (golden retriever)" }
-- { "key": "hobby", "value": "gaming, basketball" }
-- { "key": "body_preference", "value": "booty, thick" }
-- { "key": "favorite_drink", "value": "Starbucks iced coffee" }
-- { "key": "work_schedule", "value": "night shift, off weekends" }
+Also capture in "facts" array (key-value):
+- pet_name, hobby, favorite_drink, work_schedule, body_preference, favorite_team, music_taste, tv_shows, age, kinks, food_preference, sports_team, birthday_month, etc.
 
 ## Content Preferences
 What type of content does this fan react to or request?
 Examples: "booty", "boobs", "feet", "lingerie", "nude", "tease", "POV", "JOI", "roleplay", "GFE", "dom", "sub"
 
+## Do Not Forget
+Write 3-8 bullet points that a chatter should ALWAYS remember about this fan. These are the most important things. Examples:
+- "Loves when you call him daddy"
+- "Works night shifts — best time to message is after 11pm"
+- "Has a golden retriever named Max — always ask about Max"
+- "Hates being ignored — responds to attention quickly"
+- "Big tipper when he's drunk on weekends"
+
+## Suggested Questions
+If you CANNOT find certain facts (job, location, relationship status, pets, hobbies), generate 1-3 casual questions the chatter could ask to fill the gaps. Make them natural, not interrogating.
+Examples:
+- "What do you do for work babe?"
+- "Are you single or is someone gonna get jealous? 😏"
+- "Do you have any pets? I love animals"
+- "What shows are you watching lately?"
+
 ## Rules
 - Only analyze FAN messages (not creator messages)
+- Messages marked [PURCHASED $X] or [TIPPED] indicate actual purchases — note the behavior
 - If there aren't enough messages to classify, set confidence low
 - Be conservative with intent tags — only tag if fairly sure
 - Be AGGRESSIVE with personal facts — capture EVERYTHING they reveal
 - The summary should be actionable for a chatter (what to do next)
+- For "unknown" fields, set to null (not the string "unknown")
+- Always return suggestedQuestions for any missing key fact (job, location, relationship, hobbies)
 
 Return ONLY valid JSON matching this schema:
 {
   "fanType": "string or null",
   "tonePreference": "string or null",
-  "intentTags": [{ "tag": "string", "confidence": 0.0-1.0, "evidence": "short quote" }],
   "emotionalDrivers": ["string"],
+  "nickname": "string or null",
+  "location": "string or null",
+  "job": "string or null",
+  "relationshipStatus": "string or null",
+  "pets": ["string"],
+  "hobbies": ["string"],
+  "facts": [{ "key": "string", "value": "string" }],
+  "intentTags": [{ "tag": "string", "confidence": 0.0-1.0, "evidence": "short quote" }],
   "buyingKeywords": ["string"],
-  "personalFacts": [{ "key": "string", "value": "string" }],
   "contentPreferences": ["string"],
   "confidence": 0.0-1.0,
-  "summary": "1-2 sentence actionable summary"
+  "summary": "1-2 sentence actionable summary",
+  "suggestedQuestions": ["string"],
+  "doNotForget": ["string"]
 }`;
 
 /**
- * Classify a fan's messages to detect type, intent, and preferences.
+ * Classify a fan's messages to detect type, intent, preferences, and personal facts.
  * @param fanMessages - Array of fan message texts (HTML stripped, chronological order)
  * @param fanName - Optional fan name for context
+ * @param existingFacts - Previously stored facts (so the agent doesn't redo work)
  * @returns Classification result or null if API unavailable
  */
 export async function classifyFan(
     fanMessages: string[],
     fanName?: string,
-): Promise<ClassificationResult | null> {
+    existingFacts?: PersonalFact[],
+): Promise<Omit<ClassificationResult, "analysis"> | null> {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
         console.warn("[AI Classifier] OPENAI_API_KEY not set — skipping classification");
@@ -140,17 +199,23 @@ export async function classifyFan(
         return null;
     }
 
-    // Send more messages to GPT for deeper analysis
-    // GPT-4o-mini has 128K context — we can fit ~100 messages easily
-    const maxMsgs = Math.min(fanMessages.length, 100);
+    // Budget: max 200 messages to GPT (GPT-4o-mini has 128K context)
+    const maxMsgs = Math.min(fanMessages.length, 200);
     const trimmedMessages = fanMessages
         .slice(-maxMsgs)
         .map((m, i) => `[${i + 1}] ${m.slice(0, 500)}`) // Truncate each to 500 chars
         .join("\n");
 
-    const userPrompt = fanName
+    // Build user prompt with context
+    let userPrompt = fanName
         ? `Fan "${fanName}" sent these messages:\n\n${trimmedMessages}`
         : `Fan messages:\n\n${trimmedMessages}`;
+
+    // If we have existing facts, tell the agent so it doesn't redo work
+    if (existingFacts && existingFacts.length > 0) {
+        const existingStr = existingFacts.map(f => `${f.key}: ${f.value}`).join("\n");
+        userPrompt += `\n\n--- EXISTING FACTS (already known, update only if new info contradicts or adds detail) ---\n${existingStr}`;
+    }
 
     try {
         const response = await fetch(OPENAI_BASE, {
@@ -160,13 +225,13 @@ export async function classifyFan(
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "gpt-4o-mini", // Widely available, fast, cheap — upgrade to gpt-5-mini when key supports it
+                model: "gpt-4o-mini",
                 messages: [
                     { role: "system", content: SYSTEM_PROMPT },
                     { role: "user", content: userPrompt },
                 ],
                 temperature: 0.2,
-                max_tokens: 800,
+                max_tokens: 1200, // Expanded for doNotForget + suggestedQuestions + facts
                 response_format: { type: "json_object" },
             }),
         });
@@ -181,19 +246,27 @@ export async function classifyFan(
         const content = data.choices?.[0]?.message?.content;
         if (!content) return null;
 
-        const result = JSON.parse(content) as ClassificationResult;
+        const raw = JSON.parse(content);
 
-        // Validate the structure
+        // Validate + default all fields (LLM may omit arrays)
         return {
-            fanType: result.fanType || null,
-            tonePreference: result.tonePreference || null,
-            intentTags: Array.isArray(result.intentTags) ? result.intentTags : [],
-            emotionalDrivers: Array.isArray(result.emotionalDrivers) ? result.emotionalDrivers : [],
-            buyingKeywords: Array.isArray(result.buyingKeywords) ? result.buyingKeywords : [],
-            personalFacts: Array.isArray(result.personalFacts) ? result.personalFacts : [],
-            contentPreferences: Array.isArray(result.contentPreferences) ? result.contentPreferences : [],
-            confidence: typeof result.confidence === "number" ? result.confidence : 0.5,
-            summary: result.summary || "",
+            fanType: raw.fanType || null,
+            tonePreference: raw.tonePreference || null,
+            emotionalDrivers: Array.isArray(raw.emotionalDrivers) ? raw.emotionalDrivers : [],
+            nickname: raw.nickname || null,
+            location: raw.location || null,
+            job: raw.job || null,
+            relationshipStatus: raw.relationshipStatus || null,
+            pets: Array.isArray(raw.pets) ? raw.pets : [],
+            hobbies: Array.isArray(raw.hobbies) ? raw.hobbies : [],
+            facts: Array.isArray(raw.facts) ? raw.facts : [],
+            intentTags: Array.isArray(raw.intentTags) ? raw.intentTags : [],
+            buyingKeywords: Array.isArray(raw.buyingKeywords) ? raw.buyingKeywords : [],
+            contentPreferences: Array.isArray(raw.contentPreferences) ? raw.contentPreferences : [],
+            confidence: typeof raw.confidence === "number" ? raw.confidence : 0.5,
+            summary: raw.summary || "",
+            suggestedQuestions: Array.isArray(raw.suggestedQuestions) ? raw.suggestedQuestions : [],
+            doNotForget: Array.isArray(raw.doNotForget) ? raw.doNotForget : [],
         };
     } catch (e: any) {
         console.error("[AI Classifier] Failed:", e.message);

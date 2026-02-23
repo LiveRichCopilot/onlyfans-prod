@@ -119,6 +119,8 @@ export async function GET(request: Request) {
                 narrativeSummary: fan.narrativeSummary,
                 lastMessageAt: fan.lastMessageAt?.toISOString() || null,
                 followUpDueAt: fan.followUpDueAt?.toISOString() || null,
+                lastAnalyzedAt: fan.lastAnalyzedAt?.toISOString() || null,
+                messagesAnalyzed: fan.messagesAnalyzed,
             } : null,
             preferences: (fan?.preferences || []).map(p => ({
                 tag: p.tag, weight: p.weight, source: p.source,
