@@ -71,18 +71,48 @@ export async function GET(request: Request) {
         }
 
         // Enrich chats with persistent fan data from DB (lastPurchaseAt, lifetimeSpend)
-        // OFAPI chat objects may have fan data at: chat.fan.id, chat.withUser.id, or top-level chat.id
-        const fanIds = allChats.map(c => {
-            const id = c.fan?.id || c.withUser?.id || c.id;
-            return id ? String(id) : null;
-        }).filter(Boolean) as string[];
+        // Auto-create Fan rows for anyone not yet in the DB
+        // Use OFAPI totalSumm as authoritative lifetime spend
+        const chatFanData = allChats.map(c => {
+            const fan = c.fan || {};
+            const id = fan.id || c.withUser?.id || c.id;
+            return {
+                ofapiFanId: id ? String(id) : null,
+                name: fan.name || fan.displayName || c.withUser?.name || null,
+                username: fan.username || c.withUser?.username || null,
+                // OFAPI lifetime spend — this is the authoritative number
+                totalSumm: fan.subscribedOnData?.totalSumm || 0,
+                creatorId: c._creatorId || "",
+            };
+        }).filter(d => d.ofapiFanId);
 
-        if (fanIds.length > 0) {
-            const fans = await prisma.fan.findMany({
+        if (chatFanData.length > 0) {
+            const fanIds = chatFanData.map(d => d.ofapiFanId!);
+            const existingFans = await prisma.fan.findMany({
                 where: { ofapiFanId: { in: fanIds } },
                 select: { ofapiFanId: true, lastPurchaseAt: true, lastPurchaseType: true, lastPurchaseAmount: true, lifetimeSpend: true },
             });
-            const fanMap = new Map(fans.map(f => [f.ofapiFanId, f]));
+            const fanMap = new Map(existingFans.map(f => [f.ofapiFanId, f]));
+
+            // Auto-create missing fans in background (don't block response)
+            const missingFans = chatFanData.filter(d => !fanMap.has(d.ofapiFanId!));
+            if (missingFans.length > 0) {
+                // Fire and forget — create placeholder Fan rows
+                Promise.allSettled(
+                    missingFans.map(d => prisma.fan.create({
+                        data: {
+                            ofapiFanId: d.ofapiFanId!,
+                            creatorId: d.creatorId,
+                            name: d.name,
+                            username: d.username,
+                            lifetimeSpend: d.totalSumm,
+                        },
+                    }).catch(() => {})) // Ignore dupes from race conditions
+                );
+                console.log(`[Chats] Auto-creating ${missingFans.length} missing fans`);
+            }
+
+            // Enrich chat objects
             let matchCount = 0;
             for (const chat of allChats) {
                 const fanId = String(chat.fan?.id || chat.withUser?.id || chat.id || "");
@@ -91,13 +121,15 @@ export async function GET(request: Request) {
                     chat._lastPurchaseAt = dbFan.lastPurchaseAt?.toISOString() || null;
                     chat._lastPurchaseType = dbFan.lastPurchaseType || null;
                     chat._lastPurchaseAmount = dbFan.lastPurchaseAmount || null;
-                    if (dbFan.lifetimeSpend > 0) {
-                        chat._dbLifetimeSpend = dbFan.lifetimeSpend;
-                    }
                     matchCount++;
                 }
+                // Always use OFAPI totalSumm as authoritative spend (not our partial DB)
+                const ofapiSpend = chat.fan?.subscribedOnData?.totalSumm;
+                if (ofapiSpend && ofapiSpend > 0) {
+                    chat._dbLifetimeSpend = ofapiSpend;
+                }
             }
-            console.log(`[Chats Enrichment] ${allChats.length} chats, ${fanIds.length} fan IDs extracted, ${fans.length} found in DB, ${matchCount} enriched`);
+            console.log(`[Chats Enrichment] ${allChats.length} chats, ${fanIds.length} IDs, ${existingFans.length} in DB, ${matchCount} enriched, ${missingFans.length} auto-created`);
         }
 
         // Sort by last message time (most recent first)
