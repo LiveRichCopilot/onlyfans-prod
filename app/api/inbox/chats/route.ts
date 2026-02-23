@@ -52,6 +52,11 @@ export async function GET(request: Request) {
                 const accountName = creator.ofapiCreatorId || creator.telegramId;
                 // Use single-page fetch with offset/limit for infinite scroll
                 const res = await listChats(accountName, apiKey, limit, offset);
+                // DEBUG: log raw response shape
+                const resKeys = Object.keys(res || {});
+                const dataType = Array.isArray(res?.data) ? "array" : typeof res?.data;
+                const dataLen = Array.isArray(res?.data) ? res.data.length : (res?.data?.list?.length || "no-list");
+                console.log(`[CHATS DEBUG] account=${accountName} limit=${limit} offset=${offset} resKeys=[${resKeys}] dataType=${dataType} dataLen=${dataLen} hasPagination=${!!res?._pagination}`);
                 // OFAPI chats response: { data: [...chats], _pagination: { next_page } }
                 const chatList = Array.isArray(res?.data) ? res.data : (res?.list || res?.data?.list || []);
                 return (Array.isArray(chatList) ? chatList : []).map((chat: any) => ({
