@@ -560,6 +560,13 @@ export default function InboxPage() {
         setActiveChat(null);
         setMessages([]);
         setMobileView("list");
+        // Reset spend filter when switching creators
+        setSpendBucket(0);
+        setOnlineOnly(false);
+        setSpendFilteredChats(null);
+        // Reset jump state
+        isJumpedRef.current = false;
+        setIsJumped(false);
     };
 
     const handleSelectChat = (chat: Chat) => {

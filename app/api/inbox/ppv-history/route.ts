@@ -10,13 +10,11 @@ export const maxDuration = 30;
  *
  * ?creatorId=xxx&chatId=xxx
  *
- * Scans up to 500 messages (5 pages) for PPV content (price > 0).
- * Returns PPV cards with: media thumbnails, price, purchased status,
- * mass/direct indicator, date, mediaCount.
- *
- * PPV detection: price > 0
+ * PPV detection: price > 0 (paid message)
  * Purchased: isOpened === true
- * Mass vs Direct: isFromQueue === true means mass message
+ * Mass vs Direct: isFromQueue === true
+ *
+ * Scans up to 300 messages (3 pages of 100) to balance speed vs coverage.
  */
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -40,11 +38,12 @@ export async function GET(request: Request) {
 
         const accountName = creator.ofapiCreatorId;
 
-        // Paginate through messages to find all PPVs (up to 500 messages)
+        // Paginate through messages to find all PPVs
         const allPpvs: any[] = [];
         let cursor: string | undefined;
         let totalMessages = 0;
-        const maxPages = 5;
+        const maxPages = 3; // 3 pages x 100 = 300 messages max for speed
+        let debugSample: any = null; // First message for debugging
 
         for (let page = 0; page < maxPages; page++) {
             const res = await getChatMessages(accountName, chatId, apiKey, 100, cursor);
@@ -53,62 +52,116 @@ export async function GET(request: Request) {
             if (msgs.length === 0) break;
             totalMessages += msgs.length;
 
-            // Extract PPVs (price > 0)
+            // Capture first message for debugging (helps identify field names)
+            if (!debugSample && msgs.length > 0) {
+                const m = msgs[0];
+                debugSample = {
+                    id: m.id,
+                    price: m.price,
+                    priceType: typeof m.price,
+                    isOpened: m.isOpened,
+                    isFree: m.isFree,
+                    isFromQueue: m.isFromQueue,
+                    mediaCount: m.mediaCount,
+                    hasMedia: (m.media || []).length > 0,
+                    // Check alternative field names
+                    lockedText: m.lockedText,
+                    isPaid: m.isPaid,
+                    tip_amount: m.tip_amount,
+                    isTip: m.isTip,
+                };
+            }
+
+            // Extract PPVs — check multiple possible "paid" indicators
             for (const msg of msgs) {
                 const price = Number(msg.price) || 0;
-                if (price <= 0) continue;
+                const isTip = msg.isTip === true;
+                const tipAmount = Number(msg.tip_amount) || 0;
+
+                // PPV: has a price > 0 (paid content) OR is a tip with amount
+                const isPpv = price > 0;
+                const effectivePrice = price || tipAmount;
+
+                if (!isPpv && !isTip) continue;
+                if (effectivePrice <= 0) continue;
 
                 // Build media thumbnails
                 const thumbnails: { id: string; type: string; thumb: string; preview: string }[] = [];
                 const mediaList = msg.media || [];
 
                 for (const med of mediaList) {
+                    const thumb = med.files?.thumb?.url || med.files?.squarePreview?.url || med.thumb || "";
+                    const preview = med.files?.preview?.url || med.files?.full?.url || med.preview || med.src || "";
                     thumbnails.push({
                         id: String(med.id || ""),
                         type: med.type || "photo",
-                        thumb: med.files?.thumb?.url || med.files?.squarePreview?.url || "",
-                        preview: med.files?.preview?.url || med.files?.full?.url || "",
+                        thumb,
+                        preview,
                     });
+                }
+
+                // Also check previews array (separate from media)
+                if (thumbnails.length === 0 && msg.previews && Array.isArray(msg.previews)) {
+                    for (const prev of msg.previews) {
+                        thumbnails.push({
+                            id: String(prev.id || ""),
+                            type: prev.type || "photo",
+                            thumb: prev.files?.thumb?.url || prev.src || "",
+                            preview: prev.files?.preview?.url || prev.src || "",
+                        });
+                    }
                 }
 
                 allPpvs.push({
                     messageId: String(msg.id),
-                    createdAt: msg.createdAt || msg.created_at,
-                    price,
+                    createdAt: msg.createdAt || msg.created_at || msg.changedAt,
+                    price: effectivePrice,
                     purchased: msg.isOpened === true,
+                    isTip,
                     isMass: msg.isFromQueue === true,
                     isFree: msg.isFree === true,
                     mediaCount: msg.mediaCount || mediaList.length,
-                    thumbnails: thumbnails.slice(0, 3), // Max 3 thumbs per card
+                    thumbnails: thumbnails.slice(0, 3),
                     totalThumbs: thumbnails.length,
                     text: (msg.text || "").replace(/<[^>]*>/g, "").slice(0, 100),
-                    // For "copy as draft" — store media IDs
                     mediaIds: mediaList.map((m: any) => m.id).filter(Boolean),
                 });
             }
 
             // Get cursor for next page
             const nextPage = res?._pagination?.next_page;
-            if (!nextPage || res?.data?.hasMore === false) break;
+            const hasMoreData = res?.data?.hasMore;
+            if (!nextPage && hasMoreData === false) break;
+            if (hasMoreData === false) break;
 
-            // Extract cursor from next_page URL
-            const nextUrl = new URL(nextPage, "https://app.onlyfansapi.com");
-            cursor = nextUrl.searchParams.get("id") || undefined;
-            if (!cursor) break;
+            // Extract cursor from nextLastId or next_page URL
+            const nextLastId = res?.data?.nextLastId;
+            if (nextLastId) {
+                cursor = String(nextLastId);
+            } else if (nextPage) {
+                try {
+                    const nextUrl = new URL(nextPage, "https://app.onlyfansapi.com");
+                    cursor = nextUrl.searchParams.get("id") || undefined;
+                } catch {
+                    break;
+                }
+            } else {
+                break;
+            }
         }
 
-        // Sort by date descending (newest first)
+        // Sort by date descending
         allPpvs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        // Compute stats
+        // Stats
         const totalPpv = allPpvs.length;
         const purchasedCount = allPpvs.filter(p => p.purchased).length;
         const notPurchasedCount = totalPpv - purchasedCount;
         const buyRate = totalPpv > 0 ? Math.round((purchasedCount / totalPpv) * 100) : 0;
         const totalRevenue = allPpvs.filter(p => p.purchased).reduce((sum, p) => sum + p.price, 0);
-        const highestPrice = allPpvs.length > 0 ? Math.max(...allPpvs.map(p => p.price)) : 0;
-        const lowestPrice = allPpvs.length > 0 ? Math.min(...allPpvs.map(p => p.price)) : 0;
-
+        const prices = allPpvs.map(p => p.price);
+        const highestPrice = prices.length > 0 ? Math.max(...prices) : 0;
+        const lowestPrice = prices.length > 0 ? Math.min(...prices) : 0;
         const massCount = allPpvs.filter(p => p.isMass).length;
         const directCount = totalPpv - massCount;
 
@@ -125,6 +178,14 @@ export async function GET(request: Request) {
                 massCount,
                 directCount,
                 messagesScanned: totalMessages,
+            },
+            // Debug info (remove in production later)
+            _debug: {
+                accountName,
+                chatId,
+                totalMessages,
+                ppvsFound: totalPpv,
+                sampleMessage: debugSample,
             },
         });
     } catch (e: any) {

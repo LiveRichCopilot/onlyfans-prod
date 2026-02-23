@@ -122,7 +122,7 @@ export async function classifyFan(
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "gpt-5-mini",
+                model: "gpt-4o-mini", // Widely available, fast, cheap — upgrade to gpt-5-mini when key supports it
                 messages: [
                     { role: "system", content: SYSTEM_PROMPT },
                     { role: "user", content: userPrompt },
