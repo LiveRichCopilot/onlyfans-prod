@@ -6,6 +6,7 @@ type RequestOptions = {
     method?: string;
     body?: any;
     targetAccountId?: string;
+    timeoutMs?: number;
 };
 
 async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOptions = {}) {
@@ -26,11 +27,16 @@ async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOp
         headers["X-Account-Id"] = options.targetAccountId;
     }
 
+    const controller = new AbortController();
+    const timeoutMs = options.timeoutMs || 8000; // 8s default per-call timeout
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     const response = await fetch(options.targetAccountId ? `${url}?accountId=${options.targetAccountId}` : url, {
         method: options.method || "GET",
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+        signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
 
     if (!response.ok) {
         const err = await response.text();

@@ -92,12 +92,19 @@ export async function POST(request: Request) {
         // Budget constants
         const MAX_API_CALLS = 6;
         const MAX_MESSAGES = 400;
+        const HARD_DEADLINE_MS = 25000; // Bail at 25s so we can return a response before Vercel's 30s kill
+        const isOverBudget = () => Date.now() - startTime > HARD_DEADLINE_MS;
 
         // EARLY WINDOW: order=asc, limit=100 (skip on incremental — we already have early context via existingFacts)
         if (!isIncremental) {
-            const earlyRes = await getChatMessages(accountName, chatId, apiKey, 100, undefined, "asc");
-            apiCallsMade++;
-            earlyMessages.push(...extractMessages(earlyRes));
+            try {
+                const earlyRes = await getChatMessages(accountName, chatId, apiKey, 100, undefined, "asc");
+                apiCallsMade++;
+                earlyMessages.push(...extractMessages(earlyRes));
+            } catch (e: any) {
+                console.warn("[Classify] Early window fetch failed:", e.message);
+                // Continue without early window — recent window is more important
+            }
         }
 
         // RECENT WINDOW: order=desc, limit=100, up to 3 pages
@@ -106,8 +113,14 @@ export async function POST(request: Request) {
         const maxRecentPages = 3;
         let cursorFound = false;
 
-        for (let page = 0; page < maxRecentPages && apiCallsMade < MAX_API_CALLS; page++) {
-            const res = await getChatMessages(accountName, chatId, apiKey, 100, recentPageCursor, "desc");
+        for (let page = 0; page < maxRecentPages && apiCallsMade < MAX_API_CALLS && !isOverBudget(); page++) {
+            let res;
+            try {
+                res = await getChatMessages(accountName, chatId, apiKey, 100, recentPageCursor, "desc");
+            } catch (e: any) {
+                console.warn(`[Classify] Recent window page ${page} failed:`, e.message);
+                break; // Stop paging on error — use what we have
+            }
             apiCallsMade++;
             const msgs = extractMessages(res);
             if (msgs.length === 0) break;
@@ -203,6 +216,14 @@ export async function POST(request: Request) {
         const newestMsgAt = newestMsg?.createdAt || undefined;
 
         // --- STEP 7: Run AI classification (with existing facts context) ---
+        if (isOverBudget()) {
+            return NextResponse.json({
+                classified: false,
+                reason: `OFAPI calls took too long (${Math.round((Date.now() - startTime) / 1000)}s) — try again when OFAPI is faster`,
+                runtimeMs: Date.now() - startTime,
+                apiCallsMade,
+            });
+        }
         // FIX #3: On incremental, existingFacts are passed so the model has early context even without early window
         const result = await classifyFan(fanMessages, fanName, existingFacts);
 
