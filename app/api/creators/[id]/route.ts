@@ -153,13 +153,77 @@ export async function PATCH(
         const body = await request.json();
         const { action, whaleAlertTarget, hourlyTarget, purchaseAlertsEnabled } = body;
 
-        // --- Action: Disconnect (unlink OFAPI so user can re-auth) ---
+        // --- Action: Disconnect (DELETE from OFAPI + clear DB so user can re-auth) ---
         if (action === "disconnect") {
+            const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
+            if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
+
+            const apiKey = process.env.OFAPI_API_KEY;
+            const OFAPI_BASE = "https://app.onlyfansapi.com";
+
+            // If creator has a real acct_ ID, disconnect from OFAPI first
+            if (apiKey && creator.ofapiCreatorId?.startsWith("acct_")) {
+                try {
+                    const delRes = await fetch(`${OFAPI_BASE}/api/accounts/${creator.ofapiCreatorId}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${apiKey}` },
+                    });
+                    console.log(`[Disconnect] OFAPI DELETE /api/accounts/${creator.ofapiCreatorId}: ${delRes.status}`);
+                } catch (e: any) {
+                    console.error(`[Disconnect] OFAPI DELETE failed:`, e.message);
+                    // Continue anyway — clear DB even if OFAPI call fails
+                }
+            }
+
+            // Clear DB linkage so Connect OF button reappears
             const updatedCreator = await prisma.creator.update({
                 where: { id: creatorId },
-                data: { ofapiToken: "unlinked", avatarUrl: null, headerUrl: null },
+                data: {
+                    ofapiToken: "unlinked",
+                    ofapiCreatorId: null,
+                    avatarUrl: null,
+                    headerUrl: null,
+                },
             });
             return NextResponse.json({ success: true, creator: updatedCreator });
+        }
+
+        // --- Action: Re-authenticate (refresh OFAPI session without full disconnect) ---
+        if (action === "reauthenticate") {
+            const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
+            if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
+
+            const apiKey = process.env.OFAPI_API_KEY;
+            if (!apiKey) return NextResponse.json({ error: "OFAPI_API_KEY not configured" }, { status: 500 });
+
+            const acctId = creator.ofapiCreatorId;
+            if (!acctId?.startsWith("acct_")) {
+                return NextResponse.json({
+                    success: false,
+                    error: "No valid OFAPI account ID — use Disconnect & Reconnect instead",
+                }, { status: 400 });
+            }
+
+            const OFAPI_BASE = "https://app.onlyfansapi.com";
+            try {
+                const reauthRes = await fetch(`${OFAPI_BASE}/api/authenticate/${acctId}/reauthenticate`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                });
+                const reauthData = await reauthRes.json().catch(() => null);
+
+                if (!reauthRes.ok) {
+                    return NextResponse.json({
+                        success: false,
+                        error: `Re-authenticate failed: ${reauthRes.status}`,
+                        details: reauthData,
+                    }, { status: reauthRes.status });
+                }
+
+                return NextResponse.json({ success: true, reauthenticated: acctId, response: reauthData });
+            } catch (e: any) {
+                return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+            }
         }
 
         // --- Action: Force re-sync profile from OFAPI ---

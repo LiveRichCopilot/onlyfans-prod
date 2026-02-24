@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { RefreshCw, Unlink } from "lucide-react";
+import { RefreshCw, Unlink, MoreVertical } from "lucide-react";
 import { ConnectButton } from "./creator-card/ConnectButton";
 import { StatusBadge } from "./creator-card/StatusBadge";
 import { ThresholdSlider } from "./creator-card/ThresholdSlider";
@@ -20,6 +20,11 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
     const isLinked = c.ofapiToken && c.ofapiToken !== "unlinked";
     const [syncing, setSyncing] = useState(false);
     const [syncError, setSyncError] = useState<string | null>(null);
+    const [showMenu, setShowMenu] = useState(false);
+    const [disconnecting, setDisconnecting] = useState(false);
+
+    // Missing profile data = needs sync (no avatar AND no header)
+    const needsSync = isLinked && (!c.avatarUrl && !c.headerUrl);
 
     async function handleSync(e: React.MouseEvent) {
         e.preventDefault();
@@ -48,7 +53,9 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
     async function handleDisconnect(e: React.MouseEvent) {
         e.preventDefault();
         e.stopPropagation();
-        if (!confirm(`Disconnect ${c.name || "this creator"}? You'll need to re-link their OF account.`)) return;
+        setShowMenu(false);
+        if (!confirm(`Disconnect ${c.name || "this creator"} from OnlyFansAPI?\n\nThis will remove their OFAPI session and clear profile data. You'll need to re-authenticate via the Connect OF button.`)) return;
+        setDisconnecting(true);
         try {
             await fetch(`/api/creators/${c.id}`, {
                 method: "PATCH",
@@ -56,7 +63,40 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                 body: JSON.stringify({ action: "disconnect" }),
             });
             onRefresh?.();
-        } catch {}
+        } catch {} finally {
+            setDisconnecting(false);
+        }
+    }
+
+    async function handleReauth(e: React.MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowMenu(false);
+        setSyncing(true);
+        setSyncError(null);
+        try {
+            const res = await fetch(`/api/creators/${c.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "reauthenticate" }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                // After re-auth, force-sync to pull fresh profile
+                await fetch(`/api/creators/${c.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "force-sync" }),
+                });
+                onRefresh?.();
+            } else {
+                setSyncError(data.error || "Re-authenticate failed");
+            }
+        } catch {
+            setSyncError("Re-authenticate failed");
+        } finally {
+            setSyncing(false);
+        }
     }
 
     return (
@@ -90,24 +130,62 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                         </div>
 
                         {!isLinked ? (
-                            <ConnectButton isAuthenticating={isAuthenticatingId === c.id} onClick={(e) => onConnectOF(e, c)} />
+                            <ConnectButton isAuthenticating={isAuthenticatingId === c.id || disconnecting} onClick={(e) => onConnectOF(e, c)} />
                         ) : (
                             <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleSync}
-                                    disabled={syncing}
-                                    title="Re-sync profile from OnlyFans"
-                                    className="w-7 h-7 rounded-lg bg-white/5 border border-solid border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50"
-                                >
-                                    <RefreshCw size={12} className={`text-white/50 ${syncing ? "animate-spin" : ""}`} />
-                                </button>
-                                <button
-                                    onClick={handleDisconnect}
-                                    title="Disconnect OF account"
-                                    className="w-7 h-7 rounded-lg bg-white/5 border border-solid border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/20 transition-all"
-                                >
-                                    <Unlink size={12} className="text-white/40 hover:text-red-400" />
-                                </button>
+                                {/* Quick sync button — visible when profile data is missing */}
+                                {needsSync && (
+                                    <button
+                                        onClick={handleSync}
+                                        disabled={syncing}
+                                        title="Sync profile"
+                                        className="px-2 py-1 rounded-lg bg-amber-500/10 border border-solid border-amber-500/20 flex items-center gap-1.5 text-amber-400 text-[10px] font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                                    >
+                                        <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
+                                        Sync
+                                    </button>
+                                )}
+
+                                {/* Dropdown menu */}
+                                <div className="relative">
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMenu(!showMenu); }}
+                                        className="w-7 h-7 rounded-lg bg-white/5 border border-solid border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all"
+                                    >
+                                        <MoreVertical size={13} className="text-white/40" />
+                                    </button>
+                                    {showMenu && (
+                                        <div
+                                            className="absolute right-0 top-9 w-48 rounded-xl bg-[#1a1a1a] border border-solid border-white/10 shadow-2xl z-50 overflow-hidden"
+                                            onMouseLeave={() => setShowMenu(false)}
+                                        >
+                                            <button
+                                                onClick={handleSync}
+                                                disabled={syncing}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
+                                            >
+                                                <RefreshCw size={13} className={`text-teal-400 ${syncing ? "animate-spin" : ""}`} />
+                                                Force Sync Profile
+                                            </button>
+                                            <button
+                                                onClick={handleReauth}
+                                                disabled={syncing}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
+                                            >
+                                                <RefreshCw size={13} className="text-blue-400" />
+                                                Re-authenticate
+                                            </button>
+                                            <div className="border-t border-white/10" />
+                                            <button
+                                                onClick={handleDisconnect}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2.5 transition-colors"
+                                            >
+                                                <Unlink size={13} />
+                                                Disconnect Account
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <StatusBadge isActive={c.active} />
                             </div>
                         )}
