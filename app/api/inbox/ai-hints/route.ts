@@ -97,6 +97,11 @@ export async function POST(request: Request) {
         const compressedContext = compressBundle(bundle);
 
         // --- Build Intelligence Object ---
+        // Use real-time lastFanMessageTs from OFAPI (via context bundle) instead of stale DB value
+        const realLastMessageAt = bundle.lastFanMessageTs
+            ? new Date(bundle.lastFanMessageTs).toISOString()
+            : fan?.lastMessageAt?.toISOString() || null;
+
         const intelligence = fan
             ? {
                   stage: fan.stage,
@@ -108,7 +113,7 @@ export async function POST(request: Request) {
                   emotionalNeeds: fan.emotionalNeeds,
                   nextBestAction: fan.nextBestAction,
                   nextBestActionReason: fan.nextBestActionReason,
-                  lastMessageAt: fan.lastMessageAt?.toISOString() || null,
+                  lastMessageAt: realLastMessageAt,
                   buyerType: fan.buyerType,
                   lastObjection: fan.lastObjection,
                   topObjection: fan.topObjection,

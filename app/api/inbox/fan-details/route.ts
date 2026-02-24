@@ -75,6 +75,63 @@ export async function GET(request: Request) {
         const fmtDate = (d: Date | null) =>
             d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
 
+        // Reconstruct last classification from DB so purple card persists across fan switches
+        let lastClassification = null;
+        if (fan?.lastAnalyzedAt && fan.narrativeSummary) {
+            const factMap: Record<string, string> = {};
+            for (const f of (fan.facts || [])) factMap[f.key] = f.value;
+
+            let doNotForget: string[] = [];
+            try { doNotForget = factMap["do_not_forget"] ? JSON.parse(factMap["do_not_forget"]) : []; } catch {}
+
+            let emotionalDrivers: string[] = [];
+            try { emotionalDrivers = fan.emotionalDrivers ? JSON.parse(fan.emotionalDrivers) : []; } catch {}
+
+            let contentPrefs: string[] = [];
+            try { contentPrefs = fan.emotionalNeeds ? JSON.parse(fan.emotionalNeeds) : []; } catch {}
+
+            const intentEvents = await prisma.fanIntentEvent.findMany({
+                where: { fanId: fan.id },
+                orderBy: { createdAt: "desc" },
+                take: 10,
+            });
+
+            lastClassification = {
+                fanType: fan.fanType || null,
+                tonePreference: fan.tonePreference || null,
+                emotionalDrivers,
+                summary: fan.narrativeSummary,
+                confidence: Math.min((fan.intentScore || 50) / 100, 1),
+                doNotForget,
+                nickname: factMap["nickname"] || null,
+                location: factMap["location"] || null,
+                job: factMap["job"] || null,
+                relationshipStatus: factMap["relationship_status"] || null,
+                pets: factMap["pets"] ? factMap["pets"].split(", ") : [],
+                hobbies: factMap["hobbies"] ? factMap["hobbies"].split(", ") : [],
+                intentTags: intentEvents.map(e => ({
+                    tag: e.intentTag,
+                    confidence: e.confidence,
+                    evidence: e.messageText || "",
+                })),
+                contentPreferences: contentPrefs,
+                suggestedQuestions: [],
+                facts: (fan.facts || [])
+                    .filter(f => !["do_not_forget", "nickname", "location", "job", "relationship_status", "pets", "hobbies"].includes(f.key))
+                    .map(f => ({ key: f.key, value: f.value })),
+                buyingKeywords: [],
+                analysis: {
+                    totalMessagesUsed: fan.messagesAnalyzed || 0,
+                    apiCallsMade: 0,
+                    runtimeMs: 0,
+                    isIncremental: false,
+                    earlyWindowCount: 0,
+                    recentWindowCount: 0,
+                    purchaseContextCount: 0,
+                },
+            };
+        }
+
         // Build spend breakdown from fan data
         const spendBreakdown = fan ? {
             total: Math.round((fan.lifetimeSpend || 0) * 100) / 100,
@@ -128,6 +185,7 @@ export async function GET(request: Request) {
             facts: (fan?.facts || []).map(f => ({
                 key: f.key, value: f.value, confidence: f.confidence, source: f.source,
             })),
+            lastClassification,
         });
     } catch (e: any) {
         console.error("Fan details error:", e.message);

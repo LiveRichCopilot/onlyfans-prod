@@ -152,6 +152,7 @@ export function FanSidebar({ chat, width, onSuggestMessage }: Props) {
                         fanName={chat?.withUser?.name}
                         lastAnalyzedAt={fanData?.intelligence?.lastAnalyzedAt || null}
                         messagesAnalyzed={fanData?.intelligence?.messagesAnalyzed || null}
+                        persistedResult={(fanData as any)?.lastClassification || null}
                         onClassified={handleUpdate}
                     />
                     <FanPreferences

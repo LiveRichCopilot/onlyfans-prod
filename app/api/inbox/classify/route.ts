@@ -169,10 +169,18 @@ export async function POST(request: Request) {
             new Date(a.createdAt || a.created_at).getTime() - new Date(b.createdAt || b.created_at).getTime()
         );
 
-        if (allMessages.length < 3) {
+        // For first-time analysis, require at least 3 messages
+        // For incremental (update), allow even 1 new message since we have existingFacts for context
+        if (!isIncremental && allMessages.length < 3) {
             return NextResponse.json({
                 classified: false,
                 reason: `Not enough messages (found ${allMessages.length})`,
+            });
+        }
+        if (isIncremental && allMessages.length === 0) {
+            return NextResponse.json({
+                classified: false,
+                reason: "No new messages since last analysis",
             });
         }
 
@@ -200,10 +208,18 @@ export async function POST(request: Request) {
             })
             .filter((text: string) => text.length > 2);
 
-        if (fanMessages.length < 3) {
+        // For first-time: need at least 3 fan messages
+        // For incremental: allow 1+ since existingFacts provide prior context
+        if (!isIncremental && fanMessages.length < 3) {
             return NextResponse.json({
                 classified: false,
                 reason: `Not enough fan messages (found ${fanMessages.length} from ${allMessages.length} total)`,
+            });
+        }
+        if (isIncremental && fanMessages.length === 0 && existingFacts.length === 0) {
+            return NextResponse.json({
+                classified: false,
+                reason: "No new fan messages and no existing facts to update",
             });
         }
 

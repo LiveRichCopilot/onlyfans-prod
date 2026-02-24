@@ -31,6 +31,7 @@ export type ContextBundle = {
     retrievedSnippets: string[];     // Keyword-matched historical snippets
     missingContext: string[];        // What we couldn't find
     contextQuality: "rich" | "partial" | "minimal";  // How much data we have
+    lastFanMessageTs: number | null; // Actual timestamp of most recent fan message from OFAPI (ms)
 };
 
 // Keywords to search for in message history (needle-in-haystack retrieval)
@@ -209,6 +210,12 @@ export async function buildContextBundle(params: {
 
     if (recentFanMessages.length < 3) missingContext.push("very_few_messages");
 
+    // Compute actual last fan message timestamp from OFAPI data (not stale DB)
+    const fanOnlyMessages = allRecentMessages.filter(m => m.fromFan);
+    const lastFanMessageTs = fanOnlyMessages.length > 0
+        ? Math.max(...fanOnlyMessages.map(m => m.ts))
+        : null;
+
     // 7. Keyword retrieval — search recent messages for family/work/pet mentions
     const retrievedSnippets: string[] = [];
     for (const [category, keywords] of Object.entries(RETRIEVAL_KEYWORDS)) {
@@ -243,6 +250,7 @@ export async function buildContextBundle(params: {
         retrievedSnippets,
         missingContext,
         contextQuality,
+        lastFanMessageTs,
     };
 }
 

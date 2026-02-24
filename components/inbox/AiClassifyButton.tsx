@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ClassificationResult } from "@/lib/ai-classifier";
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
     fanName?: string;
     lastAnalyzedAt?: string | null;
     messagesAnalyzed?: number | null;
+    persistedResult?: ClassificationResult | null;
     onClassified?: () => void;
 };
 
@@ -33,10 +34,20 @@ function timeAgo(dateStr: string): string {
     return `${days}d ago`;
 }
 
-export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastAnalyzedAt, messagesAnalyzed, onClassified }: Props) {
+export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastAnalyzedAt, messagesAnalyzed, persistedResult, onClassified }: Props) {
     const [classifying, setClassifying] = useState(false);
     const [result, setResult] = useState<ClassificationResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Reset local state when switching fans (prevents cross-contamination)
+    useEffect(() => {
+        setResult(null);
+        setError(null);
+        setClassifying(false);
+    }, [fanOfapiId]);
+
+    // Show persisted result from DB immediately, override with fresh result after classify
+    const displayResult = result || persistedResult || null;
 
     const canClassify = Boolean(creatorId && chatId && fanOfapiId);
     const hasBeenAnalyzed = !!lastAnalyzedAt;
@@ -82,14 +93,14 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
 
     return (
         <div>
-            {/* Classify button */}
+            {/* Classify / Update button */}
             <button
                 onClick={handleClassify}
                 disabled={!canClassify || classifying}
                 className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
                     classifying
                         ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
-                        : result
+                        : displayResult
                             ? "bg-teal-500/10 text-teal-400 border border-teal-500/20 hover:bg-teal-500/20"
                             : "bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20"
                 } disabled:opacity-40`}
@@ -99,9 +110,9 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                         <div className="w-4 h-4 rounded-full border-2 border-violet-400/30 border-t-violet-400 animate-spin" />
                         <span>Scanning chat history...</span>
                     </>
-                ) : hasBeenAnalyzed && !result
+                ) : displayResult
                     ? "Update analysis"
-                    : result ? "Re-analyze with AI" : "Analyze Fan with AI"}
+                    : hasBeenAnalyzed ? "Update analysis" : "Analyze Fan with AI"}
             </button>
 
             {/* Loading subtitle */}
@@ -109,8 +120,8 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                 <p className="text-[10px] text-violet-400/50 text-center mt-1.5">Reading messages and building fan profile — takes 5-15s</p>
             )}
 
-            {/* Previous analysis metadata */}
-            {hasBeenAnalyzed && !result && !classifying && (
+            {/* Analysis metadata (only when no card is showing) */}
+            {hasBeenAnalyzed && !displayResult && !classifying && (
                 <p className="text-[10px] text-white/25 text-center mt-1.5">
                     {messagesAnalyzed ? `${messagesAnalyzed} messages analyzed` : "Analyzed"} · {timeAgo(lastAnalyzedAt!)}
                 </p>
@@ -121,35 +132,35 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                 <p className="text-[11px] text-red-400/70 mt-1.5 text-center">{error}</p>
             )}
 
-            {/* Classification result card */}
-            {result && (
+            {/* Classification result card (purple) — shows from DB or fresh analysis */}
+            {displayResult && (
                 <div className="mt-3 border border-violet-500/20 rounded-xl p-3 bg-violet-500/5 space-y-3">
                     {/* Summary */}
-                    <p className="text-[12px] text-white/70 leading-relaxed">{result.summary}</p>
+                    <p className="text-[12px] text-white/70 leading-relaxed">{displayResult.summary}</p>
 
                     {/* Fan type + tone + confidence */}
                     <div className="flex flex-wrap gap-1.5">
-                        {result.fanType && (
+                        {displayResult.fanType && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">
-                                {result.fanType}
+                                {displayResult.fanType}
                             </span>
                         )}
-                        {result.tonePreference && (
+                        {displayResult.tonePreference && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">
-                                {result.tonePreference}
+                                {displayResult.tonePreference}
                             </span>
                         )}
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/10">
-                            {Math.round(result.confidence * 100)}% confident
+                            {Math.round(displayResult.confidence * 100)}% confident
                         </span>
                     </div>
 
                     {/* Do Not Forget bullets */}
-                    {result.doNotForget.length > 0 && (
+                    {displayResult.doNotForget.length > 0 && (
                         <div>
                             <div className="text-[9px] text-amber-400/60 font-semibold uppercase tracking-wider mb-1">Do Not Forget</div>
                             <ul className="space-y-0.5">
-                                {result.doNotForget.map((item, i) => (
+                                {displayResult.doNotForget.map((item, i) => (
                                     <li key={i} className="text-[11px] text-white/60 flex items-start gap-1.5">
                                         <span className="text-amber-400 mt-0.5">•</span>
                                         <span>{item}</span>
@@ -160,26 +171,26 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     )}
 
                     {/* Personal facts (top-level) */}
-                    {(result.nickname || result.job || result.location || result.relationshipStatus || result.pets.length > 0 || result.hobbies.length > 0) && (
+                    {(displayResult.nickname || displayResult.job || displayResult.location || displayResult.relationshipStatus || displayResult.pets.length > 0 || displayResult.hobbies.length > 0) && (
                         <div>
                             <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Personal Info</div>
                             <div className="grid grid-cols-2 gap-1">
-                                {result.nickname && <InfoChip label="Name" value={result.nickname} />}
-                                {result.job && <InfoChip label="Job" value={result.job} />}
-                                {result.location && <InfoChip label="Location" value={result.location} />}
-                                {result.relationshipStatus && <InfoChip label="Status" value={result.relationshipStatus} />}
-                                {result.pets.length > 0 && <InfoChip label="Pets" value={result.pets.join(", ")} />}
-                                {result.hobbies.length > 0 && <InfoChip label="Hobbies" value={result.hobbies.join(", ")} />}
+                                {displayResult.nickname && <InfoChip label="Name" value={displayResult.nickname} />}
+                                {displayResult.job && <InfoChip label="Job" value={displayResult.job} />}
+                                {displayResult.location && <InfoChip label="Location" value={displayResult.location} />}
+                                {displayResult.relationshipStatus && <InfoChip label="Status" value={displayResult.relationshipStatus} />}
+                                {displayResult.pets.length > 0 && <InfoChip label="Pets" value={displayResult.pets.join(", ")} />}
+                                {displayResult.hobbies.length > 0 && <InfoChip label="Hobbies" value={displayResult.hobbies.join(", ")} />}
                             </div>
                         </div>
                     )}
 
                     {/* Suggested questions (when facts are missing) */}
-                    {result.suggestedQuestions.length > 0 && (
+                    {displayResult.suggestedQuestions.length > 0 && (
                         <div>
                             <div className="text-[9px] text-cyan-400/60 font-semibold uppercase tracking-wider mb-1">Ask Next</div>
                             <ul className="space-y-0.5">
-                                {result.suggestedQuestions.map((q, i) => (
+                                {displayResult.suggestedQuestions.map((q, i) => (
                                     <li key={i} className="text-[11px] text-cyan-400/70 italic">&ldquo;{q}&rdquo;</li>
                                 ))}
                             </ul>
@@ -187,11 +198,11 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     )}
 
                     {/* Intent tags */}
-                    {result.intentTags.length > 0 && (
+                    {displayResult.intentTags.length > 0 && (
                         <div>
                             <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Intent Signals</div>
                             <div className="space-y-1">
-                                {result.intentTags
+                                {displayResult.intentTags
                                     .sort((a, b) => b.confidence - a.confidence)
                                     .map((t, i) => (
                                         <div key={i} className="flex items-start gap-2">
@@ -215,11 +226,11 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     )}
 
                     {/* Emotional drivers */}
-                    {result.emotionalDrivers.length > 0 && (
+                    {displayResult.emotionalDrivers.length > 0 && (
                         <div>
                             <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Emotional Drivers</div>
                             <div className="flex flex-wrap gap-1">
-                                {result.emotionalDrivers.map(d => (
+                                {displayResult.emotionalDrivers.map(d => (
                                     <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                                         {d}
                                     </span>
@@ -229,11 +240,11 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     )}
 
                     {/* Content preferences */}
-                    {result.contentPreferences.length > 0 && (
+                    {displayResult.contentPreferences.length > 0 && (
                         <div>
                             <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Content Preferences</div>
                             <div className="flex flex-wrap gap-1">
-                                {result.contentPreferences.map(k => (
+                                {displayResult.contentPreferences.map(k => (
                                     <span key={k} className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-400 border border-pink-500/20">
                                         {k}
                                     </span>
@@ -243,12 +254,19 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     )}
 
                     {/* Analysis metadata */}
-                    {result.analysis && (
+                    {displayResult.analysis && (
                         <div className="pt-2 border-t border-white/[0.06] flex flex-wrap gap-x-3 gap-y-0.5">
-                            <span className="text-[9px] text-white/20">{result.analysis.totalMessagesUsed} msgs analyzed</span>
-                            <span className="text-[9px] text-white/20">{result.analysis.apiCallsMade} API calls</span>
-                            <span className="text-[9px] text-white/20">{Math.round(result.analysis.runtimeMs / 1000)}s runtime</span>
-                            {result.analysis.isIncremental && <span className="text-[9px] text-teal-400/40">incremental</span>}
+                            <span className="text-[9px] text-white/20">{displayResult.analysis.totalMessagesUsed} msgs analyzed</span>
+                            {displayResult.analysis.apiCallsMade > 0 && (
+                                <span className="text-[9px] text-white/20">{displayResult.analysis.apiCallsMade} API calls</span>
+                            )}
+                            {displayResult.analysis.runtimeMs > 0 && (
+                                <span className="text-[9px] text-white/20">{Math.round(displayResult.analysis.runtimeMs / 1000)}s runtime</span>
+                            )}
+                            {displayResult.analysis.isIncremental && <span className="text-[9px] text-teal-400/40">incremental</span>}
+                            {lastAnalyzedAt && (
+                                <span className="text-[9px] text-white/20">{timeAgo(lastAnalyzedAt)}</span>
+                            )}
                         </div>
                     )}
                 </div>

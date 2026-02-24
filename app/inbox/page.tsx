@@ -699,7 +699,7 @@ export default function InboxPage() {
             <div
                 className={`${
                     mobileView === "chat" ? "flex" : "hidden"
-                } md:flex flex-1 flex-col min-w-0 h-screen overflow-hidden`}
+                } md:flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden`}
                 style={{ backgroundColor: "#1a1a1a" }}
             >
                 {activeChat ? (
