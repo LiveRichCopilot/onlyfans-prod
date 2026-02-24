@@ -8,6 +8,7 @@ import {
   User,
   RefreshCw,
   Users,
+  Trophy,
 } from "lucide-react";
 
 interface LiveSession {
@@ -190,13 +191,22 @@ export default function ChatterLive() {
                 Auto-refreshes every 30 seconds
               </span>
             </div>
-            <a
-              href="/chatter"
-              className="text-sm text-teal-400 hover:text-teal-300 transition-colors flex items-center gap-1.5"
-            >
-              <ArrowLeft size={12} />
-              Clock-In Page
-            </a>
+            <div className="flex items-center gap-4">
+              <a
+                href="/chatter/scores"
+                className="text-sm text-yellow-400 hover:text-yellow-300 transition-colors flex items-center gap-1.5"
+              >
+                <Trophy size={12} />
+                Scores
+              </a>
+              <a
+                href="/chatter"
+                className="text-sm text-teal-400 hover:text-teal-300 transition-colors flex items-center gap-1.5"
+              >
+                <ArrowLeft size={12} />
+                Clock-In Page
+              </a>
+            </div>
           </div>
         )}
       </div>

@@ -9,31 +9,33 @@ datasource db {
 }
 
 model Creator {
-  id             String        @id @default(cuid())
-  name           String?
-  ofUsername      String?       // The actual OnlyFans username (e.g. "angiyang")
-  avatarUrl      String?
-  headerUrl      String?       // OF profile header/banner image URL
-  telegramId     String        // Agency owner's Telegram ID (same for all creators in agency)
-  ofapiToken     String?
-  ofapiCreatorId String?       @unique
-  lastSyncCursor String?
-  telegramGroupId String?      // Optional: Routes this specific creator's alerts to a specific Group ID
-  
-  hourlyTarget   Float         @default(100.0)
-  whaleAlertTarget Float       @default(200.0)
-  active         Boolean       @default(true)
-  onlineFanCache Json?
+  id              String  @id @default(cuid())
+  name            String?
+  ofUsername      String? // The actual OnlyFans username (e.g. "angiyang")
+  avatarUrl       String?
+  headerUrl       String? // OF profile header/banner image URL
+  telegramId      String // Agency owner's Telegram ID (same for all creators in agency)
+  ofapiToken      String?
+  ofapiCreatorId  String? @unique
+  lastSyncCursor  String?
+  telegramGroupId String? // Optional: Routes this specific creator's alerts to a specific Group ID
+
+  hourlyTarget          Float   @default(100.0)
+  whaleAlertTarget      Float   @default(200.0)
+  active                Boolean @default(true)
+  onlineFanCache        Json?
   purchaseAlertsEnabled Boolean @default(true)
 
-  fans           Fan[]
-  mediaAssets    MediaAsset[]
-  assignedUsers  CreatorAssignment[]
-  chatterSessions ChatterSession[]
-  chatterSchedules ChatterSchedule[]
+  fans                Fan[]
+  mediaAssets         MediaAsset[]
+  assignedUsers       CreatorAssignment[]
+  chatterSessions     ChatterSession[]
+  chatterSchedules    ChatterSchedule[]
+  chatterHourlyScores ChatterHourlyScore[]
+  chatterProfiles     ChatterProfile[]
 
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {
@@ -55,18 +57,18 @@ model CreatorAssignment {
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -82,12 +84,12 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String              @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?             @unique
   emailVerified DateTime?
   image         String?
-  role          Role      @default(UNASSIGNED)
+  role          Role                @default(UNASSIGNED)
   accounts      Account[]
   sessions      Session[]
   assignments   CreatorAssignment[]
@@ -102,121 +104,121 @@ model VerificationToken {
 }
 
 model MediaAsset {
-  id             String        @id @default(cuid())
-  creatorId      String
-  creator        Creator       @relation(fields: [creatorId], references: [id])
-  ofapiMediaId   String        @unique
-  fileType       String
-  originalName   String?
-  totalRevenue   Float         @default(0.00)
-  aiTitle        String?
-  aiDescription  String?
+  id            String  @id @default(cuid())
+  creatorId     String
+  creator       Creator @relation(fields: [creatorId], references: [id])
+  ofapiMediaId  String  @unique
+  fileType      String
+  originalName  String?
+  totalRevenue  Float   @default(0.00)
+  aiTitle       String?
+  aiDescription String?
   // vaultTags      String?    // PENDING MIGRATION
   // priceBand      String?    // PENDING MIGRATION
   // intensity      String?    // PENDING MIGRATION
   // sentToFanIds   String?    // PENDING MIGRATION
 
-  transactions   Transaction[]
-  createdAt      DateTime      @default(now())
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
 }
 
 model Fan {
-  id              String        @id @default(cuid())
-  ofapiFanId      String        @unique
-  creatorId       String
-  name            String?
-  username        String?
-  lifetimeSpend   Float         @default(0)
-  lastPurchaseAt  DateTime?     // Last tip/PPV/purchase timestamp
-  lastPurchaseType String?      // tip, message, post, subscription
-  lastPurchaseAmount Float?     // Amount of last purchase
+  id                 String    @id @default(cuid())
+  ofapiFanId         String    @unique
+  creatorId          String
+  name               String?
+  username           String?
+  lifetimeSpend      Float     @default(0)
+  lastPurchaseAt     DateTime? // Last tip/PPV/purchase timestamp
+  lastPurchaseType   String? // tip, message, post, subscription
+  lastPurchaseAmount Float? // Amount of last purchase
 
   // --- Fan intelligence (detected from messages) ---
-  fanType         String?       // submissive, dominant, romantic, transactional, lonely
-  tonePreference  String?       // playful, assertive, romantic, direct
-  priceRange      String?       // low (1-10), mid (10-50), high (50+), whale (200+)
-  lastIntentAt    DateTime?     // Last time they showed buying intent
-  intentScore     Int?          // 0-100 how likely to buy right now
+  fanType        String? // submissive, dominant, romantic, transactional, lonely
+  tonePreference String? // playful, assertive, romantic, direct
+  priceRange     String? // low (1-10), mid (10-50), high (50+), whale (200+)
+  lastIntentAt   DateTime? // Last time they showed buying intent
+  intentScore    Int? // 0-100 how likely to buy right now
 
   // --- Responsiveness & timing ---
-  avgReplyTimeSec Int?          // Rolling average reply time in seconds
-  activeHours     String?       // JSON array of top active hours e.g. "[22,23,0,1]"
-  lastMessageAt   DateTime?     // Last time this fan sent a message
-  followUpDueAt   DateTime?     // Next scheduled follow-up
+  avgReplyTimeSec Int? // Rolling average reply time in seconds
+  activeHours     String? // JSON array of top active hours e.g. "[22,23,0,1]"
+  lastMessageAt   DateTime? // Last time this fan sent a message
+  followUpDueAt   DateTime? // Next scheduled follow-up
   followUpType    String?
   followUpMessage String?
 
   // --- Purchase behavior profile ---
-  buyerType       String?       // ppv_buyer, custom_buyer, tipper, subscriber_only, window_shopper
-  conversionRate  Float?        // PPV sent → PPV bought ratio
-  avgOrderValue   Float?        // Average purchase amount
-  discountSensitivity String?   // never, sometimes, always
-  chargebackRisk  Boolean       @default(false)
+  buyerType           String? // ppv_buyer, custom_buyer, tipper, subscriber_only, window_shopper
+  conversionRate      Float? // PPV sent → PPV bought ratio
+  avgOrderValue       Float? // Average purchase amount
+  discountSensitivity String? // never, sometimes, always
+  chargebackRisk      Boolean @default(false)
 
   // --- Objections ---
-  lastObjection   String?       // objection_price, objection_trust, objection_value, etc.
-  topObjection    String?       // Most frequent objection tag
+  lastObjection String? // objection_price, objection_trust, objection_value, etc.
+  topObjection  String? // Most frequent objection tag
 
   // --- Relationship stage ---
-  stage           String?       // new, warming, active_buyer, cooling_off, at_risk, churned
-  stageUpdatedAt  DateTime?
+  stage          String? // new, warming, active_buyer, cooling_off, at_risk, churned
+  stageUpdatedAt DateTime?
 
   // --- Content format preference ---
-  formatPreference String?      // photo, video, audio, text_chat, bundle
-  lengthPreference String?      // short, medium, long
-  customInterestLevel Int?      // 0-100
+  formatPreference    String? // photo, video, audio, text_chat, bundle
+  lengthPreference    String? // short, medium, long
+  customInterestLevel Int? // 0-100
 
   // --- Conversation quality signals ---
-  timeWasterScore Int?          // 0-100
-  toxicityFlag    Boolean       @default(false)
-  toxicityReason  String?
-  agentEffortMinutes Float?     // Estimated minutes spent on this fan
+  timeWasterScore    Int? // 0-100
+  toxicityFlag       Boolean @default(false)
+  toxicityReason     String?
+  agentEffortMinutes Float? // Estimated minutes spent on this fan
 
   // --- Emotional drivers ---
-  emotionalDrivers String?      // JSON array: ["validation","companionship","escapism"]
-  emotionalNeeds  String?       // "someone to talk to", "stress relief"
+  emotionalDrivers String? // JSON array: ["validation","companionship","escapism"]
+  emotionalNeeds   String? // "someone to talk to", "stress relief"
 
   // --- Communication preferences ---
-  messageLengthPref String?     // short, medium, long
-  frequencyPref   String?       // daily, few_times_week, only_new_content
-  bestOpenerType  String?       // meme, question, update, compliment, topic_hook
-  bestOfferType   String?       // limited_drop, bundle, personalized, behind_scenes
+  messageLengthPref String? // short, medium, long
+  frequencyPref     String? // daily, few_times_week, only_new_content
+  bestOpenerType    String? // meme, question, update, compliment, topic_hook
+  bestOfferType     String? // limited_drop, bundle, personalized, behind_scenes
 
   // --- Next best action (computed) ---
-  nextBestAction  String?       // build_rapport, ask_qualifying, offer_bundle, set_followup, deprioritize
+  nextBestAction       String? // build_rapport, ask_qualifying, offer_bundle, set_followup, deprioritize
   nextBestActionReason String?
-  deprioritizeUntil DateTime?   // Cooldown for time-wasters
+  deprioritizeUntil    DateTime? // Cooldown for time-wasters
 
   // --- Narrative summary (rolling AI/human summary) ---
-  narrativeSummary String?      // "Prefers playful banter, replies late nights, likes gaming..."
+  narrativeSummary String? // "Prefers playful banter, replies late nights, likes gaming..."
 
   // --- AI Analysis cursor (scan once, update later) ---
-  lastAnalyzedMessageId String?   // OFAPI message ID — fetch only newer msgs next time
+  lastAnalyzedMessageId String? // OFAPI message ID — fetch only newer msgs next time
   lastAnalyzedAt        DateTime? // When last AI analysis completed
-  messagesAnalyzed      Int?      // Count of messages processed in last analysis
+  messagesAnalyzed      Int? // Count of messages processed in last analysis
 
   // --- Relationship timeline ---
   firstContactAt  DateTime?
   firstPurchaseAt DateTime?
   biggestPurchase Float?
-  birthday        String?       // If volunteered
+  birthday        String? // If volunteered
   subAnniversary  DateTime?
 
   // --- Identity & context (only if volunteered) ---
-  language        String?
-  timezone        String?
+  language           String?
+  timezone           String?
   relationshipStatus String?
   occupationCategory String?
 
-  creator         Creator       @relation(fields: [creatorId], references: [id])
+  creator         Creator             @relation(fields: [creatorId], references: [id])
   transactions    Transaction[]
   preferences     FanPreference[]
   intentEvents    FanIntentEvent[]
   facts           FanFact[]
   lifecycleEvents FanLifecycleEvent[]
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([creatorId])
   @@index([lastPurchaseAt])
@@ -230,16 +232,16 @@ model Fan {
 
 // What a fan is into — tags with evidence
 model FanPreference {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   fanId           String
-  tag             String        // e.g. "roleplay", "customs", "audio", "gfe", "dominant"
-  weight          Float         @default(1.0)  // How strongly associated (1-10)
-  lastSeenAt      DateTime      @default(now())
-  sourceMessageId String?       // OFAPI message ID where this was detected
-  source          String?       // "auto" (AI detected) or "manual" (agent tagged)
+  tag             String // e.g. "roleplay", "customs", "audio", "gfe", "dominant"
+  weight          Float    @default(1.0) // How strongly associated (1-10)
+  lastSeenAt      DateTime @default(now())
+  sourceMessageId String? // OFAPI message ID where this was detected
+  source          String? // "auto" (AI detected) or "manual" (agent tagged)
 
-  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
+  fan       Fan      @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
   @@unique([fanId, tag])
   @@index([fanId])
@@ -248,15 +250,15 @@ model FanPreference {
 
 // Buying intent signals — detected from fan messages
 model FanIntentEvent {
-  id              String        @id @default(cuid())
-  fanId           String
-  intentTag       String        // ready_to_buy, wants_custom, price_question, discount_request, etc.
-  confidence      Float         @default(0.5) // 0-1 how confident the detection is
-  messageId       String?       // OFAPI message ID
-  messageText     String?       // Short excerpt of what they said
-  createdAt       DateTime      @default(now())
+  id          String   @id @default(cuid())
+  fanId       String
+  intentTag   String // ready_to_buy, wants_custom, price_question, discount_request, etc.
+  confidence  Float    @default(0.5) // 0-1 how confident the detection is
+  messageId   String? // OFAPI message ID
+  messageText String? // Short excerpt of what they said
+  createdAt   DateTime @default(now())
 
-  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  fan Fan @relation(fields: [fanId], references: [id], onDelete: Cascade)
 
   @@index([fanId, createdAt])
   @@index([intentTag])
@@ -264,25 +266,25 @@ model FanIntentEvent {
 
 // Chatter QA reviews — scores per conversation
 model ChatQAReview {
-  id              String        @id @default(cuid())
-  creatorId       String        // Which model account
-  chatterId       String?       // Which chatter handled this (User.id)
-  fanId           String?       // Which fan
-  chatId          String?       // OFAPI chat ID
+  id                   String   @id @default(cuid())
+  creatorId            String // Which model account
+  chatterId            String? // Which chatter handled this (User.id)
+  fanId                String? // Which fan
+  chatId               String? // OFAPI chat ID
   // Scores 0-5
-  controlScore    Int?          // Conversation control
-  tensionScore    Int?          // Tension / playfulness
-  valueScore      Int?          // Value & objection handling
-  personalizationScore Int?     // Personalization to fan type
-  compliancePass  Boolean?      // Safety compliance
+  controlScore         Int? // Conversation control
+  tensionScore         Int? // Tension / playfulness
+  valueScore           Int? // Value & objection handling
+  personalizationScore Int? // Personalization to fan type
+  compliancePass       Boolean? // Safety compliance
   // Tags
-  mistakeTags     String[]      // permission_asking, flat_ack, no_cta, discount_too_fast
-  strengthTags    String[]      // good_push_pull, strong_cta, adapted_to_fan
-  agentStyle      String?       // direct, playful, warm, efficient
-  fanTypeGuess    String?       // submissive, dominant, romantic, transactional, lonely
-  outcome         String?       // ppv_bought, no_sale, follow_up_set
-  notes           String?       // Free text reviewer notes
-  createdAt       DateTime      @default(now())
+  mistakeTags          String[] // permission_asking, flat_ack, no_cta, discount_too_fast
+  strengthTags         String[] // good_push_pull, strong_cta, adapted_to_fan
+  agentStyle           String? // direct, playful, warm, efficient
+  fanTypeGuess         String? // submissive, dominant, romantic, transactional, lonely
+  outcome              String? // ppv_bought, no_sale, follow_up_set
+  notes                String? // Free text reviewer notes
+  createdAt            DateTime @default(now())
 
   @@index([creatorId, createdAt])
   @@index([chatterId])
@@ -290,17 +292,17 @@ model ChatQAReview {
 
 // Structured long-term memory — facts the fan has volunteered or we've detected
 model FanFact {
-  id              String        @id @default(cuid())
+  id              String    @id @default(cuid())
   fanId           String
-  key             String        // e.g. "hobby", "pet_name", "work_schedule", "favorite_team"
-  value           String        // The actual value
-  confidence      Float         @default(0.8)
-  sourceMessageId String?       // OFAPI message ID where this was learned
-  source          String?       @default("manual") // "auto" or "manual"
-  lastConfirmedAt DateTime?     @default(now())
-  createdAt       DateTime      @default(now())
+  key             String // e.g. "hobby", "pet_name", "work_schedule", "favorite_team"
+  value           String // The actual value
+  confidence      Float     @default(0.8)
+  sourceMessageId String? // OFAPI message ID where this was learned
+  source          String?   @default("manual") // "auto" or "manual"
+  lastConfirmedAt DateTime? @default(now())
+  createdAt       DateTime  @default(now())
 
-  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  fan Fan @relation(fields: [fanId], references: [id], onDelete: Cascade)
 
   @@unique([fanId, key])
   @@index([fanId])
@@ -309,64 +311,125 @@ model FanFact {
 
 // Timeline events — stage changes, milestones, follow-ups
 model FanLifecycleEvent {
-  id              String        @id @default(cuid())
-  fanId           String
-  type            String        // stage_change, followup_set, first_purchase, churn_risk, milestone, promise_made
-  metadata        Json?         // Flexible: { from: "warming", to: "active_buyer", reason: "bought 3rd PPV" }
-  createdAt       DateTime      @default(now())
+  id        String   @id @default(cuid())
+  fanId     String
+  type      String // stage_change, followup_set, first_purchase, churn_risk, milestone, promise_made
+  metadata  Json? // Flexible: { from: "warming", to: "active_buyer", reason: "bought 3rd PPV" }
+  createdAt DateTime @default(now())
 
-  fan             Fan           @relation(fields: [fanId], references: [id], onDelete: Cascade)
+  fan Fan @relation(fields: [fanId], references: [id], onDelete: Cascade)
 
   @@index([fanId, createdAt])
   @@index([type])
 }
 
 model Transaction {
-  id             String        @id @default(cuid())
-  ofapiTxId      String        @unique
-  fanId          String
-  creatorId      String?       // Optional for backward compat — backfilled by cron
-  amount         Float
-  type           String?       // tip, message, post, subscription, stream, referral
-  date           DateTime
+  id        String   @id @default(cuid())
+  ofapiTxId String   @unique
+  fanId     String
+  creatorId String? // Optional for backward compat — backfilled by cron
+  amount    Float
+  type      String? // tip, message, post, subscription, stream, referral
+  date      DateTime
 
-  fan            Fan           @relation(fields: [fanId], references: [id])
-  mediaAssetId   String?
-  mediaAsset     MediaAsset?   @relation(fields: [mediaAssetId], references: [id])
+  fan          Fan         @relation(fields: [fanId], references: [id])
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
 
-  createdAt      DateTime      @default(now())
+  createdAt DateTime @default(now())
 
   @@index([creatorId, date])
   @@index([date])
 }
 
-// PENDING MIGRATION — uncomment after running prisma db push
-// model ChatterPerformance {
-//   id                    String   @id @default(cuid())
-//   userId                String
-//   creatorId             String
-//   date                  DateTime @db.Date
-//   liveScore             Int      @default(50)
-//   dailyEarned           Float    @default(0)
-//   ppvUnlocks            Int      @default(0)
-//   cueAccuracy           Float?
-//   robotPhraseCount      Int      @default(0)
-//   creativePhraseCount   Int      @default(0)
-//   conversationsHandled  Int      @default(0)
-//   avgResponseTime       Int?
-//   createdAt             DateTime @default(now())
-//   @@unique([userId, creatorId, date])
-//   @@index([userId, date])
-// }
+model ChatterPerformance {
+  id                   String   @id @default(cuid())
+  userId               String
+  creatorId            String
+  date                 DateTime @db.Date
+  liveScore            Int      @default(50)
+  dailyEarned          Float    @default(0)
+  ppvUnlocks           Int      @default(0)
+  cueAccuracy          Float?
+  robotPhraseCount     Int      @default(0)
+  creativePhraseCount  Int      @default(0)
+  conversationsHandled Int      @default(0)
+  avgResponseTime      Int?
+  createdAt            DateTime @default(now())
+
+  @@unique([userId, creatorId, date])
+  @@index([userId, date])
+}
+
+model ChatterHourlyScore {
+  id                    String   @id @default(cuid())
+  chatterEmail          String
+  creatorId             String
+  creator               Creator  @relation(fields: [creatorId], references: [id])
+  windowStart           DateTime
+  windowEnd             DateTime
+  slaScore              Int      @default(0)
+  followupScore         Int      @default(0)
+  triggerScore          Int      @default(0)
+  qualityScore          Int      @default(0)
+  revenueScore          Int      @default(0)
+  copyPastePenalty      Int      @default(0)
+  missedTriggerPenalty  Int      @default(0)
+  spamPenalty           Int      @default(0)
+  totalScore            Int      @default(0)
+  attributionConfidence String   @default("high")
+  detectedArchetype     String?
+  conversationsScanned  Int      @default(0)
+  messagesAnalyzed      Int      @default(0)
+  robotPhraseCount      Int      @default(0)
+  creativePhraseCount   Int      @default(0)
+  aiNotes               String?
+  mistakeTags           String[]
+  strengthTags          String[]
+  createdAt             DateTime @default(now())
+
+  @@unique([chatterEmail, creatorId, windowStart])
+  @@index([chatterEmail, createdAt])
+  @@index([creatorId, createdAt])
+  @@index([creatorId, windowStart])
+  @@index([chatterEmail, creatorId])
+}
+
+model ChatterProfile {
+  id                   String   @id @default(cuid())
+  chatterEmail         String
+  creatorId            String
+  creator              Creator  @relation(fields: [creatorId], references: [id])
+  chatterName          String?
+  avgTotalScore        Float    @default(50)
+  avgSlaScore          Float    @default(0)
+  avgFollowupScore     Float    @default(0)
+  avgTriggerScore      Float    @default(0)
+  avgQualityScore      Float    @default(0)
+  avgRevenueScore      Float    @default(0)
+  dominantArchetype    String?
+  archetypeCounts      Json?
+  recentScores         Json?
+  improvementIndex     Float    @default(0)
+  totalScoringSessions Int      @default(0)
+  topStrengths         String[]
+  topWeaknesses        String[]
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+
+  @@unique([chatterEmail, creatorId])
+  @@index([chatterEmail])
+  @@index([creatorId])
+}
 
 model ChatterSession {
-  id          String   @id @default(cuid())
-  email       String
-  creatorId   String
-  creator     Creator  @relation(fields: [creatorId], references: [id])
-  clockIn     DateTime @default(now())
-  clockOut    DateTime?
-  isLive      Boolean  @default(true)
+  id        String    @id @default(cuid())
+  email     String
+  creatorId String
+  creator   Creator   @relation(fields: [creatorId], references: [id])
+  clockIn   DateTime  @default(now())
+  clockOut  DateTime?
+  isLive    Boolean   @default(true)
 
   @@index([email])
   @@index([creatorId])
@@ -374,14 +437,14 @@ model ChatterSession {
 }
 
 model ChatterSchedule {
-  id          String   @id @default(cuid())
-  email       String
-  name        String
-  shift       String
-  creatorId   String
-  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  isCover     Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  email     String
+  name      String
+  shift     String
+  creatorId String
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  isCover   Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@unique([email, creatorId, shift])
   @@index([email])

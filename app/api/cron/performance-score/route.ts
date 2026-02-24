@@ -1,7 +1,5 @@
-// @ts-nocheck — PENDING MIGRATION: ChatterPerformance table
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { detectRobotPhrases } from "@/lib/ai-robot-detector";
+import { buildScoringWindows, scoreChatter } from "@/lib/chatter-scorer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
@@ -10,13 +8,17 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * GET /api/cron/performance-score
- * Runs every 15 minutes via Vercel cron.
  *
- * Per chatter (User with CHATTER role) per creator:
- * - Count today's transactions (daily earned, PPV unlocks)
- * - Scan recent messages for robot phrases
- * - Compute score: base(50) + revenue(0-25) + creativity(0-15) + speed(0-10) - robot_penalty(0-20)
- * - Upsert ChatterPerformance record
+ * Runs every 30 minutes via Vercel cron.
+ * Scores the last fully completed UK hour for each active chatter-creator pair.
+ *
+ * UK-aligned windows:
+ * - Canonical timezone: Europe/London
+ * - Score the last completed UK hour (e.g., if now=14:12 UK, score 13:00-14:00 UK)
+ * - Store windowStart/windowEnd as UTC in DB
+ *
+ * Budget: max 3 pairs per run (~17s each, 50s usable, 5s safety margin)
+ * Round-robin rotates through pairs across runs.
  */
 export async function GET(request: Request) {
     if (CRON_SECRET) {
@@ -26,104 +28,144 @@ export async function GET(request: Request) {
         }
     }
 
+    const startTime = Date.now();
+
     try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Compute UK-aligned hour window boundaries
+        const { windowStart, windowEnd } = getLastCompletedUKHour();
 
-        // Get all chatters (users assigned to creators)
-        const assignments = await prisma.creatorAssignment.findMany({
-            include: {
-                user: true,
-                creator: { select: { id: true, name: true, ofapiToken: true } },
-            },
-        });
+        console.log(
+            `[PerfScore] Scoring window: ${windowStart.toISOString()} → ${windowEnd.toISOString()}`,
+        );
 
-        const results: any[] = [];
+        // Build all possible scoring windows (chatter-creator pairs with active sessions)
+        const allWindows = await buildScoringWindows(windowStart, windowEnd);
 
-        for (const assignment of assignments) {
-            const userId = assignment.userId;
-            const creatorId = assignment.creatorId;
+        if (allWindows.length === 0) {
+            return NextResponse.json({
+                ok: true,
+                message: "No active chatter sessions in scoring window",
+                window: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
+            });
+        }
+
+        // Round-robin: rotate through pairs across cron runs
+        const offset = Math.floor(Date.now() / (60 * 60 * 1000)) % allWindows.length;
+        const rotated = [...allWindows.slice(offset), ...allWindows.slice(0, offset)];
+
+        const results: Array<{
+            chatter: string;
+            creator: string;
+            score: number | null;
+            status: string;
+        }> = [];
+
+        const MAX_PAIRS = 3;
+
+        for (let i = 0; i < Math.min(rotated.length, MAX_PAIRS); i++) {
+            // Time guard: stop if running low on budget
+            if (Date.now() - startTime > 50_000) {
+                console.log("[PerfScore] Time guard hit — stopping early");
+                break;
+            }
+
+            const window = rotated[i];
 
             try {
-                // Get today's transactions for this creator
-                const todayTx = await prisma.transaction.findMany({
-                    where: {
-                        creatorId,
-                        date: { gte: today },
-                    },
-                });
-
-                const dailyEarned = todayTx.reduce((sum, tx) => sum + tx.amount, 0);
-                const ppvUnlocks = todayTx.filter((tx) => tx.type === "message").length;
-
-                // For robot detection, we'd need to know which messages this chatter sent.
-                // For now, we use a placeholder. In production, messages would be tagged
-                // with the chatter's userId who sent them.
-                // TODO: Tag outgoing messages with chatter userId for accurate attribution
-                const robotResult = { robotCount: 0, creativeCount: 0, robotExamples: [], creativeExamples: [] };
-
-                // Count conversations handled (unique fans with transactions today)
-                const uniqueFans = new Set(todayTx.map((tx) => tx.fanId));
-
-                // Compute score components
-                const revenueScore = Math.min(25, dailyEarned / 20); // $500 = max 25 pts
-                const creativityScore = Math.min(15, robotResult.creativeCount * 3);
-                const robotPenalty = Math.min(20, robotResult.robotCount * 4);
-                const speedScore = 5; // Placeholder — needs response time tracking
-
-                const liveScore = Math.max(
-                    0,
-                    Math.min(100, Math.round(50 + revenueScore + creativityScore + speedScore - robotPenalty)),
-                );
-
-                // Upsert performance record
-                await prisma.chatterPerformance.upsert({
-                    where: {
-                        userId_creatorId_date: {
-                            userId,
-                            creatorId,
-                            date: today,
-                        },
-                    },
-                    update: {
-                        liveScore,
-                        dailyEarned,
-                        ppvUnlocks,
-                        robotPhraseCount: robotResult.robotCount,
-                        creativePhraseCount: robotResult.creativeCount,
-                        conversationsHandled: uniqueFans.size,
-                    },
-                    create: {
-                        userId,
-                        creatorId,
-                        date: today,
-                        liveScore,
-                        dailyEarned,
-                        ppvUnlocks,
-                        robotPhraseCount: robotResult.robotCount,
-                        creativePhraseCount: robotResult.creativeCount,
-                        conversationsHandled: uniqueFans.size,
-                    },
-                });
+                const result = await scoreChatter(window, true);
 
                 results.push({
-                    user: assignment.user.name,
-                    creator: assignment.creator.name,
-                    score: liveScore,
-                    earned: dailyEarned,
+                    chatter: window.chatterEmail,
+                    creator: window.creatorName,
+                    score: result?.totalScore ?? null,
+                    status: result ? "scored" : "skipped",
                 });
             } catch (e: any) {
                 results.push({
-                    user: assignment.user.name,
-                    creator: assignment.creator.name,
-                    error: e.message,
+                    chatter: window.chatterEmail,
+                    creator: window.creatorName,
+                    score: null,
+                    status: `error: ${e.message}`,
                 });
             }
         }
 
-        return NextResponse.json({ ok: true, results });
+        const elapsed = Date.now() - startTime;
+
+        return NextResponse.json({
+            ok: true,
+            window: { start: windowStart.toISOString(), end: windowEnd.toISOString() },
+            totalPairs: allWindows.length,
+            scored: results.filter((r) => r.status === "scored").length,
+            elapsed: `${elapsed}ms`,
+            results,
+        });
     } catch (e: any) {
-        console.error("[Performance Score] Error:", e);
+        console.error("[PerfScore] Error:", e);
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
+}
+
+/**
+ * Get the last fully completed UK hour boundaries as UTC dates.
+ *
+ * Example: If current UK time is 14:12, returns:
+ *   windowStart = 13:00 UK → converted to UTC
+ *   windowEnd   = 14:00 UK → converted to UTC
+ *
+ * Handles BST/GMT transitions via Intl.DateTimeFormat.
+ */
+function getLastCompletedUKHour(): { windowStart: Date; windowEnd: Date } {
+    const now = new Date();
+
+    // Get current UK time components using Intl
+    const ukFormatter = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/London",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
+
+    const parts = ukFormatter.formatToParts(now);
+    const ukYear = parseInt(parts.find((p) => p.type === "year")!.value);
+    const ukMonth = parseInt(parts.find((p) => p.type === "month")!.value) - 1;
+    const ukDay = parseInt(parts.find((p) => p.type === "day")!.value);
+    const ukHour = parseInt(parts.find((p) => p.type === "hour")!.value);
+
+    // Window end = start of current UK hour (the last completed hour ends here)
+    // Window start = one hour before that
+    // We need to convert UK local time to UTC
+
+    // Create a date string in UK timezone and parse it back to get UTC offset
+    const windowEndUK = new Date(
+        Date.UTC(ukYear, ukMonth, ukDay, ukHour, 0, 0, 0),
+    );
+    const windowStartUK = new Date(
+        Date.UTC(ukYear, ukMonth, ukDay, ukHour - 1, 0, 0, 0),
+    );
+
+    // Calculate UTC offset for Europe/London at this time
+    // The UTC time above represents UK local time, so we need to subtract the UK offset
+    const ukOffset = getUKOffsetMs(now);
+
+    const windowStart = new Date(windowStartUK.getTime() - ukOffset);
+    const windowEnd = new Date(windowEndUK.getTime() - ukOffset);
+
+    return { windowStart, windowEnd };
+}
+
+/**
+ * Get the UTC offset for Europe/London in milliseconds.
+ * Returns 0 for GMT, 3600000 for BST.
+ */
+function getUKOffsetMs(date: Date): number {
+    // Create a UTC reference and a UK reference, compare them
+    const utcStr = date.toLocaleString("en-US", { timeZone: "UTC" });
+    const ukStr = date.toLocaleString("en-US", { timeZone: "Europe/London" });
+    const utcDate = new Date(utcStr);
+    const ukDate = new Date(ukStr);
+    return ukDate.getTime() - utcDate.getTime();
 }

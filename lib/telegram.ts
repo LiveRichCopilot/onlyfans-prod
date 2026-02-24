@@ -129,7 +129,8 @@ if (!(globalThis as any)[commandsKey]) {
         { command: "compare", description: "Compare this week vs last week" },
         { command: "hourly", description: "Revenue by hour today" },
         { command: "breakdown", description: "Revenue split by type" },
-        { command: "newfans", description: "New fans today + churn count" }
+        { command: "newfans", description: "New fans today + churn count" },
+        { command: "scores", description: "Check chatter performance scores" }
     ]).catch(() => {}); // Silently ignore — commands are already set from previous deploys
 }
 
@@ -207,28 +208,23 @@ bot.command("stats", async (ctx) => {
         const now = new Date();
         const startWindow = new Date(now.getTime() - (hours * 60 * 60 * 1000));
 
-        const payload = {
-            account_ids: [ofAccount],
-            start_date: startWindow.toISOString(),
-            end_date: now.toISOString()
-        };
-
-        const allTx = await fetchAllTransactions(ofAccount, creator.ofapiToken, startWindow);
-
-        const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= startWindow);
+        // Use LOCAL DB as source of truth — synced from OFAPI every 5 min
+        const localTx = await prisma.transaction.findMany({
+            where: { creatorId: creator.id, date: { gte: startWindow } },
+            select: { amount: true, type: true },
+        });
 
         let totalGross = 0;
         let subscriptions = 0;
         let tips = 0;
         let messages = 0;
 
-        rawTxs.forEach((t: any) => {
-            const amt = parseFloat(t.amount || t.gross || t.price || "0");
-            totalGross += amt;
-            // Best effort categorization since OF drops labels in raw payload without deep parsing
-            if (t.description?.toLowerCase().includes("tip")) tips += amt;
-            else if (t.description?.toLowerCase().includes("message")) messages += amt;
-            else subscriptions += amt;
+        localTx.forEach((t) => {
+            totalGross += t.amount;
+            if (t.type === "tip") tips += t.amount;
+            else if (t.type === "message") messages += t.amount;
+            else if (t.type === "subscription") subscriptions += t.amount;
+            else subscriptions += t.amount; // default bucket
         });
 
         // Hardcoded flat 20% OF Fee
@@ -243,10 +239,12 @@ Gross Revenue: $${totalGross.toFixed(2)}
 Net Profit: $${totalNet.toFixed(2)}
 Platform Fees: $${totalFees.toFixed(2)}
 
-Breakdown (Est.):
+Breakdown:
 - Subscriptions: $${subscriptions.toFixed(2)}
 - Tips: $${tips.toFixed(2)}
-- Messages: $${messages.toFixed(2)}
+- Messages/PPV: $${messages.toFixed(2)}
+
+Transactions: ${localTx.length}
         `;
 
         await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
@@ -296,65 +294,65 @@ bot.command("report", async (ctx) => {
         const start20m = new Date(now.getTime() - (20 * 60 * 1000));
         const start24h = new Date(now.getTime() - (24 * 60 * 60 * 1000));
 
-        const payload20m = {
-            account_ids: [ofAccount],
-            start_date: start20m.toISOString(),
-            end_date: now.toISOString()
-        };
-        const payload24h = {
-            account_ids: [ofAccount],
-            start_date: start24h.toISOString(),
-            end_date: now.toISOString()
-        };
-
-        const [summary20m, summary24h, allTx] = await Promise.all([
-            getTransactionsSummary(creator.ofapiToken, payload20m).catch(() => null),
-            getTransactionsSummary(creator.ofapiToken, payload24h).catch(() => null),
-            fetchAllTransactions(ofAccount, creator.ofapiToken, start24h).catch(() => [])
+        // Use LOCAL DB as source of truth — synced from OFAPI every 5 min
+        const [revenue20m, revenue24h, topFansData] = await Promise.all([
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: start20m } },
+                _sum: { amount: true },
+            }),
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: start24h } },
+                _sum: { amount: true },
+            }),
+            prisma.transaction.groupBy({
+                by: ['fanId'],
+                where: { creatorId: creator.id, date: { gte: start24h } },
+                _sum: { amount: true },
+                orderBy: { _sum: { amount: 'desc' } },
+                take: 5,
+            }),
         ]);
-        const rawTxs = allTx.filter((t: any) => new Date(t.createdAt) >= start24h);
 
-        // The OF Analytics summary endpoint ignores hours and rounds to days.
-        // To get true 20-minute velocity, we manually sum the raw ledger events from the last 20 mins.
-        const txs20m = allTx.filter((t: any) => new Date(t.createdAt) >= start20m);
-        const manualGross20m = txs20m.reduce((sum: number, t: any) => {
-            return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
-        }, 0);
+        const gross20m = (revenue20m._sum.amount || 0).toFixed(2);
+        const gross24h = (revenue24h._sum.amount || 0).toFixed(2);
 
-        const manualGross24h = rawTxs.reduce((sum: number, t: any) => {
-            return sum + (parseFloat(t.amount || t.gross || t.price || "0"));
-        }, 0);
+        // Resolve fan names
+        const topFanIds = topFansData.filter(f => (f._sum.amount || 0) > 0).map(f => f.fanId);
+        const fans = topFanIds.length > 0
+            ? await prisma.fan.findMany({ where: { id: { in: topFanIds } }, select: { id: true, name: true, username: true } })
+            : [];
+        const fanMap = new Map(fans.map(f => [f.id, f]));
 
-        const gross20m = manualGross20m.toFixed(2);
-        const gross24h = manualGross24h.toFixed(2);
+        const validSpenders = topFansData.filter(f => (f._sum.amount || 0) > 0);
 
-        const topFans = calculateTopFans(rawTxs, 0);
-
-        const validSpenders = topFans.filter(f => f.spend > 0);
-
-        let md = `🔥 **DAILY BRIEF**: ${creatorName}\n\n`;
-        md += `⏱ **20-Minute Velocity:** $${gross20m}\n`;
-        md += `📅 **24-Hour Total:** $${gross24h}\n\n`;
-        md += `🏆 **Top 3 Spenders [Last 24h]**\n`;
+        let md = `DAILY BRIEF: ${creatorName}\n\n`;
+        md += `20-Minute Velocity: $${gross20m}\n`;
+        md += `24-Hour Total: $${gross24h}\n\n`;
+        md += `Top 3 Spenders [Last 24h]\n`;
 
         if (validSpenders.length === 0) {
             md += "No spenders found in the last 24h.\n";
-            await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
+            await ctx.reply(md, replyOpt);
         } else {
             const displayList = validSpenders.slice(0, 3);
-            displayList.forEach((fan, i) => {
-                md += `${i + 1}. ${fan.name} (@${fan.username}) — $${fan.spend.toFixed(2)}\n`;
+            displayList.forEach((entry, i) => {
+                const fan = fanMap.get(entry.fanId);
+                const displayName = fan?.name || fan?.username || "Anonymous";
+                const username = fan?.username || "?";
+                md += `${i + 1}. ${displayName} (@${username}) — $${(entry._sum.amount || 0).toFixed(2)}\n`;
             });
 
-            const topWhale = validSpenders[0];
-            md += `\n🎯 **Action Required:** Your #1 whale right now is ${topWhale.name}. Would you like to send them a private reward or voice note to their inbox?`;
+            const topFan = fanMap.get(validSpenders[0].fanId);
+            const topWhaleName = topFan?.name || topFan?.username || "Top Spender";
+            const topWhaleUsername = topFan?.username || "unknown";
+            md += `\nAction Required: Your #1 whale right now is ${topWhaleName}. Want to send them content or a voice note?`;
 
             const keyboard = new InlineKeyboard()
-                .text("🎤 Voice Note", `alert_reply_voice_${topWhale.username}`).row()
-                .text("📹 Send Video", `alert_reply_video_${topWhale.username}`).row()
+                .text("Voice Note", `alert_reply_voice_${topWhaleUsername}`).row()
+                .text("Send Video", `alert_reply_video_${topWhaleUsername}`).row()
                 .text("Skip / Dismiss", "action_skip");
 
-            await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const, reply_markup: keyboard }));
+            await ctx.reply(md, Object.assign({}, replyOpt, { reply_markup: keyboard }));
         }
 
     } catch (e: any) {
@@ -369,36 +367,59 @@ bot.command("forecast", async (ctx) => {
 
     try {
         const creator = await getOrBindCreator(ctx);
+        if (!creator) return ctx.reply("Not linked.", replyOpt);
 
-        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") return;
+        await ctx.reply(`Computing forecast for ${creator.name || "Creator"}...`, replyOpt);
 
-        await ctx.reply(`Booting statistical modeling engine for ${creator.name}...`, replyOpt);
-
-        // We look at the last 30 days to project the next 7
         const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-        const payload = {
-            account_ids: [creator.ofapiCreatorId || creator.telegramId],
-            model: "ARIMA",
-            start_date: thirtyDaysAgo.toISOString(),
-            end_date: now.toISOString()
-        };
+        // Use LOCAL DB — get weekly revenue for the last 4 weeks
+        const [rev7d, rev14d, rev30d, txCount30d] = await Promise.all([
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: sevenDaysAgo } },
+                _sum: { amount: true },
+                _count: true,
+            }),
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+                _sum: { amount: true },
+            }),
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: thirtyDaysAgo } },
+                _sum: { amount: true },
+            }),
+            prisma.transaction.count({
+                where: { creatorId: creator.id, date: { gte: thirtyDaysAgo } },
+            }),
+        ]);
 
-        const forecast = await getRevenueForecast(creator.ofapiToken, payload);
+        const thisWeek = rev7d._sum.amount || 0;
+        const lastWeek = rev14d._sum.amount || 0;
+        const monthly = rev30d._sum.amount || 0;
+        const dailyAvg = monthly / 30;
+        const weeklyAvg = monthly / 4.3; // ~4.3 weeks in 30 days
 
-        const md = `
-7-DAY REVENUE FORECAST:
-Model: ARIMA
+        // Simple trend: weighted average of recent velocity
+        // 70% this week's pace + 30% monthly average
+        const projected7d = (thisWeek * 0.7) + (weeklyAvg * 0.3);
+        const projectedNet = projected7d * 0.8; // After 20% OF fee
+        const weekDelta = lastWeek > 0 ? ((thisWeek - lastWeek) / lastWeek * 100) : 0;
+        const trend = weekDelta >= 5 ? "Trending UP" : weekDelta <= -5 ? "Trending DOWN" : "Holding steady";
 
-Forecasted Net: $${(forecast.projected_net || 0).toFixed(2)}
-Confidence Interval: +/- $${(forecast.interval_variance || 0).toFixed(2)}
+        let md = `7-DAY REVENUE FORECAST — ${creator.name || "Creator"}\n\n`;
+        md += `This week so far: $${thisWeek.toFixed(2)} (${rev7d._count} tx)\n`;
+        md += `Last week: $${lastWeek.toFixed(2)}\n`;
+        md += `30-day daily avg: $${dailyAvg.toFixed(2)}\n\n`;
+        md += `Projected next 7 days (gross): $${projected7d.toFixed(2)}\n`;
+        md += `Projected next 7 days (net): $${projectedNet.toFixed(2)}\n`;
+        md += `Week-over-week: ${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(1)}%\n`;
+        md += `${trend}\n\n`;
+        md += `Based on ${txCount30d} transactions over 30 days.`;
 
-Note: This projection is based purely on the velocity of your last 30 days of standard transactions.
-        `;
-
-        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
-
+        await ctx.reply(md, replyOpt);
     } catch (e: any) {
         console.error("Forecast command error", e);
         await ctx.reply("Failed to generate forecast.", replyOpt);
@@ -788,37 +809,40 @@ bot.command("compare", async (ctx) => {
 
     try {
         const creator = await getOrBindCreator(ctx);
-        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("Not linked.", replyOpt);
-        }
+        if (!creator) return ctx.reply("Not linked.", replyOpt);
 
-        const acct = creator.ofapiCreatorId || creator.telegramId;
         await ctx.reply(`Comparing weeks for ${creator.name || "Creator"}...`, replyOpt);
 
         const now = new Date();
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-        const [thisWeekTx, lastWeekTx] = await Promise.all([
-            fetchAllTransactions(acct, creator.ofapiToken, sevenDaysAgo, 1000).catch(() => []),
-            fetchAllTransactions(acct, creator.ofapiToken, fourteenDaysAgo, 2000).catch(() => []),
+        // Use LOCAL DB as source of truth
+        const [thisWeekAgg, lastWeekAgg, thisWeekCount, lastWeekCount] = await Promise.all([
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: sevenDaysAgo } },
+                _sum: { amount: true },
+            }),
+            prisma.transaction.aggregate({
+                where: { creatorId: creator.id, date: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+                _sum: { amount: true },
+            }),
+            prisma.transaction.count({
+                where: { creatorId: creator.id, date: { gte: sevenDaysAgo } },
+            }),
+            prisma.transaction.count({
+                where: { creatorId: creator.id, date: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+            }),
         ]);
 
-        const thisWeekArr = Array.isArray(thisWeekTx) ? thisWeekTx.filter((t: any) => new Date(t.createdAt) >= sevenDaysAgo) : [];
-        const lastWeekArr = Array.isArray(lastWeekTx) ? lastWeekTx.filter((t: any) => {
-            const d = new Date(t.createdAt);
-            return d >= fourteenDaysAgo && d < sevenDaysAgo;
-        }) : [];
-
-        const sumTx = (txs: any[]) => txs.reduce((s, t) => s + (parseFloat(t.amount || "0")), 0);
-        const thisWeekTotal = sumTx(thisWeekArr);
-        const lastWeekTotal = sumTx(lastWeekArr);
+        const thisWeekTotal = thisWeekAgg._sum.amount || 0;
+        const lastWeekTotal = lastWeekAgg._sum.amount || 0;
         const delta = lastWeekTotal > 0 ? ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100) : 0;
         const arrow = delta >= 0 ? "+" : "";
 
         let md = `WEEK COMPARISON — ${creator.name || "Creator"}\n\n`;
-        md += `This week (7d): $${thisWeekTotal.toFixed(2)} (${thisWeekArr.length} tx)\n`;
-        md += `Last week: $${lastWeekTotal.toFixed(2)} (${lastWeekArr.length} tx)\n`;
+        md += `This week (7d): $${thisWeekTotal.toFixed(2)} (${thisWeekCount} tx)\n`;
+        md += `Last week: $${lastWeekTotal.toFixed(2)} (${lastWeekCount} tx)\n`;
         md += `Change: ${arrow}${delta.toFixed(1)}%\n`;
 
         if (delta >= 10) md += `\nTrending UP`;
@@ -838,23 +862,26 @@ bot.command("hourly", async (ctx) => {
 
     try {
         const creator = await getOrBindCreator(ctx);
-        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
+        if (!creator) {
             return ctx.reply("Not linked.", replyOpt);
         }
 
-        const acct = creator.ofapiCreatorId || creator.telegramId;
+        // Use LOCAL DB as source of truth — not OFAPI analytics
+        // (getTransactionsSummary doesn't support sub-daily granularity)
         const now = new Date();
         const todayUTC = new Date(now); todayUTC.setUTCHours(0, 0, 0, 0);
 
-        const txRes = await getTransactions(acct, creator.ofapiToken).catch(() => null);
-        const allTx = txRes?.data?.list || txRes?.list || txRes?.transactions || [];
-        const todayTx = allTx.filter((t: any) => new Date(t.createdAt) >= todayUTC);
+        const todayTx = await prisma.transaction.findMany({
+            where: { creatorId: creator.id, date: { gte: todayUTC } },
+            select: { amount: true, date: true },
+            orderBy: { date: "asc" },
+        });
 
         // Group by hour
         const hourBuckets: Record<number, number> = {};
-        todayTx.forEach((t: any) => {
-            const h = new Date(t.createdAt).getUTCHours();
-            hourBuckets[h] = (hourBuckets[h] || 0) + (parseFloat(t.amount || "0"));
+        todayTx.forEach((t) => {
+            const h = new Date(t.date).getUTCHours();
+            hourBuckets[h] = (hourBuckets[h] || 0) + t.amount;
         });
 
         const currentHour = now.getUTCHours();
@@ -986,6 +1013,111 @@ bot.command("newfans", async (ctx) => {
     } catch (e: any) {
         console.error("Newfans command error:", e);
         await ctx.reply("Failed to fetch fan movement data.", replyOpt);
+    }
+});
+
+bot.command("scores", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
+
+    try {
+        const creator = await getOrBindCreator(ctx);
+        if (!creator) return ctx.reply("Not linked.", replyOpt);
+
+        // Get live sessions for this creator
+        const liveSessions = await prisma.chatterSession.findMany({
+            where: { creatorId: creator.id, isLive: true },
+            select: { email: true, clockIn: true },
+        });
+
+        // Get most recent hourly score per chatter for this creator (last 24h)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const recentScores = await prisma.chatterHourlyScore.findMany({
+            where: { creatorId: creator.id, createdAt: { gte: oneDayAgo } },
+            orderBy: { windowStart: "desc" },
+        });
+
+        // Get profiles for this creator
+        const profiles = await prisma.chatterProfile.findMany({
+            where: { creatorId: creator.id },
+        });
+
+        // Dedupe: most recent score per chatter
+        const latestByChatter = new Map<string, typeof recentScores[0]>();
+        for (const score of recentScores) {
+            if (!latestByChatter.has(score.chatterEmail)) {
+                latestByChatter.set(score.chatterEmail, score);
+            }
+        }
+
+        const profileMap = new Map(profiles.map(p => [p.chatterEmail, p]));
+        const liveEmails = new Set(liveSessions.map(s => s.email));
+
+        // Collect all known chatters for this creator
+        const allEmails = new Set([
+            ...latestByChatter.keys(),
+            ...profileMap.keys(),
+            ...liveEmails,
+        ]);
+
+        if (allEmails.size === 0) {
+            return ctx.reply(`No chatter data found for ${creator.name || "this creator"}.`, replyOpt);
+        }
+
+        const archetypeLabels: Record<string, string> = {
+            yes_babe_robot: "Yes Babe Robot",
+            interview_bot: "Interview Bot",
+            doormat: "Doormat",
+            commander: "Commander",
+            tease: "Tease",
+            chameleon: "Chameleon",
+        };
+
+        let msg = `CHATTER SCORES — ${creator.name || "Creator"}\n\n`;
+
+        // Sort: live first, then by score desc
+        const entries = Array.from(allEmails).map(email => {
+            const score = latestByChatter.get(email);
+            const profile = profileMap.get(email);
+            const isLive = liveEmails.has(email);
+            const displayScore = score?.totalScore ?? Math.round(profile?.avgTotalScore ?? 0);
+            const name = profile?.chatterName || email.split("@")[0];
+            return { email, name, score, profile, isLive, displayScore };
+        }).sort((a, b) => {
+            if (a.isLive && !b.isLive) return -1;
+            if (!a.isLive && b.isLive) return 1;
+            return b.displayScore - a.displayScore;
+        });
+
+        for (const entry of entries.slice(0, 10)) {
+            const emoji = entry.displayScore >= 80 ? "🟢" : entry.displayScore >= 50 ? "🟡" : "🔴";
+            const liveTag = entry.isLive ? " [LIVE]" : "";
+            msg += `${emoji} ${entry.name}${liveTag}: ${entry.displayScore}/100\n`;
+
+            if (entry.score) {
+                msg += `   SLA: ${entry.score.slaScore}/25 | FU: ${entry.score.followupScore}/20 | Trig: ${entry.score.triggerScore}/20 | Qual: ${entry.score.qualityScore}/20 | Rev: ${entry.score.revenueScore}/15\n`;
+            }
+
+            const archetype = entry.score?.detectedArchetype || entry.profile?.dominantArchetype;
+            if (archetype) {
+                msg += `   Style: ${archetypeLabels[archetype] || archetype}\n`;
+            }
+
+            if (entry.profile && entry.profile.improvementIndex !== 0) {
+                const arrow = entry.profile.improvementIndex > 0 ? "+" : "";
+                msg += `   Trend: ${arrow}${entry.profile.improvementIndex.toFixed(1)} | Sessions: ${entry.profile.totalScoringSessions}\n`;
+            }
+
+            msg += "\n";
+        }
+
+        const liveCount = entries.filter(e => e.isLive).length;
+        msg += `Live: ${liveCount} | Total tracked: ${entries.length}`;
+
+        await ctx.reply(msg, replyOpt);
+    } catch (e: any) {
+        console.error("Scores command error:", e);
+        await ctx.reply("Failed to fetch chatter scores.", replyOpt);
     }
 });
 
