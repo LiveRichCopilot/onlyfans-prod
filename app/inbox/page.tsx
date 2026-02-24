@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { MessageSquare } from "lucide-react";
-import type { Chat, Message } from "@/components/inbox/types";
+import type { Chat } from "@/components/inbox/types";
 import { NavBar } from "@/components/inbox/NavBar";
 import { FanList } from "@/components/inbox/FanList";
 import { ChatTopBar } from "@/components/inbox/ChatTopBar";
@@ -12,615 +12,70 @@ import { FanSidebar } from "@/components/inbox/FanSidebar";
 import { SpendBuckets } from "@/components/inbox/SpendBuckets";
 import { WhaleOnlineAlert } from "@/components/inbox/WhaleOnlineAlert";
 import { PanelSlider } from "@/components/inbox/PanelSlider";
-
-// Helper: map raw OFAPI chat to our Chat type
-function mapRawChat(c: any): Chat {
-    return {
-        id: c.fan?.id || c.chat_id || c.id || Math.random().toString(),
-        withUser: {
-            id: c.fan?.id || c.withUser?.id || "unknown",
-            username: c.fan?.username || c.withUser?.username || "Fan",
-            name: c.fan?.name || c.withUser?.name || "Anonymous",
-            avatar: c.fan?.avatar || c.withUser?.avatar || "",
-        },
-        lastMessage: {
-            text:
-                c.lastMessage?.text?.replace(/<[^>]*>?/gm, "") ||
-                (c.lastMessage?.media?.length > 0 || c.hasMedia ? "[Media]" : "No message"),
-            createdAt: c.lastMessage?.createdAt || new Date().toISOString(),
-            isRead: c.lastMessage?.isOpened ?? true,
-        },
-        // Use DB lifetimeSpend if available (persistent), fallback to OFAPI snapshot
-        totalSpend: c._dbLifetimeSpend || c.fan?.subscribedOnData?.totalSumm || c.totalSpend || 0,
-        _creatorId: c._creatorId || "",
-        _creatorName: c._creatorName || "",
-        // lastPurchaseAt comes from DB (persistent) — set by /api/sync
-        _lastPurchaseAt: c._lastPurchaseAt || undefined,
-    };
-}
+import { useChats } from "@/components/inbox/hooks/useChats";
+import { useMessages } from "@/components/inbox/hooks/useMessages";
 
 export default function InboxPage() {
-    const [creators, setCreators] = useState<any[]>([]);
-    const [selectedCreatorId, setSelectedCreatorId] = useState<string>("all");
-    const [chats, setChats] = useState<Chat[]>([]);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const {
+        creators,
+        selectedCreatorId,
+        chats,
+        loading,
+        loadingMoreChats,
+        loadingSpendFilter,
+        spendBucket,
+        setSpendBucket,
+        onlineOnly,
+        setOnlineOnly,
+        spendFilteredChats,
+        hasMoreChats,
+        tempTick,
+        handleSelectCreator,
+        handleLoadMoreChats,
+    } = useChats();
+
     const [activeChat, setActiveChat] = useState<Chat | null>(null);
-    const [inputText, setInputText] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [msgsLoading, setMsgsLoading] = useState(false);
-    const [isSfw, setIsSfw] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-
-    // Mobile view state: "list" or "chat"
     const [mobileView, setMobileView] = useState<"list" | "chat">("list");
-
-    // Sort & Filter state
     const [sortBy, setSortBy] = useState("recent");
     const [unreadFirst, setUnreadFirst] = useState(false);
     const [filters, setFilters] = useState<any>(null);
-
-    // Spend bucket filter
-    const [spendBucket, setSpendBucket] = useState(0); // 0 = all, 50 = $50+, etc.
-    const [onlineOnly, setOnlineOnly] = useState(false);
-    const [spendFilteredChats, setSpendFilteredChats] = useState<Chat[] | null>(null); // null = use regular chats
-    const [loadingSpendFilter, setLoadingSpendFilter] = useState(false);
-
-    // --- Infinite message scroll state ---
-    const [loadingOlder, setLoadingOlder] = useState(false);
-    const [hasMoreMessages, setHasMoreMessages] = useState(true);
-    const nextLastIdRef = useRef<string | null>(null);
-
-    // Guard: track which creator selection is active to prevent stale appends
-    const activeCreatorSelectionRef = useRef<string>("");
-
-    // Guard: after jump-to-date, suppress the 5s poll from overwriting historical messages
-    // Reset when user switches chat or new chat is opened
-    const isJumpedRef = useRef(false);
-    const [isJumped, setIsJumped] = useState(false); // State version for UI rendering
-
-    // --- Infinite fan list scroll state ---
-    const [chatOffset, setChatOffset] = useState(0);
-    const [hasMoreChats, setHasMoreChats] = useState(true);
-    const [loadingMoreChats, setLoadingMoreChats] = useState(false);
-
-    // --- Media map ---
-    const [mediaMap, setMediaMap] = useState<Record<string, { src: string; preview: string; type: string }>>({});
-
-    // --- Jump to date state ---
-    const [jumpingToDate, setJumpingToDate] = useState(false);
-    const [jumpProgress, setJumpProgress] = useState(0); // number of messages loaded so far
-
-    // --- AI Suggest state ---
-    const [aiSuggestLoading, setAiSuggestLoading] = useState(false);
-
-    // --- Resizable sidebar ---
+    const [isSfw, setIsSfw] = useState(false);
+    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(300);
+
+    const {
+        messages,
+        msgsLoading,
+        inputText,
+        setInputText,
+        messagesEndRef,
+        loadingOlder,
+        hasMoreMessages,
+        jumpingToDate,
+        jumpProgress,
+        isJumped,
+        aiSuggestLoading,
+        handleLoadOlderMessages,
+        handleJumpToDate,
+        handleReturnToLatest,
+        handleAiSuggest,
+        handleSend,
+        resetJumpState,
+    } = useMessages(activeChat, selectedCreatorId);
+
     const handleSidebarResize = useCallback((deltaX: number) => {
         setSidebarWidth((prev) => Math.max(220, Math.min(500, prev + deltaX)));
     }, []);
 
-    // --- Mobile sidebar toggle ---
-    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-
-    // --- Spend bucket filter: fetch fans filtered by spend threshold ---
-    useEffect(() => {
-        if (spendBucket === 0 && !onlineOnly) {
-            setSpendFilteredChats(null); // Use regular chat list
-            return;
-        }
-
-        setLoadingSpendFilter(true);
-        const params = new URLSearchParams();
-        params.set("creatorId", selectedCreatorId);
-        params.set("minSpend", String(spendBucket));
-        if (onlineOnly) params.set("online", "true");
-
-        fetch(`/api/inbox/fans-by-spend?${params.toString()}`)
-            .then(r => r.json())
-            .then(data => {
-                if (!data.error && data.fans) {
-                    // Map OFAPI fan objects to Chat format for the fan list
-                    const mapped: Chat[] = data.fans.map((f: any) => ({
-                        id: f.id,
-                        withUser: {
-                            id: f.id,
-                            username: f.username || "Fan",
-                            name: f.name || "Anonymous",
-                            avatar: f.avatar || "",
-                        },
-                        lastMessage: {
-                            text: f.isOnline ? "Online now" : f.lastSeen ? `Last seen ${new Date(f.lastSeen).toLocaleDateString()}` : "",
-                            createdAt: f.lastSeen || new Date().toISOString(),
-                            isRead: true,
-                        },
-                        totalSpend: f.totalSpend || 0,
-                        _creatorId: f._creatorId,
-                        _creatorName: f._creatorName,
-                        _creatorAvatar: f._creatorAvatar,
-                    }));
-                    setSpendFilteredChats(mapped);
-                }
-                setLoadingSpendFilter(false);
-            })
-            .catch(() => setLoadingSpendFilter(false));
-    }, [spendBucket, onlineOnly, selectedCreatorId]);
-
-    // --- Temperature ring tick — re-renders FanRows every 30s so green ring fades in real time ---
-    const [tempTick, setTempTick] = useState(0);
-    useEffect(() => {
-        const interval = setInterval(() => setTempTick(t => t + 1), 30000);
-        return () => clearInterval(interval);
-    }, []);
-
-    // 1. Fetch connected creators on load
-    useEffect(() => {
-        fetch("/api/creators")
-            .then((res) => res.json())
-            .then((data) => {
-                const available = data.creators || [];
-                setCreators(available);
-            })
-            .catch(console.error);
-    }, []);
-
-    // Helper: enrich chats with creator avatars and names
-    const enrichWithAvatars = useCallback((chatList: Chat[]) => {
-        const avatarMap: Record<string, string> = {};
-        const nameMap: Record<string, string> = {};
-        creators.forEach((c: any) => {
-            if (c.id && c.avatarUrl) avatarMap[c.id] = c.avatarUrl;
-            if (c.id && c.name) nameMap[c.id] = c.name;
-        });
-        chatList.forEach(c => {
-            if (c._creatorId) {
-                if (avatarMap[c._creatorId]) c._creatorAvatar = avatarMap[c._creatorId];
-                if (nameMap[c._creatorId]) c._creatorName = nameMap[c._creatorId];
-            }
-        });
-        return chatList;
-    }, [creators]);
-
-    // 2. Fetch initial Chat List, then auto-load remaining pages in background
-    useEffect(() => {
-        if (!selectedCreatorId) return;
-        setLoading(true);
-        setChats([]); // Clear immediately to prevent stale chats from other creators
-        setChatOffset(0);
-        setHasMoreChats(true);
-
-        // Use a unique key for this selection so stale appends get rejected
-        const selectionKey = `${selectedCreatorId}_${Date.now()}`;
-        activeCreatorSelectionRef.current = selectionKey;
-
-        const baseUrl = selectedCreatorId === "all"
-            ? "/api/inbox/chats?all=true&limit=10"
-            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10`;
-
-        // First page — show immediately
-        fetch(`${baseUrl}&offset=0`)
-            .then((res) => res.json())
-            .then(async (data) => {
-                if (activeCreatorSelectionRef.current !== selectionKey) return;
-                const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
-                const firstPage: Chat[] = enrichWithAvatars(Array.isArray(rawArray) ? rawArray.map(mapRawChat) : []);
-                firstPage.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
-                setChats(firstPage);
-                setLoading(false);
-
-                // Auto-load remaining pages in background
-                let currentOffset = 10;
-                let more = data.hasMore === true;
-                while (more && activeCreatorSelectionRef.current === selectionKey && currentOffset < 200) {
-                    try {
-                        const res = await fetch(`${baseUrl}&offset=${currentOffset}`);
-                        const nextData = await res.json();
-                        if (activeCreatorSelectionRef.current !== selectionKey) break;
-                        const nextRaw = Array.isArray(nextData.chats) ? nextData.chats : nextData.chats?.data || [];
-                        const nextChats: Chat[] = enrichWithAvatars(Array.isArray(nextRaw) ? nextRaw.map(mapRawChat) : []);
-                        if (nextChats.length > 0) {
-                            setChats(prev => {
-                                if (activeCreatorSelectionRef.current !== selectionKey) return prev;
-                                const ids = new Set(prev.map(c => c.id));
-                                const unique = nextChats.filter(c => !ids.has(c.id));
-                                const merged = [...prev, ...unique];
-                                merged.sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime());
-                                return merged;
-                            });
-                        }
-                        more = nextData.hasMore === true;
-                        currentOffset += 10;
-                    } catch { break; }
-                }
-                setChatOffset(currentOffset);
-                setHasMoreChats(false);
-            })
-            .catch((err) => {
-                console.error("Failed to fetch chats", err);
-                setLoading(false);
-            });
-
-    }, [selectedCreatorId]);
-
-    // Re-enrich chats with creator avatars/names when creators load after chats
-    useEffect(() => {
-        if (creators.length === 0 || chats.length === 0) return;
-        const avatarMap: Record<string, string> = {};
-        const nameMap: Record<string, string> = {};
-        creators.forEach((c: any) => {
-            if (c.id && c.avatarUrl) avatarMap[c.id] = c.avatarUrl;
-            if (c.id && c.name) nameMap[c.id] = c.name;
-        });
-        // Only update if any chat is missing creator data
-        const needsUpdate = chats.some(c => c._creatorId && (!c._creatorAvatar || !c._creatorName));
-        if (!needsUpdate) return;
-        setChats(prev => prev.map(c => ({
-            ...c,
-            _creatorAvatar: c._creatorId && avatarMap[c._creatorId] ? avatarMap[c._creatorId] : c._creatorAvatar,
-            _creatorName: c._creatorId && nameMap[c._creatorId] ? nameMap[c._creatorId] : c._creatorName,
-        })));
-    }, [creators, chats.length]);
-
-    // --- Phase 3: Infinite fan list scroll ---
-    const handleLoadMoreChats = useCallback(() => {
-        if (loadingMoreChats || !hasMoreChats) return;
-        setLoadingMoreChats(true);
-        const chatUrl = selectedCreatorId === "all"
-            ? `/api/inbox/chats?all=true&limit=10&offset=${chatOffset}`
-            : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10&offset=${chatOffset}`;
-        fetch(chatUrl)
-            .then((res) => res.json())
-            .then((data) => {
-                const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
-                const newChats: Chat[] = Array.isArray(rawArray) ? rawArray.map(mapRawChat) : [];
-                // Enrich with creator avatars
-                const creatorAvatarMap: Record<string, string> = {};
-                creators.forEach((c: any) => { if (c.id && c.avatarUrl) creatorAvatarMap[c.id] = c.avatarUrl; });
-                newChats.forEach(c => { if (c._creatorId && creatorAvatarMap[c._creatorId]) c._creatorAvatar = creatorAvatarMap[c._creatorId]; });
-                if (newChats.length > 0) {
-                    setChats((prev) => {
-                        const existingIds = new Set(prev.map((c) => c.id));
-                        const unique = newChats.filter((c) => !existingIds.has(c.id));
-                        return [...prev, ...unique];
-                    });
-                    setChatOffset((prev) => prev + 10);
-                }
-                setHasMoreChats(data.hasMore === true);
-                setLoadingMoreChats(false);
-            })
-            .catch((err) => {
-                console.error("Failed to load more chats", err);
-                setLoadingMoreChats(false);
-            });
-    }, [loadingMoreChats, hasMoreChats, selectedCreatorId, chatOffset]);
-
-    // 3. Fetch messages + fresh media, then poll
-    const activeCreatorId = activeChat?._creatorId || selectedCreatorId;
-
-    // Keep a ref for the mediaMap so processMessages always sees latest
-    const mediaMapRef = useRef(mediaMap);
-    mediaMapRef.current = mediaMap;
-
-    useEffect(() => {
-        if (!activeChat) return;
-        // Use the chat's own creator ID (set during enrichment)
-        // Fall back to selected creator if chat doesn't have one (shouldn't happen but safety)
-        const cId = activeChat._creatorId || (selectedCreatorId !== "all" ? selectedCreatorId : "");
-        if (!cId) return;
-
-        setMsgsLoading(true);
-        setMessages([]); // Clear stale messages immediately
-        setMediaMap({});
-        setHasMoreMessages(true);
-        nextLastIdRef.current = null;
-        isJumpedRef.current = false; setIsJumped(false); // Reset jump guard when opening a new chat
-
-        // Fetch messages AND fresh media URLs in parallel
-        Promise.all([
-            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`).then(r => r.json()).catch(() => ({ messages: [], hasMore: false })),
-            fetch(`/api/inbox/media?creatorId=${cId}&chatId=${activeChat.id}`).then(r => r.json()).catch(() => ({ media: {} })),
-        ]).then(([msgData, mediaData]) => {
-            if (mediaData.media) setMediaMap(mediaData.media);
-            processMessages(msgData, false);
-            setHasMoreMessages(msgData.hasMore !== false);
-            nextLastIdRef.current = msgData.nextLastId || null;
-            setMsgsLoading(false);
-            // Only scroll to bottom on initial chat open (not after jump-to-date)
-            if (!isJumpedRef.current) {
-                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-            }
-        });
-
-        // Poll messages every 5s (new messages only, no before param)
-        // Skip poll when viewing historical messages (jump-to-date) to prevent snap-back
-        const pollInterval = setInterval(() => {
-            if (isJumpedRef.current) return; // Don't overwrite jumped-to messages
-            fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`)
-                .then(r => r.json())
-                .then(data => processMessages(data, false))
-                .catch(console.error);
-        }, 5000);
-
-        // Phase 1: Auto-refresh media URLs every 60s to prevent CDN expiry
-        const mediaRefreshInterval = setInterval(() => {
-            fetch(`/api/inbox/media?creatorId=${cId}&chatId=${activeChat.id}`)
-                .then(r => r.json())
-                .then(mediaData => {
-                    if (mediaData.media) setMediaMap(mediaData.media);
-                })
-                .catch(console.error);
-        }, 60000);
-
-        return () => {
-            clearInterval(pollInterval);
-            clearInterval(mediaRefreshInterval);
-        };
-    }, [activeChat]);
-
-    // --- Phase 2: Load older messages on scroll-to-top ---
-    const handleLoadOlderMessages = useCallback(() => {
-        if (loadingOlder || !hasMoreMessages || !activeChat) return;
-        const cId = activeChat._creatorId;
-        if (!cId) return;
-
-        // Use OFAPI's nextLastId cursor, fall back to oldest message ID
-        const cursor = nextLastIdRef.current || messages[0]?.id;
-        if (!cursor) return;
-
-        setLoadingOlder(true);
-        fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50&before=${cursor}`)
-            .then(r => r.json())
-            .then(data => {
-                const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
-                const olderMapped = mapRawMessages(rawMsgs);
-                if (olderMapped.length > 0) {
-                    setMessages(prev => {
-                        const existingIds = new Set(prev.map(m => m.id));
-                        const unique = olderMapped.filter(m => !existingIds.has(m.id));
-                        return [...unique, ...prev];
-                    });
-                }
-                // Update cursor for next page
-                nextLastIdRef.current = data.nextLastId || null;
-                setHasMoreMessages(data.hasMore === true);
-                setLoadingOlder(false);
-            })
-            .catch(err => {
-                console.error("Failed to load older messages", err);
-                setLoadingOlder(false);
-            });
-    }, [loadingOlder, hasMoreMessages, activeChat, messages]);
-
-    // Map raw OFAPI messages to our Message type
-    const mapRawMessages = useCallback((rawMsgs: any[]): Message[] => {
-        const sorted = [...rawMsgs].sort(
-            (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-        return sorted.map((m: any) => {
-            const fromId = m.fromUser?.id || m.author?.id || "unknown";
-            const isCreator = fromId !== activeChat?.withUser?.id;
-            const cleanText = (m.text || "").replace(/<[^>]*>?/gm, "");
-            const currentMediaMap = mediaMapRef.current;
-            return {
-                id: m.id || m.message_id || Math.random().toString(),
-                text: cleanText,
-                media: Array.isArray(m.media)
-                    ? m.media.map((med: any) => {
-                          const medId = med.id?.toString() || "";
-                          // Fresh URLs from /media endpoint (refreshed every 60s)
-                          const fresh = currentMediaMap[medId];
-                          // OFAPI files structure: files.full.url, files.preview.url, files.thumb.url, files.squarePreview.url
-                          // Note: files.full.url can be NULL for DRM video even when canView=true
-                          const src = fresh?.src
-                              || med.files?.full?.url
-                              || med.files?.preview?.url
-                              || med.files?.thumb?.url
-                              || med.src || med.full
-                              || med.source?.source || med.source?.url
-                              || med.video?.url || med.audio?.url
-                              || med.preview || med.thumb || med.squarePreview || "";
-                          const preview = fresh?.preview
-                              || med.files?.preview?.url
-                              || med.files?.thumb?.url
-                              || med.files?.squarePreview?.url
-                              || med.preview || med.thumb || med.squarePreview
-                              || src || "";
-                          return {
-                              id: medId || Math.random().toString(),
-                              type: fresh?.type || (med.type === "gif" ? "photo" : (med.type || "photo")),
-                              canView: med.canView !== false,
-                              preview,
-                              src,
-                          };
-                      }).filter((med: any) => med.src || med.preview)
-                    : [],
-                createdAt: m.createdAt || new Date().toISOString(),
-                fromUser: { id: fromId },
-                isFromCreator: isCreator,
-                senderName: isCreator ? "Creator" : activeChat?.withUser?.name || "Fan",
-                price: m.price || 0,
-                isTip: m.isTip === true,
-                isOpened: m.isOpened === true,
-                isFree: m.isFree !== false,
-            };
-        });
-    }, [activeChat]);
-
-    const processMessages = (data: any, prepend: boolean) => {
-        const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
-        const mappedMsgs = mapRawMessages(rawMsgs);
-        if (prepend) {
-            setMessages(prev => {
-                const existingIds = new Set(prev.map(m => m.id));
-                const unique = mappedMsgs.filter(m => !existingIds.has(m.id));
-                return [...unique, ...prev];
-            });
-        } else {
-            setMessages(mappedMsgs);
-        }
-    };
-
-    // Jump to date: rapid-paginate backwards until we reach messages from the target date
-    // OFAPI has no date filter — we page with id cursor until createdAt crosses targetDate
-    const handleJumpToDate = useCallback(async (targetDate: Date) => {
-        if (!activeChat) return;
-        const cId = activeChat._creatorId;
-        if (!cId) return;
-
-        setJumpingToDate(true);
-        setJumpProgress(0);
-        setMessages([]);
-        isJumpedRef.current = true; setIsJumped(true); // Suppress poll from overwriting historical messages
-
-        const targetDayStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
-        let cursor: string | undefined = undefined;
-        const allMessages: any[] = [];
-        let reachedTarget = false;
-        let iterations = 0;
-        const maxIterations = 30; // Safety cap: 30 pages x 100 = 3000 messages max
-        let lastNextLastId: string | null = null;
-        let canLoadOlder = true; // Track if there are still older messages beyond what we fetched
-
-        try {
-            while (!reachedTarget && iterations < maxIterations) {
-                iterations++;
-                let fetchUrl = `/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=100`;
-                if (cursor) fetchUrl += `&before=${cursor}`;
-                const res = await fetch(fetchUrl);
-                const data = await res.json();
-                const rawMsgs: any[] = Array.isArray(data.messages) ? data.messages : data.messages?.data || [];
-
-                if (rawMsgs.length === 0) {
-                    canLoadOlder = false;
-                    break;
-                }
-
-                allMessages.push(...rawMsgs);
-                setJumpProgress(allMessages.length);
-
-                // OFAPI returns order=desc (newest first), so last element is oldest in page
-                const oldestMsg = rawMsgs[rawMsgs.length - 1];
-                const oldestTime = new Date(oldestMsg.createdAt).getTime();
-                if (oldestTime <= targetDayStart) {
-                    reachedTarget = true;
-                }
-
-                // Use the server's nextLastId cursor (extracted from _pagination.next_page)
-                lastNextLastId = data.nextLastId || null;
-                cursor = lastNextLastId || undefined;
-                if (!cursor || data.hasMore === false) {
-                    canLoadOlder = data.hasMore !== false && !!cursor;
-                    break;
-                }
-            }
-
-            // Sort all collected messages chronologically (ascending) for slicing
-            allMessages.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-            // Find the first message on or after the target date
-            const idx = allMessages.findIndex((m: any) => new Date(m.createdAt).getTime() >= targetDayStart);
-
-            let windowMsgs: any[];
-            if (idx >= 0) {
-                // Show context: 50 messages before target + 150 after (clamped to bounds)
-                const start = Math.max(0, idx - 50);
-                const end = Math.min(allMessages.length, idx + 150);
-                windowMsgs = allMessages.slice(start, end);
-            } else {
-                // Didn't reach the date — show the oldest chunk we have
-                windowMsgs = allMessages.slice(-200);
-            }
-
-            const mapped = mapRawMessages(windowMsgs);
-            setMessages(mapped);
-
-            // Set "load older" cursor = oldest message in the window (asc order, so index 0)
-            // mapRawMessages sorts asc internally, so messages[0] is oldest displayed
-            nextLastIdRef.current = windowMsgs[0]?.id ?? lastNextLastId;
-            // Only allow "load older" if we didn't exhaust the chat history
-            setHasMoreMessages(canLoadOlder);
-        } catch (err) {
-            console.error("Jump to date failed:", err);
-        } finally {
-            setJumpingToDate(false);
-        }
-    }, [activeChat, selectedCreatorId, mapRawMessages]);
-
-    // Return to latest messages — clears the jumped state and reloads fresh messages
-    const handleReturnToLatest = useCallback(() => {
-        isJumpedRef.current = false; setIsJumped(false);
-        if (!activeChat) return;
-        const cId = activeChat._creatorId || (selectedCreatorId !== "all" ? selectedCreatorId : "");
-        if (!cId) return;
-
-        setMsgsLoading(true);
-        nextLastIdRef.current = null;
-        setHasMoreMessages(true);
-
-        fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`)
-            .then(r => r.json())
-            .then(data => {
-                processMessages(data, false);
-                setHasMoreMessages(data.hasMore !== false);
-                nextLastIdRef.current = data.nextLastId || null;
-                setMsgsLoading(false);
-                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-            })
-            .catch(() => setMsgsLoading(false));
-    }, [activeChat, selectedCreatorId, processMessages]);
-
-    // AI Suggest — calls /api/inbox/ai-hints and pre-fills the chat input
-    const handleAiSuggest = useCallback(async () => {
-        if (!activeChat || aiSuggestLoading) return;
-        const cId = activeChat._creatorId;
-        const fanId = activeChat.withUser?.id;
-        if (!cId || !fanId) return;
-
-        setAiSuggestLoading(true);
-        try {
-            const res = await fetch("/api/inbox/ai-hints", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    creatorId: cId,
-                    chatId: activeChat.id,
-                    fanOfapiId: fanId,
-                }),
-            });
-            const data = await res.json();
-            if (data.hints?.draftMessage) {
-                setInputText(data.hints.draftMessage);
-            }
-        } catch (e) {
-            console.error("AI Suggest failed:", e);
-        } finally {
-            setAiSuggestLoading(false);
-        }
-    }, [activeChat, aiSuggestLoading]);
-
-    // Callback from sidebar hints — pre-fill chat input with suggested text
-    const handleSuggestMessage = useCallback((text: string) => {
-        setInputText(text);
-    }, []);
-
-    const handleSelectCreator = (id: string) => {
-        setSelectedCreatorId(id);
-        setChats([]);
+    const handleSelectCreatorAndReset = (id: string) => {
+        handleSelectCreator(id);
         setActiveChat(null);
-        setMessages([]);
         setMobileView("list");
-        // Reset spend filter when switching creators
-        setSpendBucket(0);
-        setOnlineOnly(false);
-        setSpendFilteredChats(null);
-        // Reset jump state
-        isJumpedRef.current = false;
-        setIsJumped(false);
+        resetJumpState();
     };
 
     const handleSelectChat = (chat: Chat) => {
-        // Reset jump state immediately so "Return to latest" banner doesn't flash
-        isJumpedRef.current = false;
-        setIsJumped(false);
+        resetJumpState();
         setActiveChat(chat);
         setMobileView("chat");
     };
@@ -630,31 +85,9 @@ export default function InboxPage() {
         setMobileView("list");
     };
 
-    const handleSend = async () => {
-        const sendCreatorId = activeChat?._creatorId || selectedCreatorId;
-        if (!inputText.trim() || !activeChat || !sendCreatorId || sendCreatorId === "all") return;
-        const optimisticMsg: Message = {
-            id: `temp_${Date.now()}`,
-            text: inputText,
-            createdAt: new Date().toISOString(),
-            fromUser: { id: sendCreatorId },
-            isFromCreator: true,
-            senderName: "You",
-        };
-        setMessages([...messages, optimisticMsg]);
-        const textToSend = inputText;
-        setInputText("");
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-        try {
-            await fetch("/api/inbox/messages", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ creatorId: sendCreatorId, chatId: activeChat.id, text: textToSend }),
-            });
-        } catch (e) {
-            console.error("Failed to send", e);
-        }
-    };
+    const handleSuggestMessage = useCallback((text: string) => {
+        setInputText(text);
+    }, [setInputText]);
 
     return (
         <div className="flex h-screen text-white/90 overflow-hidden" style={{ backgroundColor: "#2d2d2d" }}>
@@ -669,7 +102,6 @@ export default function InboxPage() {
                     mobileView === "list" ? "flex" : "hidden"
                 } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06]`}
             >
-                {/* Spend bucket filters */}
                 <SpendBuckets
                     activeBucket={spendBucket}
                     onBucketChange={(min) => { setSpendBucket(min); setActiveChat(null); }}
@@ -679,7 +111,7 @@ export default function InboxPage() {
                 <FanList
                     creators={creators}
                     selectedCreatorId={selectedCreatorId}
-                    onSelectCreator={handleSelectCreator}
+                    onSelectCreator={handleSelectCreatorAndReset}
                     chats={spendFilteredChats || chats}
                     activeChat={activeChat}
                     onSelectChat={handleSelectChat}
@@ -690,7 +122,7 @@ export default function InboxPage() {
                     onUnreadFirstChange={setUnreadFirst}
                     onApplyFilters={setFilters}
                     onLoadMore={handleLoadMoreChats}
-                    hasMoreChats={spendFilteredChats ? false : hasMoreChats}
+                    hasMoreChats={hasMoreChats}
                     tempTick={tempTick}
                 />
             </div>
@@ -761,13 +193,11 @@ export default function InboxPage() {
             {/* Fan Sidebar — desktop: resizable with slider, mobile: slide-over */}
             {activeChat && (
                 <>
-                    {/* Desktop sidebar with drag-resize */}
                     <div className="hidden xl:flex">
                         <PanelSlider onResize={handleSidebarResize} side="left" />
                         <FanSidebar chat={activeChat} width={sidebarWidth} onSuggestMessage={handleSuggestMessage} />
                     </div>
 
-                    {/* Mobile sidebar overlay */}
                     {showMobileSidebar && (
                         <div className="xl:hidden fixed inset-0 z-50 flex">
                             <div
