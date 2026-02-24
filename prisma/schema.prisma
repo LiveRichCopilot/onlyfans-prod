@@ -23,7 +23,8 @@ model Creator {
   hourlyTarget   Float         @default(100.0)
   whaleAlertTarget Float       @default(200.0)
   active         Boolean       @default(true)
-  // onlineFanCache Json?      // PENDING MIGRATION — uncomment after running prisma db push
+  onlineFanCache Json?
+  purchaseAlertsEnabled Boolean @default(true)
 
   fans           Fan[]
   mediaAssets    MediaAsset[]

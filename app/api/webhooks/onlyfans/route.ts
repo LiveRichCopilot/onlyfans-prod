@@ -158,9 +158,9 @@ async function handlePurchaseEvent(payload: any) {
     // Uncomment after migration adds sentToFanIds column to MediaAsset
     // if (payload.event === "messages.ppv.unlocked" && fan) { ... }
 
-    // --- 6. Telegram alert ---
-    if (creator.telegramGroupId) {
-        await sendTelegramAlert(creator, payload.event, fanName, amount, purchaseType);
+    // --- 6. Rich purchase notification via Telegram ---
+    if (fan && creator.purchaseAlertsEnabled !== false && (creator.telegramGroupId || creator.telegramId)) {
+        await sendPurchaseNotification(creator, fan, purchaseType, amount);
     }
 }
 
@@ -289,24 +289,41 @@ async function upsertPreference(fanId: string, tag: string, source: string) {
     }
 }
 
-async function sendTelegramAlert(creator: any, event: string, fanName: string | null, amount: number, purchaseType: string) {
-    let message = "";
-    const name = fanName || "Someone";
-    const isWhale = amount >= (creator.whaleAlertTarget || 50);
-
-    if (event === "subscriptions.new") {
-        message = `${isWhale ? "🐋 WHALE ALERT\n" : ""}💰 **${name}** just subscribed!\nAmount: $${amount.toFixed(2)}`;
-    } else if (event === "messages.ppv.unlocked") {
-        message = `${isWhale ? "🐋 WHALE ALERT\n" : ""}🔓 **${name}** unlocked a PPV message!\nAmount: $${amount.toFixed(2)}`;
-    } else if (event === "tips.received") {
-        message = `${isWhale ? "🐋 WHALE ALERT\n" : ""}💎 **${name}** sent a tip!\nAmount: $${amount.toFixed(2)}`;
-    } else {
-        message = `💸 **${name}** — ${purchaseType}\nAmount: $${amount.toFixed(2)}`;
-    }
-
+async function sendPurchaseNotification(creator: any, fan: any, purchaseType: string, amount: number) {
     try {
-        await bot.api.sendMessage(creator.telegramGroupId, message, { parse_mode: "Markdown" });
+        // Compute weekly spend for this fan
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const weeklyAgg = await prisma.transaction.aggregate({
+            where: { fanId: fan.id, date: { gte: sevenDaysAgo } },
+            _sum: { amount: true },
+        });
+        const weeklySpend = weeklyAgg._sum.amount || 0;
+        const lifetimeSpend = fan.lifetimeSpend || 0;
+
+        // Determine purchase type label
+        const typeLabels: Record<string, string> = {
+            tip: "Tip",
+            message: "PPV Unlock",
+            subscription: "Subscription",
+            transaction: "Transaction",
+        };
+        const typeLabel = typeLabels[purchaseType] || purchaseType;
+
+        // Build rich message
+        const fanDisplay = fan.username ? `@${fan.username}` : fan.name || "Anonymous";
+        const fanName = fan.name || fan.username || "Anonymous";
+        const isWhale = lifetimeSpend >= (creator.whaleAlertTarget || 200);
+
+        let msg = `💰 PURCHASE — ${creator.name || "Creator"}\n`;
+        msg += `Type: ${typeLabel}\n`;
+        msg += `Amount: $${amount.toFixed(2)}\n`;
+        msg += `Fan: ${fanDisplay} (${fanName})\n`;
+        msg += `📊 This week: $${weeklySpend.toFixed(2)} | Lifetime: $${lifetimeSpend.toFixed(2)}`;
+        if (isWhale) msg += `\n🐋 WHALE`;
+
+        const chatId = creator.telegramGroupId || creator.telegramId;
+        await bot.api.sendMessage(chatId, msg);
     } catch (e) {
-        console.error("Failed to send telegram alert via webhook", e);
+        console.error("Failed to send purchase notification:", e);
     }
 }

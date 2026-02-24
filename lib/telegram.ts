@@ -102,6 +102,7 @@ if (!(globalThis as any)[commandsKey]) {
         { command: "forecast", description: "Generate AI revenue projection" },
         { command: "notifications", description: "Check unread priority alerts" },
         { command: "list", description: "List connected accounts" },
+        { command: "purchases", description: "Toggle purchase alerts on/off (e.g. /purchases off)" },
         { command: "ping", description: "Check system latency and group ID" }
     ]).catch(() => {}); // Silently ignore — commands are already set from previous deploys
 }
@@ -501,7 +502,45 @@ bot.command("list", async (ctx) => {
     }
 });
 
+bot.command("purchases", async (ctx) => {
+    const threadId = ctx.message?.message_thread_id;
+    const replyOpt = threadId ? { message_thread_id: threadId } : {};
 
+    try {
+        const creator = await getOrBindCreator(ctx);
+        if (!creator) {
+            return ctx.reply("No creator account linked.", replyOpt);
+        }
+
+        const arg = (ctx.match || "").trim().toLowerCase();
+
+        if (arg === "on") {
+            await prisma.creator.update({
+                where: { id: creator.id },
+                data: { purchaseAlertsEnabled: true }
+            });
+            return ctx.reply("Purchase notifications are now ON. You'll receive alerts for every tip, PPV unlock, and subscription.", replyOpt);
+        }
+
+        if (arg === "off") {
+            await prisma.creator.update({
+                where: { id: creator.id },
+                data: { purchaseAlertsEnabled: false }
+            });
+            return ctx.reply("Purchase notifications are now OFF. Use /purchases on to re-enable.", replyOpt);
+        }
+
+        // No arg — show current status
+        const status = (creator as any).purchaseAlertsEnabled !== false ? "ON" : "OFF";
+        return ctx.reply(
+            `Purchase Alerts: ${status}\n\nUsage:\n/purchases on — Enable alerts\n/purchases off — Disable alerts`,
+            replyOpt
+        );
+    } catch (e: any) {
+        console.error("Purchases command error:", e);
+        await ctx.reply("Failed to update purchase alert settings.", replyOpt);
+    }
+});
 
 // Simple memory cache for mapping a Creator's next media upload to a specific Fan Chat
 const activeReplies: Record<string, string> = {};

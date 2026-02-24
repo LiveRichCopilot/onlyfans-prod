@@ -151,10 +151,11 @@ export async function PATCH(
     try {
         const creatorId = (await params).id;
         const body = await request.json();
-        const { whaleAlertTarget, hourlyTarget } = body;
+        const { whaleAlertTarget, hourlyTarget, purchaseAlertsEnabled } = body;
         const updateData: any = {};
         if (whaleAlertTarget !== undefined) updateData.whaleAlertTarget = Number(whaleAlertTarget);
         if (hourlyTarget !== undefined) updateData.hourlyTarget = Number(hourlyTarget);
+        if (purchaseAlertsEnabled !== undefined) updateData.purchaseAlertsEnabled = Boolean(purchaseAlertsEnabled);
         const updatedCreator = await prisma.creator.update({ where: { id: creatorId }, data: updateData });
         return NextResponse.json({ success: true, creator: updatedCreator });
     } catch (error: any) {

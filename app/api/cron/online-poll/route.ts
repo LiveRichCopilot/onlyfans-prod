@@ -1,4 +1,3 @@
-// @ts-nocheck — PENDING MIGRATION: Creator.onlineFanCache
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { listAllFans } from "@/lib/ofapi";
@@ -6,7 +5,6 @@ import { listAllFans } from "@/lib/ofapi";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55; // Vercel cron max
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
@@ -16,7 +14,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
  * For each active creator:
  * 1. Calls OFAPI listAllFans(online: true) to get currently online fans
  * 2. Compares against cached online fan IDs
- * 3. If a whale ($500+) just came online → logs FanLifecycleEvent + Telegram ping
+ * 3. If a whale ($500+) just came online → logs FanLifecycleEvent
  * 4. Updates Creator.onlineFanCache
  */
 export async function GET(request: Request) {
@@ -102,44 +100,7 @@ export async function GET(request: Request) {
                     }
                 }
 
-                // Telegram alert for new whales — throttled to max once per hour per creator
-                // The in-app WhaleOnlineAlert component still updates every 2 min
-                if (newWhales.length > 0 && TELEGRAM_BOT_TOKEN) {
-                    const lastTgAlert = (prevCache as any).lastTelegramAlert || null;
-                    const hoursSinceLastAlert = lastTgAlert
-                        ? (Date.now() - new Date(lastTgAlert).getTime()) / 3600000
-                        : Infinity;
-
-                    if (hoursSinceLastAlert >= 1) {
-                        const chatId =
-                            creator.telegramGroupId || creator.telegramId;
-                        const whaleList = newWhales
-                            .map(
-                                (w) =>
-                                    `  ${w.name} ($${w.spend.toLocaleString()})`,
-                            )
-                            .join("\n");
-                        const msg = `🐋 WHALE ONLINE — ${creator.name}\n\n${whaleList}\n\nOpen inbox to engage!`;
-
-                        await fetch(
-                            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-                            {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    chat_id: chatId,
-                                    text: msg,
-                                    parse_mode: "HTML",
-                                }),
-                            },
-                        ).catch(console.error);
-
-                        // Store timestamp so we don't spam again within the hour
-                        (prevCache as any).lastTelegramAlert = new Date().toISOString();
-                    }
-                }
-
-                // Update cache (preserve lastTelegramAlert across cycles)
+                // Update cache
                 await prisma.creator.update({
                     where: { id: creator.id },
                     data: {
@@ -147,7 +108,6 @@ export async function GET(request: Request) {
                             fanIds: [...onlineIds],
                             whales: newWhales,
                             lastChecked: new Date().toISOString(),
-                            lastTelegramAlert: (prevCache as any).lastTelegramAlert || null,
                         },
                     },
                 });
