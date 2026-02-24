@@ -503,3 +503,19 @@ export async function markChatAsRead(account: string, chatId: string, apiKey: st
 export async function hideChat(account: string, chatId: string, apiKey: string) {
     return ofapiRequest(`/api/${account}/chats/${chatId}/hide`, apiKey, { method: "POST" });
 }
+
+/**
+ * List mass messages for a creator account
+ * GET /api/{account}/mass-messages
+ */
+export async function getMassMessages(account: string, apiKey: string, limit: number = 20, offset: number = 0) {
+    return ofapiRequest(`/api/${account}/mass-messages?limit=${limit}&offset=${offset}`, apiKey, { timeoutMs: 10000 });
+}
+
+/**
+ * Get performance chart for a specific mass message
+ * GET /api/{account}/mass-messages/{id}/chart
+ */
+export async function getMassMessageChart(account: string, apiKey: string, messageId: string) {
+    return ofapiRequest(`/api/${account}/mass-messages/${messageId}/chart`, apiKey, { timeoutMs: 10000 });
+}
