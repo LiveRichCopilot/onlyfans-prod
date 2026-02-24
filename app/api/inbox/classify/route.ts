@@ -92,8 +92,9 @@ export async function POST(request: Request) {
         // Budget constants
         const MAX_API_CALLS = 6;
         const MAX_MESSAGES = 400;
-        const HARD_DEADLINE_MS = 25000; // Bail at 25s so we can return a response before Vercel's 30s kill
-        const isOverBudget = () => Date.now() - startTime > HARD_DEADLINE_MS;
+        const HARD_DEADLINE_MS = 28000; // Return response before Vercel's 30s kill
+        const OFAPI_DEADLINE_MS = 15000; // Stop OFAPI calls at 15s — reserve 13s+ for OpenAI
+        const isOfapiOverBudget = () => Date.now() - startTime > OFAPI_DEADLINE_MS;
 
         // EARLY WINDOW: order=asc, limit=100 (skip on incremental — we already have early context via existingFacts)
         if (!isIncremental) {
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
         const maxRecentPages = 3;
         let cursorFound = false;
 
-        for (let page = 0; page < maxRecentPages && apiCallsMade < MAX_API_CALLS && !isOverBudget(); page++) {
+        for (let page = 0; page < maxRecentPages && apiCallsMade < MAX_API_CALLS && !isOfapiOverBudget(); page++) {
             let res;
             try {
                 res = await getChatMessages(accountName, chatId, apiKey, 100, recentPageCursor, "desc");
@@ -216,10 +217,10 @@ export async function POST(request: Request) {
         const newestMsgAt = newestMsg?.createdAt || undefined;
 
         // --- STEP 7: Run AI classification (with existing facts context) ---
-        if (isOverBudget()) {
+        if (Date.now() - startTime > HARD_DEADLINE_MS) {
             return NextResponse.json({
                 classified: false,
-                reason: `OFAPI calls took too long (${Math.round((Date.now() - startTime) / 1000)}s) — try again when OFAPI is faster`,
+                reason: `Ran out of time (${Math.round((Date.now() - startTime) / 1000)}s) — OFAPI was slow, try again`,
                 runtimeMs: Date.now() - startTime,
                 apiCallsMade,
             });

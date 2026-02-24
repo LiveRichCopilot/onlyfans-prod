@@ -28,7 +28,7 @@ async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOp
     }
 
     const controller = new AbortController();
-    const timeoutMs = options.timeoutMs || 8000; // 8s default per-call timeout
+    const timeoutMs = options.timeoutMs || 5000; // 5s default per-call timeout
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(options.targetAccountId ? `${url}?accountId=${options.targetAccountId}` : url, {

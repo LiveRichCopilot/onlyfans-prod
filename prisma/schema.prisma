@@ -140,8 +140,8 @@ model Fan {
   activeHours     String?       // JSON array of top active hours e.g. "[22,23,0,1]"
   lastMessageAt   DateTime?     // Last time this fan sent a message
   followUpDueAt   DateTime?     // Next scheduled follow-up
-  // followUpType    String?    // PENDING MIGRATION
-  // followUpMessage String?    // PENDING MIGRATION
+  followUpType    String?
+  followUpMessage String?
 
   // --- Purchase behavior profile ---
   buyerType       String?       // ppv_buyer, custom_buyer, tipper, subscriber_only, window_shopper
