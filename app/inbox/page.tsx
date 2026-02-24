@@ -100,7 +100,7 @@ export default function InboxPage() {
             <div
                 className={`${
                     mobileView === "list" ? "flex" : "hidden"
-                } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06]`}
+                } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06] min-h-0 overflow-hidden`}
             >
                 <SpendBuckets
                     activeBucket={spendBucket}

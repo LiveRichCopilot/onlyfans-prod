@@ -102,33 +102,44 @@ export async function GET(request: Request) {
                     }
                 }
 
-                // Telegram alert for new whales
+                // Telegram alert for new whales — throttled to max once per hour per creator
+                // The in-app WhaleOnlineAlert component still updates every 2 min
                 if (newWhales.length > 0 && TELEGRAM_BOT_TOKEN) {
-                    const chatId =
-                        creator.telegramGroupId || creator.telegramId;
-                    const whaleList = newWhales
-                        .map(
-                            (w) =>
-                                `  ${w.name} ($${w.spend.toLocaleString()})`,
-                        )
-                        .join("\n");
-                    const msg = `🐋 WHALE ONLINE — ${creator.name}\n\n${whaleList}\n\nOpen inbox to engage!`;
+                    const lastTgAlert = (prevCache as any).lastTelegramAlert || null;
+                    const hoursSinceLastAlert = lastTgAlert
+                        ? (Date.now() - new Date(lastTgAlert).getTime()) / 3600000
+                        : Infinity;
 
-                    await fetch(
-                        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-                        {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                text: msg,
-                                parse_mode: "HTML",
-                            }),
-                        },
-                    ).catch(console.error);
+                    if (hoursSinceLastAlert >= 1) {
+                        const chatId =
+                            creator.telegramGroupId || creator.telegramId;
+                        const whaleList = newWhales
+                            .map(
+                                (w) =>
+                                    `  ${w.name} ($${w.spend.toLocaleString()})`,
+                            )
+                            .join("\n");
+                        const msg = `🐋 WHALE ONLINE — ${creator.name}\n\n${whaleList}\n\nOpen inbox to engage!`;
+
+                        await fetch(
+                            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    chat_id: chatId,
+                                    text: msg,
+                                    parse_mode: "HTML",
+                                }),
+                            },
+                        ).catch(console.error);
+
+                        // Store timestamp so we don't spam again within the hour
+                        (prevCache as any).lastTelegramAlert = new Date().toISOString();
+                    }
                 }
 
-                // Update cache
+                // Update cache (preserve lastTelegramAlert across cycles)
                 await prisma.creator.update({
                     where: { id: creator.id },
                     data: {
@@ -136,6 +147,7 @@ export async function GET(request: Request) {
                             fanIds: [...onlineIds],
                             whales: newWhales,
                             lastChecked: new Date().toISOString(),
+                            lastTelegramAlert: (prevCache as any).lastTelegramAlert || null,
                         },
                     },
                 });
