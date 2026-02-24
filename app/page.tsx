@@ -104,7 +104,7 @@ export default function AgencyDashboard() {
                             </>
                         )}
                         {creators.map((c) => (
-                            <CreatorCard key={c.id} creator={c} isAuthenticatingId={isAuthenticatingId} onConnectOF={handleConnectOF} />
+                            <CreatorCard key={c.id} creator={c} isAuthenticatingId={isAuthenticatingId} onConnectOF={handleConnectOF} onRefresh={() => fetchCreators()} />
                         ))}
                         {creators.length === 0 && !loading && (
                             <div className="glass-panel p-8 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 flex flex-col items-center justify-center text-center">

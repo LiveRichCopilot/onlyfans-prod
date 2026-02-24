@@ -151,7 +151,98 @@ export async function PATCH(
     try {
         const creatorId = (await params).id;
         const body = await request.json();
-        const { whaleAlertTarget, hourlyTarget, purchaseAlertsEnabled } = body;
+        const { action, whaleAlertTarget, hourlyTarget, purchaseAlertsEnabled } = body;
+
+        // --- Action: Disconnect (unlink OFAPI so user can re-auth) ---
+        if (action === "disconnect") {
+            const updatedCreator = await prisma.creator.update({
+                where: { id: creatorId },
+                data: { ofapiToken: "unlinked", avatarUrl: null, headerUrl: null },
+            });
+            return NextResponse.json({ success: true, creator: updatedCreator });
+        }
+
+        // --- Action: Force re-sync profile from OFAPI ---
+        if (action === "force-sync") {
+            const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
+            if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
+
+            const apiKey = process.env.OFAPI_API_KEY;
+            if (!apiKey) return NextResponse.json({ error: "OFAPI_API_KEY not configured" }, { status: 500 });
+
+            const OFAPI_BASE = "https://app.onlyfansapi.com";
+            const accountsRes = await fetch(`${OFAPI_BASE}/api/accounts`, {
+                headers: { Authorization: `Bearer ${apiKey}` },
+            });
+            if (!accountsRes.ok) return NextResponse.json({ error: "OFAPI accounts fetch failed" }, { status: 502 });
+
+            const accounts = await accountsRes.json();
+            const accountList = Array.isArray(accounts) ? accounts : accounts?.data || [];
+
+            // Match by acct_ ID, username, or display name
+            const key = creator.ofapiCreatorId ?? creator.ofUsername;
+            const isAcctId = key?.startsWith("acct_");
+            const match = accountList.find((a: any) =>
+                isAcctId
+                    ? a.id === key
+                    : (a.onlyfans_username === key ||
+                       a.onlyfans_username === creator.ofUsername ||
+                       a.display_name === key)
+            );
+
+            if (!match) {
+                return NextResponse.json({
+                    success: false,
+                    error: `No OFAPI match for "${key}". Available accounts: ${accountList.map((a: any) => a.onlyfans_username || a.id).join(", ")}`,
+                    availableAccounts: accountList.map((a: any) => ({
+                        id: a.id,
+                        username: a.onlyfans_username,
+                        displayName: a.display_name,
+                    })),
+                }, { status: 404 });
+            }
+
+            const userData = match.onlyfans_user_data || {};
+            const updateData: any = {
+                ofapiToken: "linked_via_auth_module",
+                ofapiCreatorId: match.id,
+            };
+
+            const displayName = userData.name || match.display_name;
+            if (displayName) updateData.name = displayName;
+            const username = match.onlyfans_username || userData.username;
+            if (username) updateData.ofUsername = username;
+
+            let avatar = userData.avatar || userData.avatarUrl;
+            let header = userData.header || userData.headerUrl || userData.header_image;
+
+            // Fallback to /me endpoint for avatar/header
+            if (!avatar || !header) {
+                try {
+                    const meRes = await fetch(`${OFAPI_BASE}/api/${match.id}/me`, {
+                        headers: { Authorization: `Bearer ${apiKey}` },
+                    });
+                    if (meRes.ok) {
+                        const me = await meRes.json();
+                        if (!avatar) avatar = me.avatar || me.avatarUrl;
+                        if (!header) header = me.header || me.headerUrl || me.header_image || me.headerSize?.url;
+                        if (!updateData.name && me.name) updateData.name = me.name;
+                    }
+                } catch {}
+            }
+
+            if (avatar) updateData.avatarUrl = avatar;
+            if (header) updateData.headerUrl = header;
+
+            const updatedCreator = await prisma.creator.update({
+                where: { id: creatorId },
+                data: updateData,
+            });
+
+            return NextResponse.json({ success: true, creator: updatedCreator, matched: match.id });
+        }
+
+        // --- Default: update thresholds ---
         const updateData: any = {};
         if (whaleAlertTarget !== undefined) updateData.whaleAlertTarget = Number(whaleAlertTarget);
         if (hourlyTarget !== undefined) updateData.hourlyTarget = Number(hourlyTarget);

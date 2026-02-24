@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { RefreshCw, Unlink } from "lucide-react";
 import { ConnectButton } from "./creator-card/ConnectButton";
 import { StatusBadge } from "./creator-card/StatusBadge";
 import { ThresholdSlider } from "./creator-card/ThresholdSlider";
@@ -9,12 +11,53 @@ type Props = {
     creator: any;
     isAuthenticatingId: string | null;
     onConnectOF: (e: React.MouseEvent, creator: any) => void;
+    onRefresh?: () => void;
 };
 
-export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF }: Props) {
+export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRefresh }: Props) {
     const displayHandle = c.ofUsername || c.name?.toLowerCase().replace(/\s+/g, "") || "unlinked";
     const headerBg = c.headerUrl ? `/api/proxy-media?url=${encodeURIComponent(c.headerUrl)}` : null;
     const isLinked = c.ofapiToken && c.ofapiToken !== "unlinked";
+    const [syncing, setSyncing] = useState(false);
+    const [syncError, setSyncError] = useState<string | null>(null);
+
+    async function handleSync(e: React.MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSyncing(true);
+        setSyncError(null);
+        try {
+            const res = await fetch(`/api/creators/${c.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "force-sync" }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                onRefresh?.();
+            } else {
+                setSyncError(data.error || "No match found");
+            }
+        } catch {
+            setSyncError("Sync failed");
+        } finally {
+            setSyncing(false);
+        }
+    }
+
+    async function handleDisconnect(e: React.MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Disconnect ${c.name || "this creator"}? You'll need to re-link their OF account.`)) return;
+        try {
+            await fetch(`/api/creators/${c.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "disconnect" }),
+            });
+            onRefresh?.();
+        } catch {}
+    }
 
     return (
         <Link href={`/creators/${c.id}`} className="block cursor-pointer">
@@ -49,9 +92,33 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF }: Pro
                         {!isLinked ? (
                             <ConnectButton isAuthenticating={isAuthenticatingId === c.id} onClick={(e) => onConnectOF(e, c)} />
                         ) : (
-                            <StatusBadge isActive={c.active} />
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleSync}
+                                    disabled={syncing}
+                                    title="Re-sync profile from OnlyFans"
+                                    className="w-7 h-7 rounded-lg bg-white/5 border border-solid border-white/10 flex items-center justify-center hover:bg-white/10 hover:border-white/20 transition-all disabled:opacity-50"
+                                >
+                                    <RefreshCw size={12} className={`text-white/50 ${syncing ? "animate-spin" : ""}`} />
+                                </button>
+                                <button
+                                    onClick={handleDisconnect}
+                                    title="Disconnect OF account"
+                                    className="w-7 h-7 rounded-lg bg-white/5 border border-solid border-white/10 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/20 transition-all"
+                                >
+                                    <Unlink size={12} className="text-white/40 hover:text-red-400" />
+                                </button>
+                                <StatusBadge isActive={c.active} />
+                            </div>
                         )}
                     </div>
+
+                    {/* Sync error message */}
+                    {syncError && (
+                        <div className="text-xs text-red-400/80 bg-red-500/10 rounded-lg px-3 py-1.5 mb-3 border border-solid border-red-500/20">
+                            {syncError}
+                        </div>
+                    )}
 
                     {/* Revenue */}
                     <div className="flex items-end justify-between">
