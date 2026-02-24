@@ -8,7 +8,7 @@ const OFAPI_BASE = "https://app.onlyfansapi.com";
  * Fetch full profile from OFAPI for a newly added creator.
  * Uses the master API key to pull name, avatar, header, username.
  */
-async function fetchAndSyncProfile(creatorId: string, ofapiCreatorId: string) {
+async function fetchAndSyncProfile(creatorId: string, ofapiCreatorId: string, ofUsername?: string) {
     const apiKey = process.env.OFAPI_API_KEY;
     if (!apiKey) return;
 
@@ -22,19 +22,24 @@ async function fetchAndSyncProfile(creatorId: string, ofapiCreatorId: string) {
         const accounts = await accountsRes.json();
         const accountList = Array.isArray(accounts) ? accounts : accounts?.data || [];
 
-        // Match by account ID or username
+        // Strict dual-mode matching (mirrors findOfapiMatch in creators route)
+        const key = ofapiCreatorId ?? ofUsername;
+        if (!key) return;
+        const isAcctId = key.startsWith("acct_");
         const match = accountList.find((a: any) =>
-            a.id === ofapiCreatorId ||
-            a.onlyfans_username === ofapiCreatorId ||
-            a.display_name === ofapiCreatorId
+            isAcctId
+                ? a.id === key
+                : (a.onlyfans_username === key ||
+                   a.onlyfans_username === ofUsername ||
+                   a.display_name === key)
         );
 
         if (!match) return;
 
         const userData = match.onlyfans_user_data || {};
         const updateData: any = {
-            ofapiToken: apiKey, // Mark as linked via master key
-            ofapiCreatorId: match.id, // Ensure we store the actual account ID
+            ofapiToken: "linked_via_auth_module", // Resolved to env var at runtime by ofapiRequest()
+            ofapiCreatorId: match.id, // Ensure we store the actual acct_xxx ID
         };
 
         const displayName = userData.name || match.display_name;

@@ -67,9 +67,9 @@ export async function GET() {
                 updateData.headerUrl = header;
             }
 
-            // If unlinked but we found a match, link it with master key
+            // If unlinked but we found a match, mark as linked (env var resolved at runtime)
             if (creator.ofapiToken === "unlinked" && ofAccount) {
-                updateData.ofapiToken = apiKey;
+                updateData.ofapiToken = "linked_via_auth_module";
                 updateData.ofapiCreatorId = ofAccount.id;
             }
 

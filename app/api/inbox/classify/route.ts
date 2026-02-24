@@ -90,16 +90,16 @@ export async function POST(request: Request) {
         const recentMessages: any[] = [];
 
         // Budget constants
-        const MAX_API_CALLS = 6;
+        const MAX_API_CALLS = 4;
         const MAX_MESSAGES = 400;
         const HARD_DEADLINE_MS = 28000; // Return response before Vercel's 30s kill
         const OFAPI_DEADLINE_MS = 15000; // Stop OFAPI calls at 15s — reserve 13s+ for OpenAI
         const isOfapiOverBudget = () => Date.now() - startTime > OFAPI_DEADLINE_MS;
 
-        // EARLY WINDOW: order=asc, limit=100 (skip on incremental — we already have early context via existingFacts)
+        // EARLY WINDOW: order=asc, limit=50 (skip on incremental — we already have early context via existingFacts)
         if (!isIncremental) {
             try {
-                const earlyRes = await getChatMessages(accountName, chatId, apiKey, 100, undefined, "asc");
+                const earlyRes = await getChatMessages(accountName, chatId, apiKey, 50, undefined, "asc");
                 apiCallsMade++;
                 earlyMessages.push(...extractMessages(earlyRes));
             } catch (e: any) {
@@ -241,24 +241,54 @@ export async function POST(request: Request) {
                 apiCallsMade,
             });
         }
+        // Cap fan messages sent to OpenAI to avoid timeout
+        const cappedFanMessages = fanMessages.slice(-80);
+
         // FIX #3: On incremental, existingFacts are passed so the model has early context even without early window
         const remainingMs = HARD_DEADLINE_MS - (Date.now() - startTime);
-        console.log(`[Classify] Calling OpenAI: ${fanMessages.length} fan msgs, ${remainingMs}ms budget remaining, ${apiCallsMade} API calls made`);
-        const result = await classifyFan(fanMessages, fanName, existingFacts, Math.max(remainingMs, 5000));
+        console.log(`[Classify] Calling OpenAI: ${cappedFanMessages.length} fan msgs (capped from ${fanMessages.length}), ${remainingMs}ms budget remaining, ${apiCallsMade} API calls made`);
+        const result = await classifyFan(cappedFanMessages, fanName, existingFacts, Math.max(remainingMs, 5000));
 
         if (!result) {
+            // Return partial result with "unknown" label so UI shows something
             return NextResponse.json({
-                classified: false,
-                reason: "Classification returned null — OpenAI may have timed out or returned an error",
+                classified: true,
+                result: {
+                    fanType: "unknown",
+                    tonePreference: null,
+                    emotionalDrivers: [],
+                    nickname: null,
+                    location: null,
+                    job: null,
+                    relationshipStatus: null,
+                    pets: [],
+                    hobbies: [],
+                    facts: [],
+                    intentTags: [],
+                    buyingKeywords: [],
+                    contentPreferences: [],
+                    confidence: 0,
+                    summary: "Classification timed out — try again or check account sync",
+                    suggestedQuestions: [],
+                    doNotForget: [],
+                    analysis: {
+                        earlyWindowCount: earlyMessages.length,
+                        recentWindowCount: recentMessages.length,
+                        purchaseContextCount,
+                        totalMessagesUsed: allMessages.length,
+                        lastMessageIdUsed: newestMsgId,
+                        lastMessageAtUsed: newestMsgAt,
+                        apiCallsMade,
+                        runtimeMs: Date.now() - startTime,
+                        isIncremental,
+                    },
+                },
+                savedToDb: false,
+                fallback: true,
                 debug: {
-                    fanMessagesCount: fanMessages.length,
+                    fanMessagesCount: cappedFanMessages.length,
                     totalMessagesFound: allMessages.length,
-                    earlyWindowCount: earlyMessages.length,
-                    recentWindowCount: recentMessages.length,
-                    apiCallsMade,
-                    runtimeMs: Date.now() - startTime,
                     remainingMsForOpenAI: remainingMs,
-                    openAiKeySet: !!process.env.OPENAI_API_KEY,
                 },
             });
         }

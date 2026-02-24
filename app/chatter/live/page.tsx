@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Users,
   Trophy,
+  LogOut,
 } from "lucide-react";
 
 interface LiveSession {
@@ -22,6 +23,7 @@ export default function ChatterLive() {
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
+  const [clockingOut, setClockingOut] = useState<string | null>(null);
 
   const fetchLive = useCallback(async () => {
     try {
@@ -63,6 +65,25 @@ export default function ChatterLive() {
     const hrs = Math.floor(totalMins / 60);
     const mins = totalMins % 60;
     return `${hrs}h ${mins}m`;
+  }
+
+  async function handleClockOut(email: string) {
+    if (!confirm(`Clock out ${email}?`)) return;
+    setClockingOut(email);
+    try {
+      const res = await fetch("/api/chatter/clock-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setLiveSessions((prev) => prev.filter((s) => s.email !== email));
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setClockingOut(null);
+    }
   }
 
   // Keep durations ticking by re-rendering every minute
@@ -166,15 +187,22 @@ export default function ChatterLive() {
                     </div>
                   </div>
 
-                  {/* Right: Duration */}
-                  <div className="text-right shrink-0">
+                  {/* Right: Duration + Clock Out */}
+                  <div className="text-right shrink-0 flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
                       <span className="text-teal-400 text-sm font-semibold">
                         {duration(session.clockIn)}
                       </span>
                     </div>
-                    <p className="text-white/25 text-xs mt-1">duration</p>
+                    <button
+                      onClick={() => handleClockOut(session.email)}
+                      disabled={clockingOut === session.email}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-solid border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 hover:border-red-500/30 transition-all disabled:opacity-50"
+                    >
+                      <LogOut size={11} />
+                      {clockingOut === session.email ? "..." : "Clock Out"}
+                    </button>
                   </div>
                 </div>
               </div>

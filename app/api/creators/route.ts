@@ -7,6 +7,24 @@ export const dynamic = "force-dynamic";
 const OFAPI_BASE = "https://app.onlyfansapi.com";
 
 /**
+ * Strict dual-mode OFAPI account matching.
+ * If ofapiCreatorId starts with "acct_" → match on a.id only.
+ * Otherwise → match on username or display_name (no partial/includes).
+ */
+function findOfapiMatch(accountList: any[], ofapiCreatorId?: string | null, ofUsername?: string | null) {
+    const key = ofapiCreatorId ?? ofUsername;
+    if (!key) return undefined;
+    const isAcctId = key.startsWith("acct_");
+    return accountList.find((a: any) =>
+        isAcctId
+            ? a.id === key
+            : (a.onlyfans_username === key ||
+               a.onlyfans_username === ofUsername ||
+               a.display_name === key)
+    );
+}
+
+/**
  * Auto-sync any creators missing profile data (name, avatar, header).
  * Runs inline on dashboard load — only fires when unsynced creators exist.
  */
@@ -40,13 +58,7 @@ async function autoSyncUnsynced(creators: any[]) {
         const accountList = Array.isArray(accounts) ? accounts : accounts?.data || [];
 
         for (const creator of unsynced) {
-            const match = accountList.find(
-                (a: any) =>
-                    a.id === creator.ofapiCreatorId ||
-                    a.onlyfans_username === creator.ofapiCreatorId ||
-                    a.onlyfans_username === creator.ofUsername ||
-                    a.display_name === creator.ofapiCreatorId
-            );
+            const match = findOfapiMatch(accountList, creator.ofapiCreatorId, creator.ofUsername);
 
             if (!match) {
                 console.log(`[auto-sync] No OFAPI match for creator ${creator.id} (${creator.ofapiCreatorId})`);
@@ -87,7 +99,7 @@ async function autoSyncUnsynced(creators: any[]) {
             if (header) updateData.headerUrl = header;
 
             if (creator.ofapiToken === "unlinked") {
-                updateData.ofapiToken = apiKey;
+                updateData.ofapiToken = "linked_via_auth_module";
             }
             updateData.ofapiCreatorId = match.id;
 
@@ -118,10 +130,12 @@ export async function GET(request: Request) {
             orderBy: { createdAt: "desc" },
         });
 
-        // Auto-sync moved to background — don't block page load
-        // Only fire if explicitly requested via ?sync=true
-        if (searchParams.get("sync") === "true") {
-            autoSyncUnsynced(creators).catch(() => {}); // Fire and forget
+        // Auto-sync on every dashboard load — fire-and-forget, cap 5 unsynced
+        const needsSync = creators.filter(
+            (c: any) => !c.name || c.name.startsWith("acct_") || (!c.avatarUrl && !c.headerUrl) || c.ofapiToken === "unlinked"
+        );
+        if (needsSync.length > 0) {
+            autoSyncUnsynced(needsSync.slice(0, 5)).catch(() => {});
         }
 
         // Compute today's revenue from DB — OnlyFans uses UK time (GMT/BST) as daily cutoff

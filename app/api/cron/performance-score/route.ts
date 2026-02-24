@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildScoringWindows, scoreChatter } from "@/lib/chatter-scorer";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
@@ -31,6 +32,12 @@ export async function GET(request: Request) {
     const startTime = Date.now();
 
     try {
+        // --- Auto-clock-out: schedule-based + max session safety net ---
+        const autoClockOutResults = await autoClockOutExpired().catch((e) => {
+            console.error("[PerfScore] Auto-clock-out error:", e.message);
+            return { scheduled: 0, maxDuration: 0 };
+        });
+
         // Compute UK-aligned hour window boundaries
         const { windowStart, windowEnd } = getLastCompletedUKHour();
 
@@ -98,6 +105,7 @@ export async function GET(request: Request) {
             totalPairs: allWindows.length,
             scored: results.filter((r) => r.status === "scored").length,
             elapsed: `${elapsed}ms`,
+            autoClockOut: autoClockOutResults,
             results,
         });
     } catch (e: any) {
@@ -168,4 +176,72 @@ function getUKOffsetMs(date: Date): number {
     const utcDate = new Date(utcStr);
     const ukDate = new Date(ukStr);
     return ukDate.getTime() - utcDate.getTime();
+}
+
+/**
+ * Auto-clock-out chatters based on:
+ * 1. Schedule: if shift end time has passed
+ * 2. Max duration safety net: any session running >12 hours
+ */
+async function autoClockOutExpired(): Promise<{ scheduled: number; maxDuration: number }> {
+    const now = new Date();
+    let scheduledCount = 0;
+    let maxDurationCount = 0;
+
+    // Find all live sessions
+    const liveSessions = await prisma.chatterSession.findMany({
+        where: { isLive: true },
+        select: { id: true, email: true, creatorId: true, clockIn: true },
+    });
+
+    if (liveSessions.length === 0) return { scheduled: 0, maxDuration: 0 };
+
+    for (const session of liveSessions) {
+        // Safety net: auto-clock-out any session >12 hours
+        const hoursLive = (now.getTime() - new Date(session.clockIn).getTime()) / 3600000;
+        if (hoursLive > 12) {
+            await prisma.chatterSession.update({
+                where: { id: session.id },
+                data: { isLive: false, clockOut: now },
+            });
+            console.log(`[AutoClockOut] Max duration: ${session.email} (${hoursLive.toFixed(1)}h)`);
+            maxDurationCount++;
+            continue;
+        }
+
+        // Schedule-based: look up ChatterSchedule for this chatter+creator
+        const schedule = await prisma.chatterSchedule.findFirst({
+            where: { email: session.email, creatorId: session.creatorId },
+        });
+
+        if (!schedule?.shift) continue;
+
+        // Parse shift end time from "HH:MM-HH:MM" format
+        const shiftParts = schedule.shift.split("-");
+        if (shiftParts.length !== 2) continue;
+
+        const endTimeParts = shiftParts[1].trim().split(":");
+        if (endTimeParts.length !== 2) continue;
+
+        const endHour = parseInt(endTimeParts[0], 10);
+        const endMinute = parseInt(endTimeParts[1], 10);
+        if (isNaN(endHour) || isNaN(endMinute)) continue;
+
+        // Build shift end time in UK timezone for today
+        const ukOffset = getUKOffsetMs(now);
+        const ukNow = new Date(now.getTime() + ukOffset);
+        const shiftEndUK = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), endHour, endMinute, 0);
+        const shiftEndUtc = new Date(shiftEndUK.getTime() - ukOffset);
+
+        if (now > shiftEndUtc) {
+            await prisma.chatterSession.update({
+                where: { id: session.id },
+                data: { isLive: false, clockOut: now },
+            });
+            console.log(`[AutoClockOut] Schedule: ${session.email} (shift ended ${schedule.shift})`);
+            scheduledCount++;
+        }
+    }
+
+    return { scheduled: scheduledCount, maxDuration: maxDurationCount };
 }

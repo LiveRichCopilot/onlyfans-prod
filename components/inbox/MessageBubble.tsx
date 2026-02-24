@@ -24,6 +24,13 @@ export function MessageBubble({ message: msg, isSfw, onDisableSfw, showTail = tr
     return (
         <div className={`flex ${isSelf ? "justify-end" : "justify-start"} group`}>
             <div className={`relative max-w-[80%] sm:max-w-[70%] ${isSelf ? "mr-1" : "ml-1"}`}>
+                {/* Sender label for outgoing messages (when not just "Creator") */}
+                {isSelf && msg.senderName && msg.senderName !== "Creator" && showTail && (
+                    <div className="text-[10px] text-teal-400/60 font-medium mb-0.5 px-1">
+                        {msg.senderName}
+                    </div>
+                )}
+
                 {/* Message bubble */}
                 <div
                     className={`rounded-[20px] px-3.5 py-2 text-[15px] leading-relaxed shadow-sm ${
