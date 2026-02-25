@@ -162,7 +162,7 @@ export async function GET(req: NextRequest) {
                         creatorId: creator.id,
                         // Use price/gross (fan-paid amount) when available, fall back to amount
                         amount: Math.abs(Number(tx.price || tx.gross || tx.amount) || 0),
-                        type: ((tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").replace(/&(?:#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);/g, "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/[\uD800-\uDFFF]/g, "").replace(/\s+/g, " ").trim().slice(0, 50)) || "unknown",
+                        type: ((tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").replace(/&(?:#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);/g, "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim().slice(0, 50).replace(/[\uD800-\uDFFF]/g, "").trim()) || "unknown",
                         date: new Date(tx.createdAt || tx.date || new Date()),
                     }))
                     .filter((tx: any) => tx.amount > 0);
