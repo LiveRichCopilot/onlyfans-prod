@@ -10,6 +10,7 @@ import { CreatorCard } from "@/components/dashboard/CreatorCard";
 import { ModulesGrid } from "@/components/dashboard/ModulesGrid";
 import { AddCreatorModal } from "@/components/dashboard/AddCreatorModal";
 import { TimeRangeSelector } from "@/components/dashboard/TimeRangeSelector";
+import { HourlyModelCounter } from "@/components/dashboard/HourlyModelCounter";
 
 type TimeRange = { start: Date; end: Date; label: string };
 
@@ -115,6 +116,8 @@ export default function AgencyDashboard() {
                         )}
                     </div>
                 </div>
+
+                <HourlyModelCounter />
 
                 <ModulesGrid />
             </main>
