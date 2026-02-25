@@ -160,8 +160,9 @@ export async function GET(req: NextRequest) {
                         ofapiTxId: tx.id.toString(),
                         fanId: fanMap.get(tx.user.id.toString())!,
                         creatorId: creator.id,
-                        amount: Math.abs(Number(tx.amount) || 0),
-                        type: (tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").slice(0, 50),
+                        // Use price/gross (fan-paid amount) when available, fall back to amount
+                        amount: Math.abs(Number(tx.price || tx.gross || tx.amount) || 0),
+                        type: (tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").replace(/&#?x?[0-9a-fA-F]+;/g, "").replace(/\s+/g, " ").trim().slice(0, 50),
                         date: new Date(tx.createdAt || tx.date || new Date()),
                     }))
                     .filter((tx: any) => tx.amount > 0);

@@ -249,7 +249,7 @@ export async function GET(req: NextRequest) {
                         fanId: fanMap.get(tx.user.id.toString())!,
                         creatorId,
                         amount: Math.abs(Number(tx.amount) || 0),
-                        type: (tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").slice(0, 50),
+                        type: (tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").replace(/&#?x?[0-9a-fA-F]+;/g, "").replace(/\s+/g, " ").trim().slice(0, 50),
                         date: new Date(tx.createdAt || tx.date || new Date()),
                     }))
                     .filter((tx: any) => tx.amount > 0);
