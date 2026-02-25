@@ -1188,27 +1188,26 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
         }
 
         // Telegram Bot API hard limit: getFile() only works for files under 20MB.
+        // For larger files, generate a signed upload link to upload directly to the creator's vault.
         const fileSize = ctx.message.video?.file_size || ctx.message.photo?.[ctx.message.photo.length - 1]?.file_size || ctx.message.voice?.file_size || 0;
         if (fileSize > 20 * 1024 * 1024) {
             const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
-            const creatorName = creator.name || creator.ofUsername || "this account";
-            const mediaType = ctx.message.video ? "video" : ctx.message.voice ? "voice" : "photo";
-            let tips = "";
-            if (mediaType === "video") {
-                tips = "To fit under 20MB:\n" +
-                    "- 720p + under 20 seconds\n" +
-                    "- Or 480p for longer clips\n" +
-                    "- Avoid sending as 'Original' quality";
-            } else if (mediaType === "voice") {
-                tips = "Voice notes should be under ~2 minutes to stay under 20MB.";
-            } else {
-                tips = "Send as photos (not documents) and fewer at a time (5-10 max).";
+            try {
+                const { createUploadToken } = await import("@/lib/upload-token");
+                const uploadToken = createUploadToken(creator.id, creator.ofapiCreatorId!, 30);
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://onlyfans-prod.vercel.app";
+                const uploadLink = `${appUrl}/upload?token=${uploadToken}`;
+                await ctx.reply(
+                    `That file is ${sizeMB}MB — too large for Telegram (20MB limit).\n\n` +
+                    `Use this link to upload directly to your vault:\n${uploadLink}\n\n` +
+                    `Link expires in 30 minutes.`
+                );
+            } catch {
+                await ctx.reply(
+                    `File too large (${sizeMB}MB). Telegram bots can only download files under 20MB.\n\n` +
+                    `For larger files, upload directly to your OF vault at onlyfans.com.`
+                );
             }
-            await ctx.reply(
-                `File too large (${sizeMB}MB). Telegram bots can only download files under 20MB.\n\n` +
-                `${tips}\n\n` +
-                `For larger files, upload directly to your OF vault at onlyfans.com.`
-            );
             return;
         }
 
