@@ -1205,10 +1205,9 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
                 tips = "Send as photos (not documents) and fewer at a time (5-10 max).";
             }
             await ctx.reply(
-                `File too large (${sizeMB}MB). Telegram bots can only process files under 20MB.\n\n` +
-                `This bot is for quick fan replies — short videos, a few photos, brief voice notes.\n\n` +
+                `File too large (${sizeMB}MB). Telegram bots can only download files under 20MB.\n\n` +
                 `${tips}\n\n` +
-                `For longer or higher-quality uploads for ${creatorName}, use the OF vault directly.`
+                `For larger files, upload directly to your OF vault at onlyfans.com.`
             );
             return;
         }
