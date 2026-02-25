@@ -256,19 +256,58 @@ export async function GET(req: NextRequest) {
 
                 fixResult.txPrepared = txRecords.length;
 
-                // Attempt the actual insert
+                // Attempt the actual insert — batch first, one-at-a-time fallback
                 if (txRecords.length > 0) {
                     let totalCreated = 0;
-                    for (let i = 0; i < txRecords.length; i += 500) {
-                        const chunk = txRecords.slice(i, i + 500);
-                        const created = await prisma.transaction.createMany({
-                            data: chunk,
-                            skipDuplicates: true,
-                        });
-                        totalCreated += created.count;
+                    let batchFailed = false;
+                    try {
+                        for (let i = 0; i < txRecords.length; i += 500) {
+                            const chunk = txRecords.slice(i, i + 500);
+                            const created = await prisma.transaction.createMany({
+                                data: chunk,
+                                skipDuplicates: true,
+                            });
+                            totalCreated += created.count;
+                        }
+                    } catch (batchErr: any) {
+                        batchFailed = true;
+                        fixResult.batchError = batchErr.message;
+                        // Fallback: insert one at a time to isolate the offending record
+                        const failures: any[] = [];
+                        totalCreated = 0;
+                        for (const tx of txRecords) {
+                            try {
+                                await prisma.transaction.create({ data: tx });
+                                totalCreated++;
+                            } catch (singleErr: any) {
+                                // Scan all string fields for diagnostics
+                                const fieldScan: Record<string, any> = {};
+                                for (const [key, val] of Object.entries(tx)) {
+                                    if (typeof val === "string") {
+                                        fieldScan[key] = {
+                                            length: val.length,
+                                            preview: val.slice(0, 120),
+                                            hex: Buffer.from(val, "utf-8").toString("hex").slice(0, 200),
+                                            hasSurrogates: /[\uD800-\uDFFF]/.test(val),
+                                            hasBackslashX: /\\x/i.test(val),
+                                        };
+                                    }
+                                }
+                                failures.push({
+                                    ofapiTxId: tx.ofapiTxId,
+                                    error: singleErr.message?.slice(0, 300),
+                                    errorCode: singleErr.code,
+                                    fieldScan,
+                                });
+                                if (failures.length >= 5) break; // cap diagnostic output
+                            }
+                        }
+                        fixResult.fallbackMode = "one-at-a-time";
+                        fixResult.failures = failures;
                     }
                     fixResult.txInserted = totalCreated;
-                    fixResult.success = true;
+                    fixResult.success = totalCreated > 0;
+                    fixResult.batchWasUsed = !batchFailed;
                 } else {
                     fixResult.txInserted = 0;
                     fixResult.success = false;
