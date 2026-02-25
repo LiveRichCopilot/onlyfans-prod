@@ -25,20 +25,13 @@ export const bot = new Bot(token, {
 import { prisma } from "./prisma";
 import {
     uploadToVault,
-    getTransactionsSummary,
-    getTransactionsByType,
-    getRevenueForecast,
     getNotificationCounts,
-    getTransactions,
-    fetchAllTransactions,
-    calculateTopFans,
     sendVaultMediaToFan,
     getMe,
     updateVaultMedia,
     getMassMessages,
     getMassMessageChart,
     getStatisticsOverview,
-    getEarningsByType
 } from "./ofapi";
 import { analyzeMediaSafety } from "./ai-analyzer";
 
@@ -214,40 +207,30 @@ bot.command("stats", async (ctx) => {
             select: { amount: true, type: true },
         });
 
-        let totalGross = 0;
+        let totalRevenue = 0;
         let subscriptions = 0;
         let tips = 0;
         let messages = 0;
+        let other = 0;
 
         localTx.forEach((t) => {
-            totalGross += t.amount;
+            totalRevenue += t.amount;
             if (t.type === "tip") tips += t.amount;
             else if (t.type === "message") messages += t.amount;
             else if (t.type === "subscription") subscriptions += t.amount;
-            else subscriptions += t.amount; // default bucket
+            else other += t.amount;
         });
 
-        // Hardcoded flat 20% OF Fee
-        const totalNet = totalGross * 0.8;
-        const totalFees = totalGross * 0.2;
+        let md = `PERFORMANCE REPORT: ${creatorName}\nWindow: Last ${args}\n\n`;
+        md += `Revenue: $${totalRevenue.toFixed(2)}\n`;
+        md += `Transactions: ${localTx.length}\n\n`;
+        md += `Breakdown:\n`;
+        md += `- Subscriptions: $${subscriptions.toFixed(2)}\n`;
+        md += `- Tips: $${tips.toFixed(2)}\n`;
+        md += `- Messages/PPV: $${messages.toFixed(2)}\n`;
+        if (other > 0) md += `- Other: $${other.toFixed(2)}\n`;
 
-        const md = `
-PERFORMANCE REPORT: ${creatorName}
-Window: Last ${args}
-
-Gross Revenue: $${totalGross.toFixed(2)}
-Net Profit: $${totalNet.toFixed(2)}
-Platform Fees: $${totalFees.toFixed(2)}
-
-Breakdown:
-- Subscriptions: $${subscriptions.toFixed(2)}
-- Tips: $${tips.toFixed(2)}
-- Messages/PPV: $${messages.toFixed(2)}
-
-Transactions: ${localTx.length}
-        `;
-
-        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
+        await ctx.reply(md, replyOpt);
 
     } catch (e: any) {
         console.error("Stats command error", e);
@@ -405,7 +388,6 @@ bot.command("forecast", async (ctx) => {
         // Simple trend: weighted average of recent velocity
         // 70% this week's pace + 30% monthly average
         const projected7d = (thisWeek * 0.7) + (weeklyAvg * 0.3);
-        const projectedNet = projected7d * 0.8; // After 20% OF fee
         const weekDelta = lastWeek > 0 ? ((thisWeek - lastWeek) / lastWeek * 100) : 0;
         const trend = weekDelta >= 5 ? "Trending UP" : weekDelta <= -5 ? "Trending DOWN" : "Holding steady";
 
@@ -413,8 +395,7 @@ bot.command("forecast", async (ctx) => {
         md += `This week so far: $${thisWeek.toFixed(2)} (${rev7d._count} tx)\n`;
         md += `Last week: $${lastWeek.toFixed(2)}\n`;
         md += `30-day daily avg: $${dailyAvg.toFixed(2)}\n\n`;
-        md += `Projected next 7 days (gross): $${projected7d.toFixed(2)}\n`;
-        md += `Projected next 7 days (net): $${projectedNet.toFixed(2)}\n`;
+        md += `Projected next 7 days: $${projected7d.toFixed(2)}\n`;
         md += `Week-over-week: ${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(1)}%\n`;
         md += `${trend}\n\n`;
         md += `Based on ${txCount30d} transactions over 30 days.`;
@@ -447,7 +428,7 @@ Tips: ${counts.tips || 0}
 New Fans: ${counts.subscribers || 0}
          `;
 
-        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "Markdown" as const }));
+        await ctx.reply(md, replyOpt);
     } catch (e: any) {
         console.error("Notifications command error", e);
         await ctx.reply("Failed to fetch notification counts.", replyOpt);
@@ -463,54 +444,54 @@ bot.command("topfans", async (ctx) => {
         const parts = textStr.split(" ").filter(Boolean);
 
         let days = 1; // default 1 day
-
         if (parts.length > 0) {
             days = parseInt(parts[0].replace('d', '')) || 1;
         }
 
         const creator = await getOrBindCreator(ctx);
+        if (!creator) return ctx.reply("Not linked.", replyOpt);
 
-        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("You are not linked to an OnlyFans account.", replyOpt);
-        }
-
-        let threshold = creator.whaleAlertTarget || 500; // default minimum
+        let threshold = creator.whaleAlertTarget || 200;
         if (parts.length > 1) {
             threshold = parseFloat(parts[1]) || threshold;
         }
 
-        await ctx.reply(`Analyzing raw ledger for ${creator.name}...\nWindow: Last ${days} days\nMinimum Spend: $${threshold} (from module)`, replyOpt);
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-        let rawTransactions: any[] = [];
-        try {
-            const txResponse = await getTransactions(creator.ofapiCreatorId || creator.telegramId, creator.ofapiToken);
-            const allTx = txResponse.data?.list || txResponse.list || txResponse.transactions || [];
-
-            const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-            rawTransactions = allTx.filter((t: any) => new Date(t.createdAt) >= cutoffDate);
-        } catch (e) {
-            console.error("Tx Fetch Error", e);
-            return ctx.reply("Failed to download raw transaction ledger from OnlyFans.", replyOpt);
-        }
-
-        const topFans = calculateTopFans(rawTransactions, threshold);
-
-        if (topFans.length === 0) {
-            return ctx.reply(`No fans found who spent over $${threshold} in this ledger slice.`, replyOpt);
-        }
-
-        // Output top 15 max to avoid telegram message length limits
-        const displayList = topFans.slice(0, 15);
-
-        let md = `TOP SPENDERS (${days}d > $${threshold})\n\n`;
-
-        displayList.forEach((fan, index) => {
-            md += `${index + 1}. ${fan.name} (@${fan.username}): $${fan.spend.toFixed(2)}\n`;
+        // Use LOCAL DB — synced from OFAPI every 5 min
+        const topFansData = await prisma.transaction.groupBy({
+            by: ['fanId'],
+            where: { creatorId: creator.id, date: { gte: cutoff } },
+            _sum: { amount: true },
+            orderBy: { _sum: { amount: 'desc' } },
+            take: 15,
         });
 
-        md += `\nTotal Whales Found: ${topFans.length}`;
+        const qualified = topFansData.filter(f => (f._sum.amount || 0) >= threshold);
 
-        await ctx.reply(md, Object.assign({}, replyOpt, { parse_mode: "HTML" as const }));
+        if (qualified.length === 0) {
+            return ctx.reply(`No fans spent over $${threshold} in the last ${days}d.`, replyOpt);
+        }
+
+        // Resolve fan names
+        const fanIds = qualified.map(f => f.fanId);
+        const fans = await prisma.fan.findMany({
+            where: { id: { in: fanIds } },
+            select: { id: true, name: true, username: true },
+        });
+        const fanMap = new Map(fans.map(f => [f.id, f]));
+
+        let md = `TOP SPENDERS (${days}d > $${threshold}) — ${creator.name || "Creator"}\n\n`;
+
+        qualified.forEach((entry, i) => {
+            const fan = fanMap.get(entry.fanId);
+            const display = fan?.name || fan?.username || "Anonymous";
+            const username = fan?.username || "?";
+            md += `${i + 1}. ${display} (@${username}): $${(entry._sum.amount || 0).toFixed(2)}\n`;
+        });
+
+        md += `\nTotal: ${qualified.length} fans`;
+        await ctx.reply(md, replyOpt);
 
     } catch (e: any) {
         console.error("Topfans command error", e);
@@ -909,49 +890,44 @@ bot.command("breakdown", async (ctx) => {
 
     try {
         const creator = await getOrBindCreator(ctx);
-        if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
-            return ctx.reply("Not linked.", replyOpt);
-        }
+        if (!creator) return ctx.reply("Not linked.", replyOpt);
 
-        const acct = creator.ofapiCreatorId || creator.telegramId;
         const now = new Date();
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const fmt = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 
-        await ctx.reply(`Fetching revenue breakdown for ${creator.name || "Creator"}...`, replyOpt);
+        // Use LOCAL DB as source of truth — synced from OFAPI every 5 min
+        const byType = await prisma.transaction.groupBy({
+            by: ['type'],
+            where: { creatorId: creator.id, date: { gte: sevenDaysAgo } },
+            _sum: { amount: true },
+            _count: true,
+        });
 
-        const [tipRes, msgRes, postRes, subRes, streamRes, overviewRes] = await Promise.all([
-            getEarningsByType(acct, creator.ofapiToken, "tips", fmt(sevenDaysAgo), fmt(now)).catch(() => null),
-            getEarningsByType(acct, creator.ofapiToken, "messages", fmt(sevenDaysAgo), fmt(now)).catch(() => null),
-            getEarningsByType(acct, creator.ofapiToken, "post", fmt(sevenDaysAgo), fmt(now)).catch(() => null),
-            getEarningsByType(acct, creator.ofapiToken, "subscribes", fmt(sevenDaysAgo), fmt(now)).catch(() => null),
-            getEarningsByType(acct, creator.ofapiToken, "stream", fmt(sevenDaysAgo), fmt(now)).catch(() => null),
-            getStatisticsOverview(acct, creator.ofapiToken, fmt(sevenDaysAgo), fmt(now)).catch(() => null),
-        ]);
+        const typeMap: Record<string, number> = {};
+        let total = 0;
+        byType.forEach(entry => {
+            const t = entry.type || "other";
+            const amt = entry._sum.amount || 0;
+            typeMap[t] = (typeMap[t] || 0) + amt;
+            total += amt;
+        });
 
-        const parseEarning = (res: any, k: string) => {
-            const d = res?.data?.[k] || res?.data || {};
-            return parseFloat(d.gross || d.total || "0");
-        };
-
-        const tips = parseEarning(tipRes, "tips");
-        const messages = parseEarning(msgRes, "chat_messages");
-        const posts = parseEarning(postRes, "post");
-        const subs = parseEarning(subRes, "subscribes");
-        const streams = parseEarning(streamRes, "stream");
-        const ov = overviewRes?.data || {};
-        const massEarnings = ov.massMessages?.earnings?.gross || 0;
-
-        const total = tips + messages + posts + subs + streams;
         const pct = (v: number) => total > 0 ? ((v / total) * 100).toFixed(1) : "0";
 
+        const tips = typeMap["tip"] || 0;
+        const messages = typeMap["message"] || 0;
+        const subs = typeMap["subscription"] || 0;
+        const posts = typeMap["post"] || 0;
+        const streams = typeMap["stream"] || 0;
+        const otherAmount = total - tips - messages - subs - posts - streams;
+
         let md = `REVENUE BREAKDOWN (7d) — ${creator.name || "Creator"}\n\n`;
-        md += `Tips: $${tips.toFixed(2)} (${pct(tips)}%)\n`;
-        md += `PPV/Messages: $${messages.toFixed(2)} (${pct(messages)}%)\n`;
-        md += `Posts: $${posts.toFixed(2)} (${pct(posts)}%)\n`;
-        md += `Subscriptions: $${subs.toFixed(2)} (${pct(subs)}%)\n`;
-        md += `Streams: $${streams.toFixed(2)} (${pct(streams)}%)\n`;
-        if (massEarnings > 0) md += `Mass Messages: $${massEarnings.toFixed(2)}\n`;
+        if (tips > 0) md += `Tips: $${tips.toFixed(2)} (${pct(tips)}%)\n`;
+        if (messages > 0) md += `PPV/Messages: $${messages.toFixed(2)} (${pct(messages)}%)\n`;
+        if (subs > 0) md += `Subscriptions: $${subs.toFixed(2)} (${pct(subs)}%)\n`;
+        if (posts > 0) md += `Posts: $${posts.toFixed(2)} (${pct(posts)}%)\n`;
+        if (streams > 0) md += `Streams: $${streams.toFixed(2)} (${pct(streams)}%)\n`;
+        if (otherAmount > 0) md += `Other: $${otherAmount.toFixed(2)} (${pct(otherAmount)}%)\n`;
         md += `\nTOTAL: $${total.toFixed(2)}`;
 
         await ctx.reply(md, replyOpt);
@@ -1216,12 +1192,10 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
         const fileSize = ctx.message.video?.file_size || ctx.message.photo?.[ctx.message.photo.length - 1]?.file_size || ctx.message.voice?.file_size || 0;
         if (fileSize > 20 * 1024 * 1024) {
             const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
-            const dashUrl = `https://onlyfans-prod.vercel.app/inbox`;
+            const creatorName = creator.name || creator.ofUsername || "this account";
             await ctx.reply(
-                `That file is ${sizeMB}MB — Telegram's bot API caps downloads at 20MB.\n\n` +
-                `Upload it directly through your dashboard instead:\n${dashUrl}\n\n` +
-                `Just drag and drop the file into any chat's Vault attachment.`,
-                { parse_mode: undefined }
+                `File too large (${sizeMB}MB). Telegram limits bot downloads to 20MB.\n\n` +
+                `Please compress the file under 20MB and resend here, or upload it directly to the OF vault for ${creatorName}.`
             );
             return;
         }
