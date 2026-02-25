@@ -7,9 +7,11 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/debug/sync-test?creatorId=xxx
  * Diagnoses why a creator shows $0.00 on dashboard.
+ * Add &fix=true to actually attempt the insert and surface exact errors.
  */
 export async function GET(req: NextRequest) {
     const creatorId = req.nextUrl.searchParams.get("creatorId");
+    const doFix = req.nextUrl.searchParams.get("fix") === "true";
     if (!creatorId) {
         return NextResponse.json({ error: "Missing ?creatorId=xxx" }, { status: 400 });
     }
@@ -199,7 +201,88 @@ export async function GET(req: NextRequest) {
             simulation.errors.push(e.message);
         }
 
-        // --- 6. Gap detection ---
+        // --- 6. Attempt actual insert if ?fix=true ---
+        const fixResult: any = { attempted: doFix };
+        if (doFix && ofapiTxs.length > 0) {
+            try {
+                // Replicate exact cron logic: fan lookup → create missing → insert transactions
+                const allFanIds = [...new Set(
+                    ofapiTxs.map((tx: any) => tx.user?.id?.toString()).filter(Boolean)
+                )];
+                const existingFans = await prisma.fan.findMany({
+                    where: { ofapiFanId: { in: allFanIds } },
+                    select: { id: true, ofapiFanId: true },
+                });
+                const fanMap = new Map(existingFans.map((f) => [f.ofapiFanId, f.id]));
+
+                // Create missing fans
+                const missingFanIds = allFanIds.filter((id) => !fanMap.has(id));
+                if (missingFanIds.length > 0) {
+                    const missingFanData = missingFanIds.map((fanId) => {
+                        const tx = ofapiTxs.find((t: any) => t.user?.id?.toString() === fanId);
+                        return {
+                            ofapiFanId: fanId,
+                            creatorId,
+                            name: tx?.user?.name || tx?.user?.displayName || null,
+                            username: tx?.user?.username || null,
+                            lifetimeSpend: 0,
+                        };
+                    });
+                    await prisma.fan.createMany({ data: missingFanData, skipDuplicates: true });
+                    const newFans = await prisma.fan.findMany({
+                        where: { ofapiFanId: { in: missingFanIds } },
+                        select: { id: true, ofapiFanId: true },
+                    });
+                    for (const f of newFans) fanMap.set(f.ofapiFanId, f.id);
+                }
+                fixResult.fansCreated = missingFanIds.length;
+
+                // Build transaction records (exact cron logic)
+                const txRecords = ofapiTxs
+                    .filter((tx: any) => {
+                        const txId = tx.id?.toString();
+                        const fanId = tx.user?.id?.toString();
+                        return txId && fanId && fanMap.has(fanId);
+                    })
+                    .map((tx: any) => ({
+                        ofapiTxId: tx.id.toString(),
+                        fanId: fanMap.get(tx.user.id.toString())!,
+                        creatorId,
+                        amount: Math.abs(Number(tx.amount) || 0),
+                        type: (tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").slice(0, 50),
+                        date: new Date(tx.createdAt || tx.date || new Date()),
+                    }))
+                    .filter((tx: any) => tx.amount > 0);
+
+                fixResult.txPrepared = txRecords.length;
+
+                // Attempt the actual insert
+                if (txRecords.length > 0) {
+                    let totalCreated = 0;
+                    for (let i = 0; i < txRecords.length; i += 500) {
+                        const chunk = txRecords.slice(i, i + 500);
+                        const created = await prisma.transaction.createMany({
+                            data: chunk,
+                            skipDuplicates: true,
+                        });
+                        totalCreated += created.count;
+                    }
+                    fixResult.txInserted = totalCreated;
+                    fixResult.success = true;
+                } else {
+                    fixResult.txInserted = 0;
+                    fixResult.success = false;
+                    fixResult.reason = "No valid transaction records after filtering";
+                }
+            } catch (e: any) {
+                fixResult.success = false;
+                fixResult.error = e.message;
+                fixResult.errorCode = e.code;
+                fixResult.errorMeta = e.meta;
+            }
+        }
+
+        // --- 7. Gap detection ---
         const newestDbDate = recentDbTx[0]?.date ? new Date(recentDbTx[0].date) : null;
         const newestOfapiDate = newestOfapi?.createdAt
             ? new Date(newestOfapi.createdAt)
@@ -259,6 +342,7 @@ export async function GET(req: NextRequest) {
                 recentSample: recentDbTx,
             },
             simulation,
+            fix: fixResult,
             diagnosis: {
                 ofapiReturnsData: ofapiTxs.length > 0,
                 dbHasTodayTx: todayDbCount > 0,
