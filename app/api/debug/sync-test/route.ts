@@ -114,7 +114,92 @@ export async function GET(req: NextRequest) {
             select: { ofapiTxId: true, amount: true, type: true, date: true },
         });
 
-        // --- 5. Gap detection ---
+        // --- 5. Simulate cron sync (minimal, no writes) ---
+        const simulation: any = { steps: [], errors: [] };
+        try {
+            // Step A: How many OFAPI tx have valid IDs?
+            const incomingTxIds = ofapiTxs.map((tx: any) => tx.id?.toString()).filter(Boolean);
+            simulation.steps.push({ step: "A_incoming", total: ofapiTxs.length, withValidId: incomingTxIds.length });
+
+            // Step B: How many already exist in DB? (ofapiTxId is globally unique)
+            const existingTx = incomingTxIds.length > 0
+                ? await prisma.transaction.findMany({
+                    where: { ofapiTxId: { in: incomingTxIds } },
+                    select: { ofapiTxId: true },
+                })
+                : [];
+            const existingSet = new Set(existingTx.map((t) => t.ofapiTxId));
+            const newTxIds = incomingTxIds.filter((id) => !existingSet.has(id));
+            simulation.steps.push({
+                step: "B_dedup",
+                alreadyInDb: existingSet.size,
+                wouldBeNew: newTxIds.length,
+            });
+
+            // Step C: Of the new ones, how many pass cron's filters?
+            const newTxs = ofapiTxs.filter((tx: any) => newTxIds.includes(tx.id?.toString()));
+            const noUser = newTxs.filter((tx: any) => !tx.user?.id);
+            const noAmount = newTxs.filter((tx: any) => {
+                const amt = Math.abs(Number(tx.amount) || 0);
+                return amt <= 0;
+            });
+            const passesAllFilters = newTxs.filter((tx: any) => {
+                const hasId = !!tx.id;
+                const hasUser = !!tx.user?.id;
+                const amt = Math.abs(Number(tx.amount) || 0);
+                return hasId && hasUser && amt > 0;
+            });
+            simulation.steps.push({
+                step: "C_filters",
+                newTxCount: newTxs.length,
+                filteredOut_noUser: noUser.length,
+                filteredOut_noAmount: noAmount.length,
+                wouldInsert: passesAllFilters.length,
+                sampleNew: passesAllFilters.slice(0, 3).map((tx: any) => ({
+                    id: tx.id,
+                    amount: tx.amount,
+                    createdAt: tx.createdAt,
+                    userId: tx.user?.id,
+                })),
+            });
+
+            // Step D: Fan lookup — would these users resolve to Fan records?
+            const newFanIds = [...new Set(passesAllFilters.map((tx: any) => tx.user.id.toString()))];
+            const existingFans = newFanIds.length > 0
+                ? await prisma.fan.findMany({
+                    where: { ofapiFanId: { in: newFanIds } },
+                    select: { id: true, ofapiFanId: true, creatorId: true },
+                })
+                : [];
+            const fanMap = new Map(existingFans.map((f) => [f.ofapiFanId, f]));
+            const missingFanIds = newFanIds.filter((id) => !fanMap.has(id));
+            simulation.steps.push({
+                step: "D_fanLookup",
+                uniqueNewFans: newFanIds.length,
+                existingFansFound: existingFans.length,
+                missingFans: missingFanIds.length,
+                missingFanSample: missingFanIds.slice(0, 5),
+            });
+
+            // Step E: Verdict
+            const canInsertCount = passesAllFilters.filter((tx: any) => fanMap.has(tx.user.id.toString())).length;
+            const blockedByMissingFan = passesAllFilters.length - canInsertCount;
+            simulation.steps.push({
+                step: "E_verdict",
+                canInsertNow: canInsertCount,
+                blockedByMissingFan,
+                wouldInsertAfterFanCreation: passesAllFilters.length,
+                verdict: passesAllFilters.length === 0
+                    ? "No new transactions to insert (all duplicates or filtered out)"
+                    : blockedByMissingFan > 0
+                        ? `${blockedByMissingFan} tx blocked by missing Fan records — cron should create them but may be failing silently`
+                        : `${canInsertCount} tx should insert — if cron shows 0, check Prisma errors in Vercel logs`,
+            });
+        } catch (e: any) {
+            simulation.errors.push(e.message);
+        }
+
+        // --- 6. Gap detection ---
         const newestDbDate = recentDbTx[0]?.date ? new Date(recentDbTx[0].date) : null;
         const newestOfapiDate = newestOfapi?.createdAt
             ? new Date(newestOfapi.createdAt)
@@ -173,6 +258,7 @@ export async function GET(req: NextRequest) {
                 newestInDb: recentDbTx[0] || null,
                 recentSample: recentDbTx,
             },
+            simulation,
             diagnosis: {
                 ofapiReturnsData: ofapiTxs.length > 0,
                 dbHasTodayTx: todayDbCount > 0,

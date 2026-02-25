@@ -157,6 +157,16 @@ export async function GET(request: Request) {
         });
         const txMap = new Map(todayTx.map((t) => [t.creatorId, { sum: t._sum.amount || 0, count: t._count }]));
 
+        // Yesterday's revenue (UK day: yesterday midnight to today midnight)
+        const yesterdayStartUtc = new Date(todayStartUtc.getTime() - 24 * 60 * 60 * 1000);
+        const yesterdayTx = await prisma.transaction.groupBy({
+            by: ["creatorId"],
+            where: { date: { gte: yesterdayStartUtc, lt: todayStartUtc } },
+            _sum: { amount: true },
+            _count: true,
+        });
+        const yesterdayMap = new Map(yesterdayTx.map((t) => [t.creatorId, { sum: t._sum.amount || 0, count: t._count }]));
+
         // Top fan per creator (highest spend today)
         const topFanRows = await prisma.transaction.groupBy({
             by: ["creatorId", "fanId"],
@@ -184,6 +194,7 @@ export async function GET(request: Request) {
             const txCount = tx?.count || 0;
             const hourlyRev = todayRev / hoursSinceStart;
             const topFan = topFanMap.get(c.id);
+            const yesterdayRev = yesterdayMap.get(c.id)?.sum ?? 0;
 
             return {
                 ...c,
@@ -193,6 +204,7 @@ export async function GET(request: Request) {
                 headerUrl: c.headerUrl || null,
                 hourlyRev: Math.round(hourlyRev * 100) / 100,
                 todayRev: Math.round(todayRev * 100) / 100,
+                yesterdayRev: Math.round(yesterdayRev * 100) / 100,
                 topFans: topFan ? [{ username: fanNameMap.get(topFan.fanId) || "Fan", spend: topFan.spend }] : [],
                 txCount,
                 target: c.hourlyTarget || 100,

@@ -24,8 +24,9 @@ export function StatsGrid({ stats }: Props) {
             {/* Revenue (Gross) */}
             <div>
                 <h2 className="text-[11px] uppercase tracking-wider text-white/35 font-medium mb-4 px-1">Revenue (Gross)</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <StatCard label="Today (UK)" value={fmt(stats.todayRevenue || 0)} sub={`${stats.txCountToday || 0} transactions`} color={COLORS.teal} tooltip="Total gross since midnight UK time" />
+                    <StatCard label="Yesterday" value={fmt(stats.yesterdayRevenue ?? 0)} sub="previous UK day" color={COLORS.teal} tooltip="Total gross for the previous UK day (midnight to midnight)" />
                     <StatCard label="This Hour" value={fmt(stats.hourlyRevenue || 0)} sub="last 60 min" color={COLORS.cyan} tooltip="Revenue in the last 60 minutes" />
                     <StatCard label="7 Days" value={fmt(stats.weeklyRevenue || 0)} sub="last 7 days" color={COLORS.violet} tooltip="Total gross revenue over the past 7 days" />
                     <StatCard label="30 Days" value={fmt(stats.monthlyRevenue || 0)} sub="last 30 days" color={COLORS.pink} tooltip="Total gross revenue over the past 30 days" />

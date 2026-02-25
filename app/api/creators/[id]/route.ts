@@ -27,7 +27,7 @@ export async function GET(
         if (!creator) return NextResponse.json({ error: "Creator not found" }, { status: 404 });
 
         const stats: any = {
-            todayRevenue: 0, hourlyRevenue: 0, weeklyRevenue: 0, monthlyRevenue: 0,
+            todayRevenue: 0, yesterdayRevenue: 0, hourlyRevenue: 0, weeklyRevenue: 0, monthlyRevenue: 0,
             subscribersCount: 0, topPercentage: "N/A", weeklyDelta: 0,
             earningsByType: {}, dailyChart: [],
             topFansToday: [], topFansWeek: [], topFansMonth: [],
@@ -41,16 +41,22 @@ export async function GET(
             const key = creator.ofapiToken;
             const now = new Date();
             const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-            const todayUTC = new Date(now); todayUTC.setUTCHours(0, 0, 0, 0);
+            // UK midnight boundaries (consistent with dashboard /api/creators)
+            const ukNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/London" }));
+            const todayStartUk = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), 0, 0, 0, 0);
+            const ukOffset = ukNow.getTime() - now.getTime();
+            const todayUTC = new Date(todayStartUk.getTime() - ukOffset);
+            const yesterdayUTC = new Date(todayUTC.getTime() - 24 * 60 * 60 * 1000);
             const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             const fmt = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 
             try {
-                // All parallel — 13 calls
-                const [summaryToday, meRes, topPctRes, overviewRes, earningsChartRes,
+                // All parallel — 14 calls
+                const [summaryToday, summaryYesterday, meRes, topPctRes, overviewRes, earningsChartRes,
                        tipRes, msgRes, postRes, subRes, streamRes, txResToday, txResWeek, txResMonth] = await Promise.all([
                     getTransactionsSummary(key, { account_ids: [acct], start_date: todayUTC.toISOString(), end_date: now.toISOString() }, acct).catch(() => null),
+                    getTransactionsSummary(key, { account_ids: [acct], start_date: yesterdayUTC.toISOString(), end_date: todayUTC.toISOString() }, acct).catch(() => null),
                     getMe(acct, key).catch(() => null),
                     getTopPercentage(acct, key).catch(() => null),
                     getStatisticsOverview(acct, key, fmt(sevenDaysAgo), fmt(now)).catch(() => null),
@@ -67,6 +73,7 @@ export async function GET(
 
                 // Today revenue from transaction summary
                 stats.todayRevenue = parseFloat(summaryToday?.data?.total_gross || "0");
+                stats.yesterdayRevenue = parseFloat(summaryYesterday?.data?.total_gross || "0");
 
                 // Weekly + monthly from earnings endpoint
                 const totalEarnings7d = earningsChartRes?.data?.total || {};

@@ -25,6 +25,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
 
     // Missing profile data = needs sync (no avatar AND no header)
     const needsSync = isLinked && (!c.avatarUrl && !c.headerUrl);
+    const yesterdayRev = c.yesterdayRev ?? 0;
 
     async function handleSync(e: React.MouseEvent) {
         e.preventDefault();
@@ -215,13 +216,23 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                 {c.txCount > 0 && <span className="text-[10px] text-teal-400/60 ml-1">{c.txCount} txns</span>}
                             </div>
                         </div>
-                        {c.topFans?.length > 0 && (
-                            <div className="text-right">
-                                <div className="text-[9px] text-white/40 uppercase tracking-wider">Top fan</div>
-                                <div className="text-xs text-amber-400 font-semibold">@{c.topFans[0].username}</div>
-                                <div className="text-xs text-amber-400/70">${c.topFans[0].spend.toFixed(2)}</div>
-                            </div>
-                        )}
+                        <div className="text-right space-y-1">
+                            {yesterdayRev > 0 && (
+                                <div>
+                                    <span className="text-sm font-medium text-white/45">
+                                        ${yesterdayRev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                    <span className="text-[10px] text-white/30 ml-1">yesterday</span>
+                                </div>
+                            )}
+                            {c.topFans?.length > 0 && (
+                                <div>
+                                    <div className="text-[9px] text-white/40 uppercase tracking-wider">Top fan</div>
+                                    <div className="text-xs text-amber-400 font-semibold">@{c.topFans[0].username}</div>
+                                    <div className="text-xs text-amber-400/70">${c.topFans[0].spend.toFixed(2)}</div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Progress + Sliders */}
