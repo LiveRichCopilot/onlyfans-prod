@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { ChevronDown, Download } from "lucide-react";
+import { ChatterHourlyDrilldown } from "./ChatterHourlyDrilldown";
 
 type CreatorHourly = {
     id: string;
@@ -29,6 +31,24 @@ function formatHour(hour: number) {
     return `${h}${ampm}`;
 }
 
+function exportCsv(data: HourlyData) {
+    const hours = Array.from({ length: data.currentHour + 1 }, (_, i) => i);
+    const header = ["Model", ...hours.map((h) => formatHour(h)), "Total"].join(",");
+    const rows = data.creators.map((c) => {
+        const cells = hours.map((h) => c.hourly[h]?.toFixed(2) || "0.00");
+        return [c.name, ...cells, c.total.toFixed(2)].join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date();
+    a.href = url;
+    a.download = `hourly-breakdown-${now.toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
 // Frosted sticky column style — matches liquid glass layering
 const stickyCol = "backdrop-blur-[40px] bg-[rgba(5,5,8,0.75)]";
 
@@ -36,6 +56,7 @@ export function HourlyModelCounter() {
     const [data, setData] = useState<HourlyData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
@@ -96,7 +117,7 @@ export function HourlyModelCounter() {
         );
     }
 
-    // --- Empty state (show the panel so user knows the feature exists) ---
+    // --- Empty state ---
     if (!data || data.creators.length === 0) {
         return (
             <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6">
@@ -113,18 +134,29 @@ export function HourlyModelCounter() {
 
     return (
         <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6">
-            {/* Header with specular top edge */}
+            {/* Header */}
             <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
                     <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-400 to-teal-600 shadow-[0_0_8px_rgba(13,148,136,0.3)]" />
                     <h3 className="text-lg font-semibold text-white/85 tracking-tight">Hourly Breakdown</h3>
+                    <span className="text-[10px] text-white/25 ml-1">click model to expand</span>
                 </div>
-                <div className="glass-inset px-3 py-1 rounded-xl">
-                    <span className="text-[10px] text-white/40 font-mono tracking-wider">UK TIME</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => exportCsv(data)}
+                        className="glass-button px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-white/50 hover:text-white/80 transition-colors"
+                        title="Export as CSV"
+                    >
+                        <Download size={12} />
+                        <span className="text-[10px] font-medium">Export</span>
+                    </button>
+                    <div className="glass-inset px-3 py-1 rounded-xl">
+                        <span className="text-[10px] text-white/40 font-mono tracking-wider">UK TIME</span>
+                    </div>
                 </div>
             </div>
 
-            {/* Table with frosted scroll */}
+            {/* Table */}
             <div className="overflow-x-auto custom-scrollbar rounded-2xl glass-inset p-1">
                 <table className="w-full text-sm border-separate border-spacing-y-1">
                     <thead>
@@ -143,44 +175,87 @@ export function HourlyModelCounter() {
                         </tr>
                     </thead>
                     <tbody>
-                        {data.creators.map((creator) => (
-                            <tr key={creator.id} className="group">
-                                {/* Sticky model column */}
-                                <td className={`py-2.5 px-3 sticky left-0 z-10 rounded-l-xl ${stickyCol} group-hover:bg-white/[0.03] transition-colors`}>
-                                    <div className="flex items-center gap-2.5">
-                                        {creator.avatarUrl ? (
-                                            <img
-                                                src={`/api/proxy-media?url=${encodeURIComponent(creator.avatarUrl)}`}
-                                                alt={creator.name}
-                                                className="w-7 h-7 rounded-full object-cover border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                                            />
-                                        ) : (
-                                            <div className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-[10px] font-bold border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                                {creator.name.charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
-                                        <span className="text-white/75 font-medium text-xs truncate max-w-[100px]">
-                                            {creator.name}
-                                        </span>
-                                    </div>
-                                </td>
-                                {/* Hourly cells */}
-                                {creator.hourly.map((amount, i) => (
-                                    <td key={i} className={`text-center py-2.5 px-1 text-xs font-mono rounded-lg transition-all ${cellStyle(amount, creator.hourlyTarget)}`}>
-                                        {amount > 0 ? `$${amount.toFixed(0)}` : "\u2013"}
-                                    </td>
-                                ))}
-                                {/* Sticky total column */}
-                                <td className={`text-right py-2.5 px-3 sticky right-0 z-10 rounded-r-xl ${stickyCol} group-hover:bg-white/[0.03] transition-colors`}>
-                                    <span className="text-white/90 font-semibold text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
-                                        ${creator.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
+                        {data.creators.map((creator) => {
+                            const isExpanded = expandedId === creator.id;
+                            return (
+                                <ModelRow
+                                    key={creator.id}
+                                    creator={creator}
+                                    hours={hours}
+                                    isExpanded={isExpanded}
+                                    onToggle={() => setExpandedId(isExpanded ? null : creator.id)}
+                                    hoursCount={data.currentHour + 1}
+                                />
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
         </div>
+    );
+}
+
+function ModelRow({
+    creator,
+    hours,
+    isExpanded,
+    onToggle,
+    hoursCount,
+}: {
+    creator: CreatorHourly;
+    hours: number[];
+    isExpanded: boolean;
+    onToggle: () => void;
+    hoursCount: number;
+}) {
+    return (
+        <>
+            <tr className="group cursor-pointer" onClick={onToggle}>
+                {/* Sticky model column */}
+                <td className={`py-2.5 px-3 sticky left-0 z-10 rounded-l-xl ${stickyCol} group-hover:bg-white/[0.03] transition-colors`}>
+                    <div className="flex items-center gap-2.5">
+                        <ChevronDown
+                            size={12}
+                            className={`text-white/30 transition-transform shrink-0 ${isExpanded ? "rotate-0" : "-rotate-90"}`}
+                        />
+                        {creator.avatarUrl ? (
+                            <img
+                                src={`/api/proxy-media?url=${encodeURIComponent(creator.avatarUrl)}`}
+                                alt={creator.name}
+                                className="w-7 h-7 rounded-full object-cover border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                            />
+                        ) : (
+                            <div className="w-7 h-7 rounded-full bg-white/8 flex items-center justify-center text-[10px] font-bold border border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                {creator.name.charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <span className="text-white/75 font-medium text-xs truncate max-w-[90px]">
+                            {creator.name}
+                        </span>
+                    </div>
+                </td>
+                {/* Hourly cells */}
+                {creator.hourly.map((amount, i) => (
+                    <td key={i} className={`text-center py-2.5 px-1 text-xs font-mono rounded-lg transition-all ${cellStyle(amount, creator.hourlyTarget)}`}>
+                        {amount > 0 ? `$${amount.toFixed(0)}` : "\u2013"}
+                    </td>
+                ))}
+                {/* Sticky total column */}
+                <td className={`text-right py-2.5 px-3 sticky right-0 z-10 rounded-r-xl ${stickyCol} group-hover:bg-white/[0.03] transition-colors`}>
+                    <span className="text-white/90 font-semibold text-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                        ${creator.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </td>
+            </tr>
+            {/* Expanded chatter drilldown */}
+            {isExpanded && (
+                <ChatterHourlyDrilldown
+                    creatorId={creator.id}
+                    creatorName={creator.name}
+                    hoursCount={hoursCount}
+                    onClose={onToggle}
+                />
+            )}
+        </>
     );
 }

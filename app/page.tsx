@@ -61,7 +61,7 @@ export default function AgencyDashboard() {
         <div className="flex min-h-screen text-white/90 overflow-hidden relative">
             <Sidebar creators={creators} loading={loading} onAddAccount={() => setShowAddModal(true)} />
 
-            <main className="flex-1 p-4 md:p-8 md:pl-4 overflow-y-auto z-10 h-screen custom-scrollbar relative pb-24">
+            <main className="flex-1 p-4 md:p-8 md:pl-4 overflow-y-auto z-10 h-screen custom-scrollbar relative pb-8">
                 <header className="flex justify-between items-center mb-8 glass-panel p-6 rounded-3xl sticky top-0 z-20 border-white/10">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-white/95 mb-1">Agency Overview</h1>
