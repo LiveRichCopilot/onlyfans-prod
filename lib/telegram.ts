@@ -1188,14 +1188,27 @@ bot.on(["message:photo", "message:video", "message:voice"], async (ctx) => {
         }
 
         // Telegram Bot API hard limit: getFile() only works for files under 20MB.
-        // For larger files, give a direct dashboard upload link instead of a cryptic error.
         const fileSize = ctx.message.video?.file_size || ctx.message.photo?.[ctx.message.photo.length - 1]?.file_size || ctx.message.voice?.file_size || 0;
         if (fileSize > 20 * 1024 * 1024) {
             const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
             const creatorName = creator.name || creator.ofUsername || "this account";
+            const mediaType = ctx.message.video ? "video" : ctx.message.voice ? "voice" : "photo";
+            let tips = "";
+            if (mediaType === "video") {
+                tips = "To fit under 20MB:\n" +
+                    "- 720p + under 20 seconds\n" +
+                    "- Or 480p for longer clips\n" +
+                    "- Avoid sending as 'Original' quality";
+            } else if (mediaType === "voice") {
+                tips = "Voice notes should be under ~2 minutes to stay under 20MB.";
+            } else {
+                tips = "Send as photos (not documents) and fewer at a time (5-10 max).";
+            }
             await ctx.reply(
-                `File too large (${sizeMB}MB). Telegram limits bot downloads to 20MB.\n\n` +
-                `Please compress the file under 20MB and resend here, or upload it directly to the OF vault for ${creatorName}.`
+                `File too large (${sizeMB}MB). Telegram bots can only process files under 20MB.\n\n` +
+                `This bot is for quick fan replies — short videos, a few photos, brief voice notes.\n\n` +
+                `${tips}\n\n` +
+                `For longer or higher-quality uploads for ${creatorName}, use the OF vault directly.`
             );
             return;
         }
