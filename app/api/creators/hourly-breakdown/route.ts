@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,8 @@ export async function GET() {
             });
             allowedCreatorIds = assignments.map((a) => a.creatorId);
             if (allowedCreatorIds.length === 0) {
-                return NextResponse.json({ currentHour: 0, creators: [] });
+                const ukNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
+                return NextResponse.json({ currentHour: ukNow.getHours(), creators: [] });
             }
         }
 
@@ -33,40 +35,30 @@ export async function GET() {
         const todayStartUtc = new Date(todayStart.getTime() - ukOffset);
         const currentHour = ukNow.getHours();
 
-        // --- Hourly revenue query ---
-        let rows: { creatorId: string; bucket: Date; total: number }[];
-
-        if (allowedCreatorIds) {
-            rows = await prisma.$queryRaw`
-                SELECT "creatorId",
-                       date_trunc('hour', "date") AS bucket,
-                       SUM("amount")::float AS total
-                FROM "Transaction"
-                WHERE "date" >= ${todayStartUtc} AND "date" < ${now}
-                  AND "creatorId" IS NOT NULL
-                  AND "creatorId" = ANY(${allowedCreatorIds})
-                GROUP BY "creatorId", bucket
-                ORDER BY bucket
-            `;
-        } else {
-            rows = await prisma.$queryRaw`
-                SELECT "creatorId",
-                       date_trunc('hour', "date") AS bucket,
-                       SUM("amount")::float AS total
-                FROM "Transaction"
-                WHERE "date" >= ${todayStartUtc} AND "date" < ${now}
-                  AND "creatorId" IS NOT NULL
-                GROUP BY "creatorId", bucket
-                ORDER BY bucket
-            `;
-        }
-
-        // --- Fetch creators ---
+        // --- Fetch creators first ---
         const creators = await prisma.creator.findMany({
             where: allowedCreatorIds ? { id: { in: allowedCreatorIds } } : undefined,
             select: { id: true, name: true, avatarUrl: true, hourlyTarget: true, active: true },
             orderBy: { name: "asc" },
         });
+
+        if (creators.length === 0) {
+            return NextResponse.json({ currentHour, creators: [] });
+        }
+
+        // --- Hourly revenue query (use Prisma.sql for safe array interpolation) ---
+        const creatorIds = creators.map((c) => c.id);
+
+        const rows: { creatorId: string; bucket: Date; total: number }[] = await prisma.$queryRaw`
+            SELECT "creatorId",
+                   date_trunc('hour', "date") AS bucket,
+                   COALESCE(SUM("amount"), 0)::float AS total
+            FROM "Transaction"
+            WHERE "date" >= ${todayStartUtc} AND "date" < ${now}
+              AND "creatorId" IN (${Prisma.join(creatorIds)})
+            GROUP BY "creatorId", bucket
+            ORDER BY bucket
+        `;
 
         // --- Build per-creator hourly arrays ---
         const hoursCount = currentHour + 1;

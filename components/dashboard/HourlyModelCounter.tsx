@@ -35,14 +35,27 @@ const stickyCol = "backdrop-blur-[40px] bg-[rgba(5,5,8,0.75)]";
 export function HourlyModelCounter() {
     const [data, setData] = useState<HourlyData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         function fetchData() {
             fetch("/api/creators/hourly-breakdown")
-                .then((res) => res.json())
-                .then((d) => { setData(d); setLoading(false); })
-                .catch((err) => { console.error("Hourly fetch error:", err); setLoading(false); });
+                .then((res) => {
+                    if (!res.ok) throw new Error(`API ${res.status}`);
+                    return res.json();
+                })
+                .then((d) => {
+                    if (d.error) throw new Error(d.error);
+                    setData(d);
+                    setError(null);
+                    setLoading(false);
+                })
+                .catch((err) => {
+                    console.error("Hourly fetch error:", err);
+                    setError(err.message);
+                    setLoading(false);
+                });
         }
 
         fetchData();
@@ -53,10 +66,14 @@ export function HourlyModelCounter() {
         };
     }, []);
 
+    // --- Loading skeleton ---
     if (loading) {
         return (
-            <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 animate-pulse">
-                <div className="h-5 w-56 bg-white/8 rounded-lg mb-5" />
+            <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6 animate-pulse">
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-1.5 h-5 rounded-full bg-teal-500/30" />
+                    <div className="h-5 w-48 bg-white/8 rounded-lg" />
+                </div>
                 <div className="space-y-3">
                     {[1, 2, 3].map((i) => (
                         <div key={i} className="h-12 bg-white/[0.03] rounded-2xl" />
@@ -66,8 +83,30 @@ export function HourlyModelCounter() {
         );
     }
 
+    // --- Error state ---
+    if (error) {
+        return (
+            <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-1.5 h-5 rounded-full bg-red-500/50" />
+                    <h3 className="text-lg font-semibold text-white/85 tracking-tight">Hourly Breakdown</h3>
+                </div>
+                <p className="text-sm text-red-400/70">Failed to load hourly data: {error}</p>
+            </div>
+        );
+    }
+
+    // --- Empty state (show the panel so user knows the feature exists) ---
     if (!data || data.creators.length === 0) {
-        return null;
+        return (
+            <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-400 to-teal-600 shadow-[0_0_8px_rgba(13,148,136,0.3)]" />
+                    <h3 className="text-lg font-semibold text-white/85 tracking-tight">Hourly Breakdown</h3>
+                </div>
+                <p className="text-sm text-white/30">No hourly data yet today. Revenue will appear here as transactions come in.</p>
+            </div>
+        );
     }
 
     const hours = Array.from({ length: data.currentHour + 1 }, (_, i) => i);
