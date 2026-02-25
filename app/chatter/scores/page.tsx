@@ -64,11 +64,15 @@ interface ScoreEntry {
 
 const ARCHETYPE_CONFIG: Record<string, { label: string; color: string }> = {
   chameleon: { label: "Chameleon", color: "text-emerald-400" },
+  sweetheart: { label: "Sweetheart", color: "text-pink-400" },
+  aggressor: { label: "Aggressor", color: "text-orange-400" },
   tease: { label: "Tease", color: "text-purple-400" },
-  commander: { label: "Commander", color: "text-orange-400" },
-  doormat: { label: "Doormat", color: "text-red-400" },
-  interview_bot: { label: "Interview Bot", color: "text-yellow-400" },
   yes_babe_robot: { label: "Yes Babe Robot", color: "text-red-500" },
+  interview_bot: { label: "Interview Bot", color: "text-yellow-400" },
+  doormat: { label: "Doormat", color: "text-red-400" },
+  fact_bot: { label: "Fact Bot", color: "text-yellow-500" },
+  friend_zone: { label: "Friend Zone", color: "text-blue-400" },
+  vending_machine: { label: "Vending Machine", color: "text-gray-400" },
 };
 
 function scoreColor(score: number): string {

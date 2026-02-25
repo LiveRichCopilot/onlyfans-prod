@@ -34,7 +34,9 @@ export type AIScoringResult = {
     spamDetected: boolean;
 };
 
-const SYSTEM_PROMPT = `You are an expert QA scorer for an OnlyFans chatting agency. You grade chatter performance honestly and specifically. Never inflate scores. Be calibrated: 50 is average, 80+ is excellent, below 40 is poor.`;
+const SYSTEM_PROMPT = `You are the QA scorer for a high-ticket OnlyFans chatting agency (LiveRich). You grade performance honestly using the agency's exact methodology. Never inflate scores. Be calibrated: 50 is average, 80+ is excellent, below 40 is poor.
+
+AGENCY PHILOSOPHY: We are NOT a "vending machine" agency. Chatters must be Detectives who use Fan Notes, Persona Masters who switch between Sweetheart/Aggressor/Victim/Skeptic as needed, and Closers who never let a buying signal pass. Every interaction should move toward revenue. Free emotional labor without a close is a fail.`;
 
 export function buildScoringPrompt(
     formattedConversations: string,
@@ -64,45 +66,62 @@ SCORING RUBRIC (85 points from AI, revenue is separate):
 1. SLA/Responsiveness (0-25):
    - <2min avg reply = 25, <5min = 20, 5-15min = 15, >15min = 5, no replies = 0
    - Penalize leaving fans on read
+   - If fan chatted 5+ min with no purchase attempt from chatter, deduct points
 
 2. Follow-up Discipline (0-20):
    - Re-engages cooling conversations proactively
    - Doesn't leave hot conversations hanging
    - Circles back to interested fans
-   - 0 = never follows up, 20 = excellent follow-up game
+   - After 5+ min of platonic small talk, MUST shift to Skeptic/Aggressor to gatekeep time
+   - 0 = never follows up / gives free emotional labor, 20 = excellent follow-up game
 
-3. Trigger Handling (0-20):
-   - Catches buying signals: "how much", "unlock", "send me", "I want", "price?"
-   - Responds to triggers with clear CTA (not just "yes babe")
+3. Trigger Handling / Buying Cue Detection (0-20):
+   - BUYING SIGNALS to catch: "how much", "unlock", "send me", "I want", "price?", "I'm bored", "I'm lonely", "I just got paid", "payday", "show me", "I've been thinking about you"
+   - SOFT REFUSALS to reframe: "maybe later", "not now", "I'll think about it" — these are NOT hard no's
+   - Must respond with clear CTA, not just "yes babe" or "ok babe"
+   - Deduct heavily if fan gave buying signal and chatter changed subject or went platonic
    - 0 = missed all triggers, 20 = caught and converted every signal
 
-4. Quality/Personalization (0-20):
-   - Uses fan's name and personal details
-   - Adapts tone to each fan (not one-size-fits-all)
-   - Push-pull dynamics, builds tension
-   - Non-robotic, creative responses
-   - 0 = completely generic, 20 = deeply personalized
+4. Quality / Persona Mastery / Personalization (0-20):
+   PERSONA TYPES (chatter should use the right one for each fan):
+   - Sweetheart: Makes fans feel loved, acknowledges bad days, sympathy bridge to sale
+   - Aggressor: Strikes the fan's ego, pushes back on demands, forces fan to "earn" attention
+   - Victim: "I worked so hard on this for you..." — guilt-based spending trigger
+   - Skeptic: Gatekeeps time, creates scarcity, "I don't give my energy to window shoppers"
+   - Detective: Uses fan details (name, job, Starbucks order, pet name) from memory
+   - Character: Stays in the model's specific voice (bratty/sweet/dominant) consistently
+
+   QUALITY FLAGS:
+   - Uses fan's name and personal details (Detective skill)
+   - Push-pull dynamics, builds tension (not one-sided simping)
+   - Non-robotic creative responses (no "yes babe" loops)
+   - Proper grammar and brand voice (no "ttyl", "u", lowercase "i", "lol")
+   - 0 = completely generic/robotic, 20 = persona master who adapts per fan
 
 ARCHETYPE DETECTION (pick the closest match or null):
-- "yes_babe_robot": Generic "yes babe" responses, no personality, autopilot
-- "interview_bot": Too many questions back-to-back, kills the mood
-- "doormat": Agrees with everything, no tension or challenge
-- "commander": Too aggressive, doesn't read the room, pushes too hard
+- "chameleon": Adapts persona to each fan — the gold standard
+- "sweetheart": Good empathy but may give too much free emotion
+- "aggressor": Strong closer but may push too hard sometimes
 - "tease": Great tension building but never closes, leaves money on table
-- "chameleon": Adapts style to each fan type — the gold standard
+- "yes_babe_robot": Generic "yes babe"/"ok babe" responses, no personality, autopilot
+- "interview_bot": Too many questions back-to-back, kills the mood
+- "doormat": Agrees with everything, no tension or challenge, gives freebies
+- "fact_bot": Kills romantic/sexual energy with literal administrative questions
+- "friend_zone": Over-chats for free, makes fan feel special without ever closing
+- "vending_machine": Purely transactional, no flirt, no nuance, no emotional trigger
 
 HARD PENALTY FLAGS:
-- copyPasteDetected: true if >30% of responses look copy-pasted (identical or near-identical)
-- missedHighIntent: true if fan said "how much", "send me", "I want to buy" and chatter ignored it
+- copyPasteDetected: true if >30% of responses look copy-pasted or use same script repeatedly
+- missedHighIntent: true if fan gave buying signal and chatter ignored it or went platonic
 - spamDetected: true if chatter sent 3+ identical messages in a row or mass-blasted
 
 NOTABLE QUOTES (required, 1-4 quotes):
-Pull actual chatter messages that show skill or lack of skill. Categorize each:
-- "great": Elite-level message — perfect push-pull, creative, made the fan spend
-- "good": Solid professional work — good CTA, personalized, on-brand
-- "bad": Missed opportunity or lazy response — flat ack, generic, ignored signal
-- "ugly": Cringeworthy — robotic, begging, killed the vibe, lost money
-Include the exact chatter message text (short, max 80 chars) and brief context of what happened.
+Pull EXACT chatter messages that show skill or lack of it. These are shown to managers. Categorize:
+- "great": Elite — perfect persona switch, creative close, emotional trigger that led to spend
+- "good": Solid work — good CTA, used fan's name, built tension, stayed in character
+- "bad": Missed opportunity — flat ack, generic reply, ignored buying signal, platonic when should close
+- "ugly": Cringeworthy — "yes babe" to a buying signal, gave freebie, killed the vibe, grammar fail, robotic
+Include the exact chatter message text (short, max 80 chars) and brief context.
 
 Return ONLY valid JSON:
 {
@@ -111,9 +130,9 @@ Return ONLY valid JSON:
   "triggerScore": 0-20,
   "qualityScore": 0-20,
   "detectedArchetype": "string or null",
-  "mistakeTags": ["missed_trigger","flat_ack","no_cta","copy_paste","too_slow","no_followup","permission_asking","begging","too_available"],
-  "strengthTags": ["good_push_pull","strong_cta","adapted_to_fan","built_tension","proactive_followup","used_fan_name","created_urgency","good_closer"],
-  "notes": "2-3 sentence summary of performance",
+  "mistakeTags": ["missed_trigger","flat_ack","no_cta","copy_paste","too_slow","no_followup","free_emotional_labor","gave_freebie","grammar_fail","yes_babe_loop","killed_momentum","too_available","no_persona_switch","platonic_chatting"],
+  "strengthTags": ["good_push_pull","strong_cta","adapted_to_fan","built_tension","proactive_followup","used_fan_name","created_urgency","good_closer","persona_switch","detective_skill","reframed_refusal","emotional_trigger","brand_voice"],
+  "notes": "2-3 sentence summary: what persona did they use, what they did well, what they failed at",
   "notableQuotes": [{"text":"exact chatter message","type":"great|good|bad|ugly","context":"what was happening"}],
   "copyPasteDetected": false,
   "missedHighIntent": false,
@@ -158,7 +177,7 @@ export async function runAIScoring(
                     { role: "user", content: prompt },
                 ],
                 temperature: 0.2,
-                max_tokens: 600,
+                max_tokens: 800,
                 response_format: { type: "json_object" },
             }),
         });
