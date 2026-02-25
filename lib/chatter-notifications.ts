@@ -14,6 +14,12 @@
 import { bot } from "@/lib/telegram";
 import { prisma } from "@/lib/prisma";
 
+type NotableQuote = {
+    text: string;
+    type: "great" | "good" | "bad" | "ugly";
+    context: string;
+};
+
 type ScoreNotification = {
     chatterEmail: string;
     chatterName: string | null;
@@ -29,6 +35,7 @@ type ScoreNotification = {
     strengthTags: string[];
     mistakeTags: string[];
     aiNotes: string | null;
+    notableQuotes: NotableQuote[];
     messagesAnalyzed: number;
     conversationsScanned: number;
     robotPhraseCount: number;
@@ -139,6 +146,16 @@ export async function sendScoreNotification(score: ScoreNotification): Promise<b
 
         if (score.aiNotes) {
             msg += `\n\nNotes: ${score.aiNotes}`;
+        }
+
+        // Notable quotes
+        if (score.notableQuotes?.length > 0) {
+            const quoteEmoji: Record<string, string> = { great: "⭐", good: "✅", bad: "⚠️", ugly: "💀" };
+            msg += `\n\nQuotes:`;
+            for (const q of score.notableQuotes.slice(0, 3)) {
+                msg += `\n${quoteEmoji[q.type] || "💬"} "${q.text}"`;
+                if (q.context) msg += ` — ${q.context}`;
+            }
         }
 
         msg += `\n\nMsgs: ${score.messagesAnalyzed} | Chats: ${score.conversationsScanned}`;

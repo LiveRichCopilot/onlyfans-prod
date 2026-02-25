@@ -13,6 +13,12 @@
 
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 
+export type NotableQuote = {
+    text: string;
+    type: "great" | "good" | "bad" | "ugly";
+    context: string;
+};
+
 export type AIScoringResult = {
     slaScore: number;
     followupScore: number;
@@ -22,6 +28,7 @@ export type AIScoringResult = {
     mistakeTags: string[];
     strengthTags: string[];
     notes: string;
+    notableQuotes: NotableQuote[];
     copyPasteDetected: boolean;
     missedHighIntent: boolean;
     spamDetected: boolean;
@@ -89,6 +96,14 @@ HARD PENALTY FLAGS:
 - missedHighIntent: true if fan said "how much", "send me", "I want to buy" and chatter ignored it
 - spamDetected: true if chatter sent 3+ identical messages in a row or mass-blasted
 
+NOTABLE QUOTES (required, 1-4 quotes):
+Pull actual chatter messages that show skill or lack of skill. Categorize each:
+- "great": Elite-level message — perfect push-pull, creative, made the fan spend
+- "good": Solid professional work — good CTA, personalized, on-brand
+- "bad": Missed opportunity or lazy response — flat ack, generic, ignored signal
+- "ugly": Cringeworthy — robotic, begging, killed the vibe, lost money
+Include the exact chatter message text (short, max 80 chars) and brief context of what happened.
+
 Return ONLY valid JSON:
 {
   "slaScore": 0-25,
@@ -99,6 +114,7 @@ Return ONLY valid JSON:
   "mistakeTags": ["missed_trigger","flat_ack","no_cta","copy_paste","too_slow","no_followup","permission_asking","begging","too_available"],
   "strengthTags": ["good_push_pull","strong_cta","adapted_to_fan","built_tension","proactive_followup","used_fan_name","created_urgency","good_closer"],
   "notes": "2-3 sentence summary of performance",
+  "notableQuotes": [{"text":"exact chatter message","type":"great|good|bad|ugly","context":"what was happening"}],
   "copyPasteDetected": false,
   "missedHighIntent": false,
   "spamDetected": false
@@ -158,6 +174,17 @@ export async function runAIScoring(
 
         const parsed = JSON.parse(content);
 
+        // Parse and validate notable quotes
+        const rawQuotes = Array.isArray(parsed.notableQuotes) ? parsed.notableQuotes : [];
+        const notableQuotes: NotableQuote[] = rawQuotes
+            .filter((q: any) => q?.text && q?.type && ["great", "good", "bad", "ugly"].includes(q.type))
+            .slice(0, 4)
+            .map((q: any) => ({
+                text: String(q.text).slice(0, 120),
+                type: q.type as NotableQuote["type"],
+                context: String(q.context || "").slice(0, 100),
+            }));
+
         return {
             slaScore: clamp(parsed.slaScore || 0, 0, 25),
             followupScore: clamp(parsed.followupScore || 0, 0, 20),
@@ -167,6 +194,7 @@ export async function runAIScoring(
             mistakeTags: Array.isArray(parsed.mistakeTags) ? parsed.mistakeTags : [],
             strengthTags: Array.isArray(parsed.strengthTags) ? parsed.strengthTags : [],
             notes: parsed.notes || "",
+            notableQuotes,
             copyPasteDetected: !!parsed.copyPasteDetected,
             missedHighIntent: !!parsed.missedHighIntent,
             spamDetected: !!parsed.spamDetected,

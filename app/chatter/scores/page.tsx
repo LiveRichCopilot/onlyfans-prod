@@ -42,6 +42,7 @@ interface ScoreEntry {
     conversationsScanned: number;
     robotPhraseCount: number;
     aiNotes: string | null;
+    notableQuotes: Array<{ text: string; type: "great" | "good" | "bad" | "ugly"; context: string }> | null;
     mistakeTags: string[];
     strengthTags: string[];
   } | null;
@@ -504,6 +505,52 @@ export default function ChatterScores() {
                                 </span>
                               ),
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notable Quotes */}
+                      {entry.currentScore?.notableQuotes && entry.currentScore.notableQuotes.length > 0 && (
+                        <div className="mt-3">
+                          <span className="text-white/30 text-[10px] uppercase tracking-wider">
+                            Notable Quotes
+                          </span>
+                          <div className="mt-1.5 space-y-1.5">
+                            {entry.currentScore.notableQuotes.map((q, qi) => (
+                              <div key={qi} className={`p-2.5 rounded-xl border border-solid ${
+                                q.type === "great" ? "bg-emerald-500/5 border-emerald-500/15" :
+                                q.type === "good" ? "bg-teal-500/5 border-teal-500/15" :
+                                q.type === "bad" ? "bg-orange-500/5 border-orange-500/15" :
+                                "bg-red-500/5 border-red-500/15"
+                              }`}>
+                                <div className="flex items-start gap-2">
+                                  <span className="text-sm shrink-0 mt-0.5">
+                                    {q.type === "great" ? "⭐" : q.type === "good" ? "✅" : q.type === "bad" ? "⚠️" : "💀"}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className={`text-xs font-medium italic ${
+                                      q.type === "great" ? "text-emerald-400/90" :
+                                      q.type === "good" ? "text-teal-400/90" :
+                                      q.type === "bad" ? "text-orange-400/90" :
+                                      "text-red-400/90"
+                                    }`}>
+                                      &ldquo;{q.text}&rdquo;
+                                    </p>
+                                    {q.context && (
+                                      <p className="text-white/25 text-[10px] mt-0.5">{q.context}</p>
+                                    )}
+                                  </div>
+                                  <span className={`text-[9px] uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded-md ${
+                                    q.type === "great" ? "bg-emerald-500/10 text-emerald-400/70" :
+                                    q.type === "good" ? "bg-teal-500/10 text-teal-400/70" :
+                                    q.type === "bad" ? "bg-orange-500/10 text-orange-400/70" :
+                                    "bg-red-500/10 text-red-400/70"
+                                  }`}>
+                                    {q.type}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}

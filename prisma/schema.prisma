@@ -384,6 +384,7 @@ model ChatterHourlyScore {
   robotPhraseCount      Int      @default(0)
   creativePhraseCount   Int      @default(0)
   aiNotes               String?
+  notableQuotes         Json?
   mistakeTags           String[]
   strengthTags          String[]
   createdAt             DateTime @default(now())

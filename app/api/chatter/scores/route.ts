@@ -140,6 +140,7 @@ export async function GET() {
                           conversationsScanned: entry.currentScore.conversationsScanned,
                           robotPhraseCount: entry.currentScore.robotPhraseCount,
                           aiNotes: entry.currentScore.aiNotes,
+                          notableQuotes: entry.currentScore.notableQuotes,
                           mistakeTags: entry.currentScore.mistakeTags,
                           strengthTags: entry.currentScore.strengthTags,
                       }
