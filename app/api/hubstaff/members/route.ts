@@ -32,6 +32,6 @@ export async function GET() {
     return NextResponse.json({ members: enriched });
   } catch (err: any) {
     console.error("Hubstaff members error:", err.message);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ members: [], error: err.message }, { status: 200 });
   }
 }

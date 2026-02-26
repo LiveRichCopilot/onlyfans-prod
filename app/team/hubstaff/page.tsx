@@ -5,7 +5,7 @@ import { Users, RefreshCw, Trash2, Plus, CheckCircle, XCircle, Link2 } from "luc
 
 type HubstaffMember = { hubstaffUserId: string; name: string; email: string; status: string; isMapped: boolean };
 type Mapping = { id: string; hubstaffUserId: string; hubstaffName: string | null; chatterEmail: string; creatorId: string | null; creator?: { name: string | null } | null };
-type Config = { configured: boolean; organizationId?: string; syncEnabled?: boolean; lastSyncAt?: string; tokenExpiresAt?: string };
+type Config = { configured: boolean; organizationId?: string; syncEnabled?: boolean; lastSyncAt?: string; tokenExpiresAt?: string; hasDpopKeys?: boolean };
 type Creator = { id: string; name: string | null };
 
 export default function HubstaffAdmin() {
@@ -21,6 +21,7 @@ export default function HubstaffAdmin() {
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,6 +44,7 @@ export default function HubstaffAdmin() {
       const memRes = await fetch("/api/hubstaff/members");
       const memData = await memRes.json();
       setMembers(memData.members || []);
+      setMembersError(memData.error || null);
     }
     setLoading(false);
   }, []);
@@ -294,12 +296,19 @@ export default function HubstaffAdmin() {
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <Plus size={18} className="text-white/60" /> Hubstaff Members
           </h2>
+          {membersError && (
+            <div className="text-xs px-3 py-2 rounded-lg bg-red-500/10 text-red-400">
+              Failed to load members: {membersError}
+            </div>
+          )}
           <div className="space-y-2">
             {members.filter(m => !m.isMapped).map(m => (
               <MemberRow key={m.hubstaffUserId} member={m} creators={creators} onMap={addMapping} />
             ))}
-            {members.filter(m => !m.isMapped).length === 0 && (
-              <p className="text-white/40 text-sm">All members are mapped</p>
+            {members.filter(m => !m.isMapped).length === 0 && !membersError && (
+              <p className="text-white/40 text-sm">
+                {members.length === 0 ? "No members found in Hubstaff org — check token & org ID" : "All members are mapped"}
+              </p>
             )}
           </div>
         </div>

@@ -13,7 +13,7 @@ let cachedKeyPair: KeyPair | null = null;
 async function getDpopKeyPair(configId?: string): Promise<KeyPair> {
   if (cachedKeyPair) return cachedKeyPair;
 
-  // Try loading from DB
+  // Try loading from DB — keys were stored during token exchange
   if (configId) {
     const config = await prisma.hubstaffConfig.findUnique({ where: { id: configId } });
     if (config?.dpopPrivateKey && config?.dpopPublicKey) {
@@ -24,12 +24,12 @@ async function getDpopKeyPair(configId?: string): Promise<KeyPair> {
     }
   }
 
-  // Generate new EC P-256 key pair
+  // No stored keys — generate new ones and store them
+  // This happens when keys were lost or on first bootstrap
   const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
   const publicJwk = publicKey.export({ format: "jwk" });
   const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
 
-  // Store in DB if we have a config
   if (configId) {
     await prisma.hubstaffConfig.update({
       where: { id: configId },
@@ -39,6 +39,11 @@ async function getDpopKeyPair(configId?: string): Promise<KeyPair> {
 
   cachedKeyPair = { privateKey, publicJwk };
   return cachedKeyPair;
+}
+
+/** Clear in-memory DPoP cache (e.g. after token update stores new keys). */
+export function clearDpopCache() {
+  cachedKeyPair = null;
 }
 
 // --- DPoP Proof Generation ---

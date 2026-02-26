@@ -1,9 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import * as crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
 const TOKEN_URL = "https://account.hubstaff.com/access_tokens";
+
+// --- DPoP helpers (inline to avoid circular deps) ---
+
+function base64url(buf: Buffer): string {
+  return buf.toString("base64url");
+}
+
+function generateKeyPair() {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const publicJwk = publicKey.export({ format: "jwk" });
+  const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
+  return { privateKey, publicJwk, privatePem };
+}
+
+function createDpopProof(
+  privateKey: crypto.KeyObject,
+  publicJwk: JsonWebKey,
+  method: string,
+  url: string,
+): string {
+  const header = { typ: "dpop+jwt", alg: "ES256", jwk: publicJwk };
+  const payload = {
+    htm: method,
+    htu: url,
+    iat: Math.floor(Date.now() / 1000),
+    jti: crypto.randomUUID(),
+  };
+
+  const headerB64 = base64url(Buffer.from(JSON.stringify(header)));
+  const payloadB64 = base64url(Buffer.from(JSON.stringify(payload)));
+  const sig = crypto.sign("sha256", Buffer.from(`${headerB64}.${payloadB64}`), privateKey);
+
+  return `${headerB64}.${payloadB64}.${base64url(sig)}`;
+}
 
 /**
  * POST /api/hubstaff/setup
@@ -17,10 +52,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "refreshToken and organizationId required" }, { status: 400 });
     }
 
-    // Exchange refresh token for an access token
+    // Generate DPoP key pair for token exchange (Hubstaff requires DPoP RFC 9449)
+    const { privateKey, publicJwk, privatePem } = generateKeyPair();
+    const dpopProof = createDpopProof(privateKey, publicJwk, "POST", TOKEN_URL);
+
+    // Exchange refresh token for an access token WITH DPoP
     const res = await fetch(TOKEN_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "DPoP": dpopProof,
+      },
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
     });
 
@@ -31,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
-    // Upsert config — works for both initial setup AND token updates
+    // Upsert config — store tokens AND DPoP keys together
     const config = await prisma.hubstaffConfig.upsert({
       where: { organizationId },
       update: {
@@ -39,15 +81,16 @@ export async function POST(req: NextRequest) {
         refreshToken: data.refresh_token || refreshToken,
         tokenExpiresAt: new Date(Date.now() + (data.expires_in || 7200) * 1000),
         syncEnabled: true,
-        // Clear DPoP keys so they get regenerated fresh with the new token
-        dpopPrivateKey: null,
-        dpopPublicKey: null,
+        dpopPrivateKey: privatePem,
+        dpopPublicKey: JSON.stringify(publicJwk),
       },
       create: {
         organizationId,
         accessToken: data.access_token,
         refreshToken: data.refresh_token || refreshToken,
         tokenExpiresAt: new Date(Date.now() + (data.expires_in || 7200) * 1000),
+        dpopPrivateKey: privatePem,
+        dpopPublicKey: JSON.stringify(publicJwk),
       },
     });
 
