@@ -129,8 +129,9 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
         <Pill label={msg.hookCategory} />
         <Pill label={msg.contentType} color="#5eead4" />
         {msg.hasCTA && <Pill label="CTA" color="#fbbf24" />}
-        {msg.isPPV && <span className="text-white/50 text-[10px] font-semibold">${msg.price}</span>}
-        {msg.isFreePreview && <Pill label="Free Preview" color="rgba(255,255,255,0.25)" />}
+        {msg.price > 0 && <span className="text-teal-400/70 text-[10px] font-bold">${msg.price}</span>}
+        {msg.price === 0 && msg.hasMedia && <Pill label="Free" color="rgba(255,255,255,0.25)" />}
+        {msg.isFreePreview && <Pill label="Preview" color="rgba(255,255,255,0.25)" />}
         <div className="flex items-center gap-0.5 ml-auto">
           <MediaTypeIcon type={msg.mediaType} />
           <span className="text-white/30 text-[10px]">{msg.mediaType.replace("-", " ")}</span>
@@ -148,9 +149,7 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
         <span className="flex items-center gap-1"><ShoppingCart size={9} /> <span className="text-white/60 font-medium">{msg.purchasedCount.toLocaleString()}</span>
           {msg.viewedCount > 0 && <span className="text-white/30">({cvr}%)</span>}
         </span>
-        {revenue > 0 && (
-          <span className="flex items-center gap-1"><DollarSign size={9} /> <span className="text-teal-400/80 font-semibold">${revenue.toFixed(0)}</span></span>
-        )}
+        <span className="flex items-center gap-1"><DollarSign size={9} /> <span className={`font-semibold ${revenue > 0 ? "text-teal-400/80" : "text-white/20"}`}>${revenue.toFixed(0)}</span></span>
         <button onClick={copyText} className="ml-auto text-white/20 hover:text-white/50 transition" title="Copy message text">
           {copied ? <Check size={11} className="text-teal-400" /> : <Copy size={11} />}
         </button>

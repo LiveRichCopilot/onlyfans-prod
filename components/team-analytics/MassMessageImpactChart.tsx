@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart, Legend } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, BarChart, Legend } from "recharts";
 import { TrendingUp, RefreshCw } from "lucide-react";
 
 type DailyPoint = { date: string; sent: number; purchased: number; revenue: number };
@@ -15,10 +15,10 @@ function fmtNum(n: number): string {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="glass-card rounded-xl px-3 py-2 text-xs border border-white/10">
-      <p className="text-white/50 mb-1">{label}</p>
+    <div className="rounded-xl px-3 py-2 text-xs border border-white/10 shadow-xl" style={{ background: "#1a1a2e", backdropFilter: "none" }}>
+      <p className="text-white/70 font-medium mb-1">{label}</p>
       {payload.map((p: any, i: number) => (
-        <p key={i} className="text-white/80" style={{ color: p.color }}>
+        <p key={i} className="font-medium" style={{ color: p.color || "#fff" }}>
           {p.name}: {p.name === "Revenue" ? `$${Number(p.value).toFixed(0)}` : fmtNum(p.value)}
         </p>
       ))}
@@ -87,27 +87,36 @@ export function MassMessageImpactChart({ days, creatorFilter, startDate, endDate
       </div>
 
       {/* Lift stats */}
-      <div className="flex gap-3 text-[10px]">
+      <div className="flex gap-3 text-[10px] flex-wrap">
         {sendDays.length > 0 && (
           <div className="glass-inset rounded-lg px-3 py-1.5">
             <span className="text-white/30">Send days avg:</span>{" "}
-            <span className="text-teal-400 font-semibold">${avgSendDayRevenue.toFixed(0)}</span>{" "}
+            <span className="text-teal-400 font-semibold">
+              {avgSendDayRevenue > 0 ? `$${avgSendDayRevenue.toFixed(0)}` : `${avgSendDayPurchases.toFixed(0)} purchases`}
+            </span>{" "}
             <span className="text-white/20">({sendDays.length}d)</span>
           </div>
         )}
         {noSendDays.length > 0 && (
           <div className="glass-inset rounded-lg px-3 py-1.5">
             <span className="text-white/30">No-send days avg:</span>{" "}
-            <span className="text-white/50 font-semibold">${avgNoSendRevenue.toFixed(0)}</span>{" "}
+            <span className="text-white/50 font-semibold">
+              {avgNoSendRevenue > 0 ? `$${avgNoSendRevenue.toFixed(0)}` : `${noSendDays.length > 0 ? (noSendDays.reduce((s, d) => s + d.purchased, 0) / noSendDays.length).toFixed(0) : 0} purchases`}
+            </span>{" "}
             <span className="text-white/20">({noSendDays.length}d)</span>
           </div>
         )}
-        {avgSendDayRevenue > 0 && avgNoSendRevenue > 0 && (
+        {avgSendDayPurchases > 0 && (
           <div className="glass-inset rounded-lg px-3 py-1.5">
-            <span className="text-white/30">Lift:</span>{" "}
-            <span className={`font-semibold ${avgSendDayRevenue > avgNoSendRevenue ? "text-teal-400" : "text-red-400"}`}>
-              {avgSendDayRevenue > avgNoSendRevenue ? "+" : ""}{((avgSendDayRevenue / avgNoSendRevenue - 1) * 100).toFixed(0)}%
-            </span>
+            <span className="text-white/30">Total sent:</span>{" "}
+            <span className="text-white/60 font-semibold">{fmtNum(sendDays.reduce((s, d) => s + d.sent, 0))}</span>
+            <span className="text-white/20 ml-1">msgs</span>
+          </div>
+        )}
+        {avgSendDayPurchases > 0 && (
+          <div className="glass-inset rounded-lg px-3 py-1.5">
+            <span className="text-white/30">Total purchased:</span>{" "}
+            <span className="text-teal-400/80 font-semibold">{fmtNum(data.reduce((s, d) => s + d.purchased, 0))}</span>
           </div>
         )}
       </div>
@@ -118,19 +127,17 @@ export function MassMessageImpactChart({ days, creatorFilter, startDate, endDate
           <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
             <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 10 }} tickLine={false} axisLine={false} />
-            <YAxis yAxisId="sent" orientation="left" tick={{ fill: "rgba(255,255,255,0.15)", fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={fmtNum} />
-            <YAxis yAxisId="rev" orientation="right" tick={{ fill: "rgba(94,234,212,0.3)", fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${fmtNum(v)}`} />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 10, opacity: 0.4 }} />
-            <Bar yAxisId="sent" dataKey="sent" name="Sent" fill="rgba(255,255,255,0.08)" radius={[4, 4, 0, 0]} />
-            <Bar yAxisId="sent" dataKey="purchased" name="Purchased" fill="rgba(94,234,212,0.3)" radius={[4, 4, 0, 0]} />
-            <Area yAxisId="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#5eead4" fill="rgba(94,234,212,0.08)" strokeWidth={1.5} />
+            <YAxis yAxisId="sent" orientation="left" tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={fmtNum} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+            <Legend wrapperStyle={{ fontSize: 10, opacity: 0.5 }} />
+            <Bar yAxisId="sent" dataKey="sent" name="Sent" fill="rgba(255,255,255,0.15)" radius={[4, 4, 0, 0]} />
+            <Bar yAxisId="sent" dataKey="purchased" name="Purchased" fill="rgba(94,234,212,0.5)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       <p className="text-[9px] text-white/15 text-center">
-        Purchase data only. Inbound fan reply tracking requires chat message pipeline (planned).
+        Sent volume vs purchase count per day. Reply attribution shown on individual messages below.
       </p>
     </div>
   );
