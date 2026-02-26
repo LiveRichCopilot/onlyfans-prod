@@ -30,7 +30,7 @@ export function ChatterRadarChart({ data }: { data: ChatterRadarEntry[] }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-white font-semibold text-sm">Skill Radar</h3>
-          <p className="text-white/40 text-xs mt-0.5">Compares each chatter across all 5 scoring areas — bigger shape = better overall</p>
+          <p className="text-white/40 text-xs mt-0.5">Each chatter's shape shows their strengths — a bigger shape means a better all-round performer</p>
         </div>
         <ExportButtons data={data} filename="chatter-radar" />
       </div>

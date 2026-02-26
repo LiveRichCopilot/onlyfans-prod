@@ -14,11 +14,11 @@ type CategoryAverages = {
 };
 
 const CATEGORIES = [
-  { key: "sla", label: "SLA", hint: "Response speed", max: 25, color: CHART_COLORS.blue },
-  { key: "followup", label: "Follow-up", hint: "Re-engaging quiet fans", max: 20, color: CHART_COLORS.teal },
-  { key: "trigger", label: "Triggers", hint: "Catching buying signals", max: 20, color: CHART_COLORS.purple },
-  { key: "quality", label: "Quality", hint: "Message creativity & persona", max: 20, color: CHART_COLORS.amber },
-  { key: "revenue", label: "Revenue", hint: "Actually making sales", max: 15, color: CHART_COLORS.emerald },
+  { key: "sla", label: "SLA", hint: "How fast they reply — under 5 min = full marks", max: 25, color: CHART_COLORS.blue },
+  { key: "followup", label: "Follow-up", hint: "Do they chase fans who go quiet, or let them drift?", max: 20, color: CHART_COLORS.teal },
+  { key: "trigger", label: "Triggers", hint: "Fan says \"I wish I could see more\" — did they act on it?", max: 20, color: CHART_COLORS.purple },
+  { key: "quality", label: "Quality", hint: "Personal, in-character messages vs robotic copy-paste", max: 20, color: CHART_COLORS.amber },
+  { key: "revenue", label: "Revenue", hint: "Did they actually close? PPV sent, tip received, sub renewed", max: 15, color: CHART_COLORS.emerald },
 ];
 
 export function ScoreCategoryBars({ data }: { data: CategoryAverages }) {
@@ -35,7 +35,7 @@ export function ScoreCategoryBars({ data }: { data: CategoryAverages }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-white font-semibold text-sm">Score Breakdown</h3>
-          <p className="text-white/40 text-xs mt-0.5">How the team scores in each area — higher bars = better performance</p>
+          <p className="text-white/40 text-xs mt-0.5">Each chatter is scored out of 100 every hour — here's where the team is strong and weak</p>
         </div>
         <ExportButtons data={chartData} filename="score-breakdown" columns={["name", "score", "max", "pct"]} />
       </div>

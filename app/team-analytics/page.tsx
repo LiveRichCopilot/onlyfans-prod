@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, BarChart2, ArrowLeft } from "lucide-react";
+import { RefreshCw, BarChart2, ArrowLeft, HelpCircle, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { KpiStatsRow } from "@/components/team-analytics/KpiStatsRow";
 import { PerformanceTrendChart } from "@/components/team-analytics/PerformanceTrendChart";
@@ -30,6 +30,7 @@ export default function TeamAnalytics() {
   const [days, setDays] = useState(7);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
+  const [showGuide, setShowGuide] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +100,37 @@ export default function TeamAnalytics() {
           </button>
         </div>
       </header>
+
+      {/* Scoring Guide */}
+      <div className="glass-card rounded-3xl overflow-hidden">
+        <button onClick={() => setShowGuide(!showGuide)} className="w-full flex items-center justify-between px-6 py-3 text-left">
+          <span className="flex items-center gap-2 text-sm text-white/70">
+            <HelpCircle size={16} className="text-teal-400" />
+            <span className="font-medium text-white">How scoring works</span>
+            <span className="text-white/30">— what all these numbers mean</span>
+          </span>
+          <ChevronDown size={16} className={`text-white/30 transition-transform ${showGuide ? "rotate-180" : ""}`} />
+        </button>
+        {showGuide && (
+          <div className="px-6 pb-5 border-t border-white/5 pt-4 space-y-3 text-[13px] leading-relaxed text-white/60">
+            <p className="text-white/80 font-medium">Every hour, AI reads each chatter's conversations and gives them a score out of 100:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+              <div><span className="text-blue-400 font-medium">SLA (25 pts)</span> — How fast they reply. Under 5 minutes = full marks. Slow replies lose points.</div>
+              <div><span className="text-teal-400 font-medium">Follow-up (20 pts)</span> — When a fan goes quiet, does the chatter re-engage them? Or let them disappear?</div>
+              <div><span className="text-purple-400 font-medium">Triggers (20 pts)</span> — Catching buying signals. Fan says "I wish I could see more" — did the chatter offer content?</div>
+              <div><span className="text-amber-400 font-medium">Quality (20 pts)</span> — Are messages creative, personal, in-character? Or copy-paste robotic garbage?</div>
+              <div><span className="text-emerald-400 font-medium">Revenue (15 pts)</span> — Did they actually close a sale? PPV sent, tip received, subscription renewed.</div>
+              <div><span className="text-red-400 font-medium">Penalties</span> — Copy-paste blasting, missed buying signals, and spamming all reduce the score.</div>
+            </div>
+            <div className="pt-2 border-t border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-white/40 text-xs">
+              <div><span className="text-white/60 font-medium">Skill Radar</span> — Spider chart comparing chatters across all 5 areas. Bigger shape = better all-rounder.</div>
+              <div><span className="text-white/60 font-medium">Archetypes</span> — AI detects chatting personality. "Tease" sells well. "Friend Zone" means they're being too nice to close.</div>
+              <div><span className="text-white/60 font-medium">Creator Workload</span> — How many chatter hours each model account is getting. Uneven = some models understaffed.</div>
+              <div><span className="text-white/60 font-medium">Performance Tags</span> — Click any tag to see which chatters have that strength or weakness.</div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* KPI Stats */}
       <KpiStatsRow data={d.kpis || { activeChatters: 0, totalSessions: 0, avgTeamScore: 0, totalHoursWorked: 0, scoringSessionsCount: 0, liveNow: 0 }} />

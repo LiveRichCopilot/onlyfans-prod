@@ -9,12 +9,21 @@ type Props = {
   categoryAverages: { sla: number; followup: number; trigger: number; quality: number; revenue: number };
 };
 
+const GAUGE_TOOLTIPS: Record<string, string> = {
+  Overall: "Total score out of 100 — combines all 5 categories below",
+  SLA: "Response speed — are they replying within 5 minutes? (out of 25)",
+  "Follow-up": "Re-engaging quiet fans — do they chase fans who stop replying? (out of 20)",
+  Triggers: "Catching buying signals — when a fan hints they want content, does the chatter act on it? (out of 20)",
+  Quality: "Message creativity — are messages personal and in-character, or copy-paste robotic? (out of 20)",
+  Revenue: "Closing sales — did they actually send PPVs, get tips, or renew subs? (out of 15)",
+};
+
 function GaugeRing({ value, max, label, color }: { value: number; max: number; label: string; color: string }) {
   const pct = Math.min(100, Math.round((value / max) * 100));
   const data = [{ value: pct, fill: color }];
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center group relative">
       <div className="w-[100px] h-[100px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" startAngle={180} endAngle={0} data={data} barSize={8}>
@@ -26,6 +35,11 @@ function GaugeRing({ value, max, label, color }: { value: number; max: number; l
         </div>
       </div>
       <span className="text-[10px] text-white/40 mt-1">{label}</span>
+      {GAUGE_TOOLTIPS[label] && (
+        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-52 px-3 py-2 rounded-xl bg-black/90 border border-white/10 text-[11px] text-white/70 leading-snug opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20 text-center">
+          {GAUGE_TOOLTIPS[label]}
+        </div>
+      )}
     </div>
   );
 }
