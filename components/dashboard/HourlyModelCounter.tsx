@@ -19,11 +19,13 @@ type HourlyData = {
     isToday?: boolean;
 };
 
-function cellStyle(amount: number, target: number) {
+function cellStyle(amount: number) {
     if (amount === 0) return "text-white/15";
-    if (amount >= target * 2) return "text-amber-400 bg-amber-500/10 border border-amber-500/15 shadow-[0_0_12px_rgba(245,158,11,0.08)]";
-    if (amount >= target) return "text-teal-400 bg-teal-500/10 border border-teal-500/15 shadow-[0_0_12px_rgba(13,148,136,0.08)]";
-    return "text-white/60 bg-white/[0.02]";
+    if (amount >= 1001) return "text-emerald-300 bg-emerald-500/15 border border-emerald-400/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]";
+    if (amount >= 501) return "text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 shadow-[0_0_12px_rgba(16,185,129,0.08)]";
+    if (amount >= 201) return "text-blue-400 bg-blue-500/10 border border-blue-500/15 shadow-[0_0_12px_rgba(59,130,246,0.08)]";
+    if (amount >= 101) return "text-orange-400 bg-orange-500/10 border border-orange-500/15 shadow-[0_0_12px_rgba(249,115,22,0.08)]";
+    return "text-purple-400 bg-purple-500/10 border border-purple-500/15 shadow-[0_0_12px_rgba(168,85,247,0.08)]";
 }
 
 function formatHour(hour: number) {
@@ -343,7 +345,7 @@ function ModelRow({
                     </div>
                 </td>
                 {creator.hourly.map((amount, i) => (
-                    <td key={i} className={`text-center py-2.5 px-1 text-xs font-mono rounded-lg transition-all ${cellStyle(amount, creator.hourlyTarget)}`}>
+                    <td key={i} className={`text-center py-2.5 px-1 text-xs font-mono rounded-lg transition-all ${cellStyle(amount)}`}>
                         {amount > 0 ? `$${amount.toFixed(0)}` : "\u2013"}
                     </td>
                 ))}
