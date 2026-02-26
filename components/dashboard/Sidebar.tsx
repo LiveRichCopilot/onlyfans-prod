@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2 } from "lucide-react";
+import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2 } from "lucide-react";
 import Link from "next/link";
 
 type Creator = {
@@ -84,6 +84,11 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                         <Link href="/performance">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
                                 <Zap size={16} /> Performance
+                            </li>
+                        </Link>
+                        <Link href="/team/hubstaff">
+                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
+                                <Link2 size={16} /> Hubstaff
                             </li>
                         </Link>
                         <Link href="/system">
