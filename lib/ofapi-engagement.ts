@@ -16,7 +16,7 @@ export async function getDirectMessageStats(
   const end = formatDate(endDate);
   return ofapiRequest(
     `/api/${account}/engagement/messages/direct-messages?startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=${limit}&offset=${offset}`,
-    apiKey, { timeoutMs: 15000 }
+    apiKey, { timeoutMs: 8000 }
   );
 }
 
@@ -31,7 +31,7 @@ export async function getMassMessageStats(
   const end = formatDate(endDate);
   return ofapiRequest(
     `/api/${account}/engagement/messages/mass-messages?startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}&limit=${limit}&offset=${offset}`,
-    apiKey, { timeoutMs: 15000 }
+    apiKey, { timeoutMs: 8000 }
   );
 }
 
@@ -46,7 +46,7 @@ export async function getMassMessageChartData(
   const end = formatDate(endDate);
   return ofapiRequest(
     `/api/${account}/engagement/messages/mass-messages/chart?startDate=${encodeURIComponent(start)}&endDate=${encodeURIComponent(end)}`,
-    apiKey, { timeoutMs: 15000 }
+    apiKey, { timeoutMs: 8000 }
   );
 }
 
