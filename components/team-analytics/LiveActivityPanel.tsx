@@ -1,6 +1,8 @@
 "use client";
 
-import { Keyboard, Mouse, Activity, Wifi, WifiOff } from "lucide-react";
+import { useState } from "react";
+import { Keyboard, Mouse, Activity, Wifi, WifiOff, ChevronDown, Settings } from "lucide-react";
+import Link from "next/link";
 
 type LiveEntry = {
   email: string;
@@ -49,32 +51,67 @@ function duration(clockIn: string): string {
 }
 
 export function LiveActivityPanel({ data, avgActivity }: { data: LiveEntry[]; avgActivity: AvgActivity }) {
+  const [expanded, setExpanded] = useState(data.length > 0);
+  const isEmpty = data.length === 0;
+
+  // Collapsed / empty state — single compact row
+  if (isEmpty && !expanded) {
+    return (
+      <div className="glass-card rounded-3xl px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <WifiOff size={14} className="text-white/20" />
+          <span className="text-white/40 text-xs font-medium">Live Activity</span>
+          <span className="text-white/20 text-[10px]">No chatters online right now</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/team/hubstaff" className="glass-button rounded-lg px-2.5 py-1 text-[10px] text-white/30 hover:text-white flex items-center gap-1">
+            <Settings size={10} /> Hubstaff Setup
+          </Link>
+          <button onClick={() => setExpanded(true)} className="text-white/20 hover:text-white/40">
+            <ChevronDown size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-card rounded-3xl p-6">
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            Live Activity
-          </h3>
-          <p className="text-white/40 text-xs mt-0.5">
-            Real-time Hubstaff data — keyboard, mouse, and overall activity for chatters online right now
-          </p>
-        </div>
-        {avgActivity && (
-          <div className="text-right">
-            <div className="text-[10px] text-white/30">Period avg</div>
-            <div className="text-sm font-bold tabular-nums" style={{ color: activityColor(avgActivity.overall) }}>
-              {avgActivity.overall}%
-            </div>
+        <div className="flex items-center gap-3">
+          <div>
+            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${data.length > 0 ? "bg-teal-400 animate-pulse" : "bg-white/20"}`} />
+              Live Activity
+              {data.length > 0 && <span className="text-teal-400/60 text-[10px] font-normal">{data.length} online</span>}
+            </h3>
+            <p className="text-white/40 text-xs mt-0.5">
+              Real-time Hubstaff data — keyboard, mouse, and overall activity
+            </p>
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-2">
+          {avgActivity && (
+            <div className="text-right mr-2">
+              <div className="text-[10px] text-white/30">Period avg</div>
+              <div className="text-sm font-bold tabular-nums" style={{ color: activityColor(avgActivity.overall) }}>
+                {avgActivity.overall}%
+              </div>
+            </div>
+          )}
+          <Link href="/team/hubstaff" className="glass-button rounded-lg px-2.5 py-1 text-[10px] text-white/30 hover:text-white flex items-center gap-1">
+            <Settings size={10} /> Setup
+          </Link>
+          <button onClick={() => setExpanded(!expanded)} className="text-white/20 hover:text-white/40">
+            <ChevronDown size={14} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </button>
+        </div>
       </div>
 
-      {data.length === 0 ? (
-        <div className="h-[120px] flex flex-col items-center justify-center text-white/30 text-sm gap-2">
-          <WifiOff size={20} />
-          <span>No chatters online right now</span>
+      {isEmpty ? (
+        <div className="flex items-center justify-center text-white/20 text-xs py-4 gap-2">
+          <WifiOff size={14} />
+          <span>No chatters online. <Link href="/team/hubstaff" className="text-teal-400/50 hover:text-teal-400 underline">Connect Hubstaff</Link> to see live activity.</span>
         </div>
       ) : (
         <div className="space-y-2">
