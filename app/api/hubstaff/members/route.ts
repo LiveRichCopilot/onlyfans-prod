@@ -24,18 +24,28 @@ export async function GET() {
       userMap.set(u.id, { name: u.name || "Unknown", email: u.email || "", status: u.status || "unknown" });
     }
 
-    // Also get existing mappings so the UI knows who's already mapped
-    const mappings = await prisma.hubstaffUserMapping.findMany();
-    const mappedIds = new Set(mappings.map(m => m.hubstaffUserId));
+    // Get existing mappings with creator names for each member
+    const mappings = await prisma.hubstaffUserMapping.findMany({
+      include: { creator: { select: { id: true, name: true } } },
+    });
+    const memberMappings = new Map<string, Array<{ creatorId: string; creatorName: string }>>();
+    for (const m of mappings) {
+      const list = memberMappings.get(m.hubstaffUserId) || [];
+      if (m.creatorId && m.creator) {
+        list.push({ creatorId: m.creatorId, creatorName: m.creator.name || m.creatorId });
+      }
+      memberMappings.set(m.hubstaffUserId, list);
+    }
 
     const enriched = members.map((m: any) => {
       const user = userMap.get(m.user_id) || { name: "Unknown", email: "", status: "unknown" };
+      const mapped = memberMappings.get(String(m.user_id)) || [];
       return {
         hubstaffUserId: String(m.user_id),
         name: user.name,
         email: user.email,
         status: user.status,
-        isMapped: mappedIds.has(String(m.user_id)),
+        mappedCreators: mapped,
       };
     });
 

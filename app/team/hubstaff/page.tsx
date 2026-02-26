@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Users, RefreshCw, Trash2, Plus, CheckCircle, XCircle, Link2 } from "lucide-react";
 
-type HubstaffMember = { hubstaffUserId: string; name: string; email: string; status: string; isMapped: boolean };
+type MappedCreator = { creatorId: string; creatorName: string };
+type HubstaffMember = { hubstaffUserId: string; name: string; email: string; status: string; mappedCreators: MappedCreator[] };
 type Mapping = { id: string; hubstaffUserId: string; hubstaffName: string | null; chatterEmail: string; creatorId: string | null; creator?: { name: string | null } | null };
-type Config = { configured: boolean; organizationId?: string; syncEnabled?: boolean; lastSyncAt?: string; tokenExpiresAt?: string; hasDpopKeys?: boolean };
+type Config = { configured: boolean; organizationId?: string; syncEnabled?: boolean; lastSyncAt?: string; tokenExpiresAt?: string };
 type Creator = { id: string; name: string | null };
 
 export default function HubstaffAdmin() {
@@ -125,6 +126,9 @@ export default function HubstaffAdmin() {
     </div>
   );
 
+  const totalMappings = mappings.length;
+  const mappedMembers = members.filter(m => m.mappedCreators.length > 0).length;
+
   return (
     <div className="min-h-screen bg-[#050508] p-6 max-w-4xl mx-auto space-y-6">
       <header className="flex items-center gap-3">
@@ -183,7 +187,6 @@ export default function HubstaffAdmin() {
             </div>
           </div>
 
-          {/* Token expiry */}
           {config.tokenExpiresAt && (
             <div className="text-xs text-white/40">
               Token expires: {new Date(config.tokenExpiresAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
@@ -193,7 +196,6 @@ export default function HubstaffAdmin() {
             </div>
           )}
 
-          {/* Action buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleSyncNow}
@@ -217,7 +219,6 @@ export default function HubstaffAdmin() {
             </div>
           )}
 
-          {/* Update Token Section */}
           {showUpdateToken && (
             <div className="space-y-3 border-t border-white/5 pt-4">
               <p className="text-white/60 text-sm font-medium">Paste new Hubstaff refresh token:</p>
@@ -259,10 +260,10 @@ export default function HubstaffAdmin() {
       )}
 
       {/* Current Mappings */}
-      {mappings.length > 0 && (
+      {totalMappings > 0 && (
         <div className="glass-card rounded-3xl p-6 space-y-4">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Users size={18} className="text-teal-400" /> Active Mappings ({mappings.length})
+            <Users size={18} className="text-teal-400" /> Active Mappings ({totalMappings})
           </h2>
           <div className="space-y-2">
             {mappings.map(m => (
@@ -290,11 +291,16 @@ export default function HubstaffAdmin() {
         </div>
       )}
 
-      {/* Unmapped Hubstaff Members */}
+      {/* All Hubstaff Members — map to multiple creators */}
       {config?.configured && (
         <div className="glass-card rounded-3xl p-6 space-y-4">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <Plus size={18} className="text-white/60" /> Hubstaff Members
+            {members.length > 0 && (
+              <span className="text-white/40 text-sm font-normal ml-1">
+                ({mappedMembers}/{members.length} mapped)
+              </span>
+            )}
           </h2>
           {membersError && (
             <div className="text-xs px-3 py-2 rounded-lg bg-red-500/10 text-red-400">
@@ -302,13 +308,11 @@ export default function HubstaffAdmin() {
             </div>
           )}
           <div className="space-y-2">
-            {members.filter(m => !m.isMapped).map(m => (
+            {members.map(m => (
               <MemberRow key={m.hubstaffUserId} member={m} creators={creators} onMap={addMapping} />
             ))}
-            {members.filter(m => !m.isMapped).length === 0 && !membersError && (
-              <p className="text-white/40 text-sm">
-                {members.length === 0 ? "No members found in Hubstaff org — check token & org ID" : "All members are mapped"}
-              </p>
+            {members.length === 0 && !membersError && (
+              <p className="text-white/40 text-sm">No members found in Hubstaff org</p>
             )}
           </div>
         </div>
@@ -323,32 +327,60 @@ function MemberRow({ member, creators, onMap }: {
   onMap: (userId: string, name: string, email: string, creatorId: string) => void;
 }) {
   const [email, setEmail] = useState(member.email || "");
-  const [selectedCreator, setSelectedCreator] = useState(creators[0]?.id || "");
+  const [selectedCreator, setSelectedCreator] = useState("");
+
+  // Filter out creators already mapped to this member
+  const mappedIds = new Set(member.mappedCreators.map(mc => mc.creatorId));
+  const availableCreators = creators.filter(c => !mappedIds.has(c.id));
+
+  function handleMap() {
+    if (!email || !selectedCreator) return;
+    onMap(member.hubstaffUserId, member.name, email, selectedCreator);
+    setSelectedCreator("");
+  }
 
   return (
-    <div className="flex items-center gap-3 glass-inset rounded-xl px-4 py-3 flex-wrap">
-      <span className="text-white text-sm font-medium min-w-[120px]">{member.name}</span>
-      <input
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        placeholder="chatter@email.com"
-        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm flex-1 min-w-[160px] placeholder-white/25"
-      />
-      <select
-        value={selectedCreator}
-        onChange={e => setSelectedCreator(e.target.value)}
-        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm max-w-[180px]"
-      >
-        <option value="">Select model...</option>
-        {creators.map(c => <option key={c.id} value={c.id} className="bg-neutral-900">{c.name || c.id}</option>)}
-      </select>
-      <button
-        onClick={() => email && selectedCreator && onMap(member.hubstaffUserId, member.name, email, selectedCreator)}
-        disabled={!email || !selectedCreator}
-        className="glass-button rounded-lg px-3 py-1.5 text-sm text-teal-400 disabled:opacity-30"
-      >
-        Map
-      </button>
+    <div className="glass-inset rounded-xl px-4 py-3 space-y-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-white text-sm font-medium min-w-[140px]">{member.name}</span>
+
+        {/* Existing mapped creators as badges */}
+        {member.mappedCreators.map(mc => (
+          <span
+            key={mc.creatorId}
+            className="text-[10px] bg-teal-500/15 text-teal-400 px-2 py-0.5 rounded-full border border-teal-500/20"
+          >
+            {mc.creatorName}
+          </span>
+        ))}
+
+        {/* Add more mapping controls */}
+        <div className="flex items-center gap-2 ml-auto">
+          <input
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="chatter@email.com"
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm w-[180px] placeholder-white/25"
+          />
+          <select
+            value={selectedCreator}
+            onChange={e => setSelectedCreator(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm max-w-[180px]"
+          >
+            <option value="">+ Add model...</option>
+            {availableCreators.map(c => (
+              <option key={c.id} value={c.id} className="bg-neutral-900">{c.name || c.id}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleMap}
+            disabled={!email || !selectedCreator}
+            className="glass-button rounded-lg px-3 py-1.5 text-sm text-teal-400 disabled:opacity-30"
+          >
+            Map
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

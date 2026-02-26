@@ -21,19 +21,19 @@ export async function GET() {
 
 /**
  * POST /api/hubstaff/mapping
- * Create a new mapping.
+ * Create a new mapping. Supports multiple creators per Hubstaff member.
  */
 export async function POST(req: NextRequest) {
   try {
     const { hubstaffUserId, hubstaffName, chatterEmail, creatorId } = await req.json();
-    if (!hubstaffUserId || !chatterEmail) {
-      return NextResponse.json({ error: "hubstaffUserId and chatterEmail required" }, { status: 400 });
+    if (!hubstaffUserId || !chatterEmail || !creatorId) {
+      return NextResponse.json({ error: "hubstaffUserId, chatterEmail, and creatorId required" }, { status: 400 });
     }
 
     const mapping = await prisma.hubstaffUserMapping.upsert({
-      where: { hubstaffUserId },
-      update: { chatterEmail, hubstaffName, ...(creatorId ? { creatorId } : {}) },
-      create: { hubstaffUserId, hubstaffName, chatterEmail, ...(creatorId ? { creatorId } : {}) },
+      where: { hubstaffUserId_creatorId: { hubstaffUserId, creatorId } },
+      update: { chatterEmail, hubstaffName },
+      create: { hubstaffUserId, hubstaffName, chatterEmail, creatorId },
     });
 
     return NextResponse.json({ mapping });

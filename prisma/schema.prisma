@@ -464,7 +464,7 @@ model ChatterSchedule {
 
 model HubstaffUserMapping {
   id             String   @id @default(cuid())
-  hubstaffUserId String   @unique
+  hubstaffUserId String
   hubstaffName   String?
   chatterEmail   String
   creatorId      String?
@@ -472,7 +472,9 @@ model HubstaffUserMapping {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@unique([hubstaffUserId, creatorId])
   @@index([chatterEmail])
+  @@index([hubstaffUserId])
 }
 
 model HubstaffConfig {
