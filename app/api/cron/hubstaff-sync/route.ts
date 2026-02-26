@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getLastActivities, getConfig, updateLastSync } from "@/lib/hubstaff";
+import { getLastActivities, getActivities, getConfig, updateLastSync } from "@/lib/hubstaff";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
 /**
  * GET /api/cron/hubstaff-sync
- * Runs every 5 min. Uses Hubstaff last_activities endpoint to detect
- * who's online right now, then creates/closes ChatterSession records.
+ * Runs every 5 min. Detects who's online, creates/closes sessions,
+ * and pulls real activity data (keyboard %, mouse %, overall score).
  */
 export async function GET(req: NextRequest) {
   if (process.env.NODE_ENV === "production") {
@@ -30,7 +30,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "no_mappings" });
     }
 
-    // Use last_activities — shows who's online right now (simpler than activity windows)
+    // Build userId → mapping lookup
+    const userIdToMapping = new Map<number, typeof mappings[0]>();
+    for (const m of mappings) {
+      userIdToMapping.set(parseInt(m.hubstaffUserId, 10), m);
+    }
+
+    // Use last_activities — shows who's online right now
     const lastActivities = await getLastActivities(config.organizationId);
 
     // Build set of online user IDs
@@ -41,16 +47,43 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Get all currently live hubstaff sessions
+    // Pull real activity data for the last 30 min (10-min blocks with keyboard/mouse/overall)
     const now = new Date();
+    const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000);
+    let activityBlocks: Awaited<ReturnType<typeof getActivities>> = [];
+    try {
+      activityBlocks = await getActivities(thirtyMinAgo.toISOString(), now.toISOString());
+    } catch (e: any) {
+      console.warn("[Hubstaff Sync] Activity fetch failed (continuing with online-only):", e.message);
+    }
+
+    // Aggregate activity per user: average keyboard, mouse, overall across recent blocks
+    const userActivity = new Map<number, { keyboard: number[]; mouse: number[]; overall: number[] }>();
+    for (const block of activityBlocks) {
+      if (!userActivity.has(block.user_id)) {
+        userActivity.set(block.user_id, { keyboard: [], mouse: [], overall: [] });
+      }
+      const ua = userActivity.get(block.user_id)!;
+      ua.keyboard.push(block.keyboard);
+      ua.mouse.push(block.mouse);
+      ua.overall.push(block.overall);
+    }
+
+    // Get all currently live hubstaff sessions
     const liveSessions = await prisma.chatterSession.findMany({
       where: { isLive: true, source: "hubstaff" },
       select: { id: true, email: true, creatorId: true },
     });
     const liveSet = new Set(liveSessions.map(s => `${s.email}|${s.creatorId}`));
+    const liveByEmail = new Map<string, string[]>();
+    for (const s of liveSessions) {
+      if (!liveByEmail.has(s.email)) liveByEmail.set(s.email, []);
+      liveByEmail.get(s.email)!.push(s.id);
+    }
 
     let clockedIn = 0;
     let clockedOut = 0;
+    let activityUpdated = 0;
     const activeEmails = new Set<string>();
 
     // For each mapping, check if user is online
@@ -63,7 +96,6 @@ export async function GET(req: NextRequest) {
 
         // Get creator IDs: prefer direct mapping, fall back to schedule
         const creatorIds: string[] = [];
-
         if (mapping.creatorId) {
           creatorIds.push(mapping.creatorId);
         } else {
@@ -74,15 +106,43 @@ export async function GET(req: NextRequest) {
           creatorIds.push(...[...new Set(schedules.map(s => s.creatorId))]);
         }
 
+        // Get this user's activity averages
+        const ua = userActivity.get(userId);
+        const avgKeyboard = ua ? Math.round(ua.keyboard.reduce((a, b) => a + b, 0) / ua.keyboard.length) : null;
+        const avgMouse = ua ? Math.round(ua.mouse.reduce((a, b) => a + b, 0) / ua.mouse.length) : null;
+        const avgOverall = ua ? Math.round(ua.overall.reduce((a, b) => a + b, 0) / ua.overall.length) : null;
+
         for (const creatorId of creatorIds) {
           const key = `${mapping.chatterEmail}|${creatorId}`;
-          if (liveSet.has(key)) continue; // Already clocked in
+          if (liveSet.has(key)) {
+            // Already clocked in — update activity data on existing session
+            if (avgOverall !== null) {
+              const sessionIds = liveByEmail.get(mapping.chatterEmail) || [];
+              for (const sid of sessionIds) {
+                await prisma.chatterSession.update({
+                  where: { id: sid },
+                  data: {
+                    keyboardPct: avgKeyboard,
+                    mousePct: avgMouse,
+                    overallActivity: avgOverall,
+                    activityUpdatedAt: now,
+                  },
+                });
+                activityUpdated++;
+              }
+            }
+            continue;
+          }
 
           await prisma.chatterSession.create({
             data: {
               email: mapping.chatterEmail,
               creatorId,
               source: "hubstaff",
+              keyboardPct: avgKeyboard,
+              mousePct: avgMouse,
+              overallActivity: avgOverall,
+              activityUpdatedAt: avgOverall !== null ? now : undefined,
             },
           });
           clockedIn++;
@@ -103,12 +163,13 @@ export async function GET(req: NextRequest) {
 
     await updateLastSync();
 
-    console.log(`[Hubstaff Sync] In: ${clockedIn} | Out: ${clockedOut} | Online: ${onlineUserIds.size} | Active: ${activeEmails.size} | Mappings: ${mappings.length}`);
+    console.log(`[Hubstaff Sync] In: ${clockedIn} | Out: ${clockedOut} | Activity updated: ${activityUpdated} | Online: ${onlineUserIds.size} | Active: ${activeEmails.size}`);
 
     return NextResponse.json({
       status: "ok",
       clockedIn,
       clockedOut,
+      activityUpdated,
       onlineUsers: onlineUserIds.size,
       activeUsers: activeEmails.size,
       totalMappings: mappings.length,

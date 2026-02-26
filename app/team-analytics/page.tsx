@@ -16,6 +16,7 @@ import { TagCloudPanel } from "@/components/team-analytics/TagCloudPanel";
 import { TeamGaugePanel } from "@/components/team-analytics/TeamGaugePanel";
 import { ConversationPhoneGallery } from "@/components/team-analytics/ConversationPhoneGallery";
 import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting";
+import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
 
 const RANGES = [
   { label: "7d", days: 7 },
@@ -134,6 +135,9 @@ export default function TeamAnalytics() {
 
       {/* KPI Stats */}
       <KpiStatsRow data={d.kpis || { activeChatters: 0, totalSessions: 0, avgTeamScore: 0, totalHoursWorked: 0, scoringSessionsCount: 0, liveNow: 0 }} />
+
+      {/* Live Activity — who's online and are they actually working */}
+      <LiveActivityPanel data={d.liveActivity || []} avgActivity={d.avgActivity || null} />
 
       {/* Row 1: Performance Trend (full width) */}
       <PerformanceTrendChart data={d.performanceTrend || []} />

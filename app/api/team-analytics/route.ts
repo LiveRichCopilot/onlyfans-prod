@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
       profiles,
       liveSessions,
       creators,
+      liveSessionDetails,
     ] = await Promise.all([
       prisma.chatterSession.findMany({
         where: { clockIn: { gte: since }, ...creatorWhere },
@@ -34,6 +35,11 @@ export async function GET(req: NextRequest) {
       }),
       prisma.chatterSession.count({ where: { isLive: true, ...creatorWhere } }),
       prisma.creator.findMany({ where: { active: true }, select: { id: true, name: true } }),
+      prisma.chatterSession.findMany({
+        where: { isLive: true, ...creatorWhere },
+        include: { creator: { select: { name: true } } },
+        orderBy: { clockIn: "asc" },
+      }),
     ]);
 
     // --- KPIs ---
@@ -246,6 +252,28 @@ export async function GET(req: NextRequest) {
     // Include all active creators for the filter dropdown (unfiltered)
     const allCreators = creators.map(c => ({ creatorId: c.id, creatorName: c.name || "Unknown" }));
 
+    // --- Live Chatter Activity (from Hubstaff) ---
+    const liveActivity = liveSessionDetails.map(s => ({
+      email: s.email,
+      name: s.email.split("@")[0],
+      creator: (s as any).creator?.name || "Unknown",
+      clockIn: s.clockIn.toISOString(),
+      source: s.source,
+      keyboardPct: (s as any).keyboardPct ?? null,
+      mousePct: (s as any).mousePct ?? null,
+      overallActivity: (s as any).overallActivity ?? null,
+      activityUpdatedAt: (s as any).activityUpdatedAt?.toISOString() ?? null,
+    }));
+
+    // --- Session-level activity averages (for all sessions in period) ---
+    const hubstaffSessions = sessions.filter((s: any) => s.source === "hubstaff" && s.overallActivity != null);
+    const avgActivity = hubstaffSessions.length > 0 ? {
+      keyboard: Math.round(avg(hubstaffSessions.map((s: any) => s.keyboardPct || 0))),
+      mouse: Math.round(avg(hubstaffSessions.map((s: any) => s.mousePct || 0))),
+      overall: Math.round(avg(hubstaffSessions.map((s: any) => s.overallActivity || 0))),
+      sessionCount: hubstaffSessions.length,
+    } : null;
+
     return NextResponse.json({
       kpis,
       performanceTrend,
@@ -260,6 +288,8 @@ export async function GET(req: NextRequest) {
       conversationSamples,
       copyPasteBlasters,
       allCreators,
+      liveActivity,
+      avgActivity,
     });
   } catch (err: any) {
     console.error("Team analytics error:", err.message);

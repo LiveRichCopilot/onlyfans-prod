@@ -427,14 +427,19 @@ model ChatterProfile {
 }
 
 model ChatterSession {
-  id        String    @id @default(cuid())
-  email     String
-  creatorId String
-  creator   Creator   @relation(fields: [creatorId], references: [id])
-  clockIn   DateTime  @default(now())
-  clockOut  DateTime?
-  isLive    Boolean   @default(true)
-  source    String    @default("manual") // "manual" | "schedule" | "hubstaff"
+  id              String    @id @default(cuid())
+  email           String
+  creatorId       String
+  creator         Creator   @relation(fields: [creatorId], references: [id])
+  clockIn         DateTime  @default(now())
+  clockOut        DateTime?
+  isLive          Boolean   @default(true)
+  source          String    @default("manual") // "manual" | "schedule" | "hubstaff"
+  // Hubstaff activity data (updated every sync cycle)
+  keyboardPct     Int?      // 0-100 keyboard activity
+  mousePct        Int?      // 0-100 mouse activity
+  overallActivity Int?      // 0-100 combined activity score
+  activityUpdatedAt DateTime? // last time activity data was refreshed
 
   @@unique([email, creatorId, clockIn])
   @@index([email])

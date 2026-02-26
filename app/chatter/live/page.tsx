@@ -18,6 +18,9 @@ interface LiveSession {
   clockIn: string;
   source?: string;
   creator: { name: string | null };
+  keyboardPct?: number | null;
+  mousePct?: number | null;
+  overallActivity?: number | null;
 }
 
 export default function ChatterLive() {
@@ -188,6 +191,20 @@ export default function ChatterLive() {
                           Clocked in at {formatClockInTime(session.clockIn)}
                         </span>
                       </div>
+                      {session.overallActivity != null && (
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="text-[10px] text-white/30">Activity:</span>
+                          <span className="text-[10px] tabular-nums" style={{ color: session.overallActivity >= 60 ? "#34d399" : session.overallActivity >= 30 ? "#fbbf24" : "#f87171" }}>
+                            {session.overallActivity}% overall
+                          </span>
+                          {session.keyboardPct != null && (
+                            <span className="text-[10px] text-white/30 tabular-nums">{session.keyboardPct}% keys</span>
+                          )}
+                          {session.mousePct != null && (
+                            <span className="text-[10px] text-white/30 tabular-nums">{session.mousePct}% mouse</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
