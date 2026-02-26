@@ -14,7 +14,7 @@ import { HoursStackedArea } from "@/components/team-analytics/HoursStackedArea";
 import { ActivityByHourBar } from "@/components/team-analytics/ActivityByHourBar";
 import { TagCloudPanel } from "@/components/team-analytics/TagCloudPanel";
 import { TeamGaugePanel } from "@/components/team-analytics/TeamGaugePanel";
-import { ConversationScoringSection } from "@/components/team-analytics/ConversationScoringSection";
+import { ConversationPhoneGallery } from "@/components/team-analytics/ConversationPhoneGallery";
 import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting";
 
 const RANGES = [
@@ -110,7 +110,7 @@ export default function TeamAnalytics() {
       <CopyPasteBlasting data={d.copyPasteBlasters || []} />
 
       {/* Row 7: Conversation Scoring with Chat Bubbles (full width) */}
-      <ConversationScoringSection data={d.conversationSamples || []} />
+      <ConversationPhoneGallery data={d.conversationSamples || []} />
     </div>
   );
 }
