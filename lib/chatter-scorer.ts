@@ -102,7 +102,7 @@ export async function buildScoringWindows(
  */
 export async function fetchAndAttributeMessages(
     window: ScoringWindow,
-    maxChats: number = 10,
+    maxChats: number = 5,
 ): Promise<{
     chatterMessages: string[];
     fanMessages: string[];

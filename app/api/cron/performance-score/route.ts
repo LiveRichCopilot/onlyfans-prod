@@ -67,11 +67,11 @@ export async function GET(request: Request) {
             status: string;
         }> = [];
 
-        const MAX_PAIRS = 3;
+        const MAX_PAIRS = 2;
 
         for (let i = 0; i < Math.min(rotated.length, MAX_PAIRS); i++) {
-            // Time guard: stop if running low on budget
-            if (Date.now() - startTime > 50_000) {
+            // Time guard: stop if running low on budget (leave 10s for DB writes + response)
+            if (Date.now() - startTime > 42_000) {
                 console.log("[PerfScore] Time guard hit — stopping early");
                 break;
             }
