@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Calendar, Download } from "lucide-react";
 import { ContentMessageCard, ContentEmptyState } from "./ContentMessageCard";
 import { ContentCreatorTab } from "./ContentCreatorTab";
+import { MassMessageImpactChart } from "./MassMessageImpactChart";
 import type { MessageCardData } from "./ContentMessageCard";
 
 type AggEntry = {
@@ -232,7 +233,13 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
           )}
 
           {tab === "Mass Messages" && (
-            <MessageList messages={data.topMass} emptyMsg="No mass messages in this period" />
+            <div className="space-y-4">
+              <MassMessageImpactChart days={days} creatorFilter={creatorFilter} />
+              <div className="border-t border-white/5 pt-3">
+                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Top Performing Mass Messages</p>
+                <MessageList messages={data.topMass} emptyMsg="No mass messages in this period" />
+              </div>
+            </div>
           )}
 
           {tab === "Hooks" && (
