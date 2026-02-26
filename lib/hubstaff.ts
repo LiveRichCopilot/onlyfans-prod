@@ -173,29 +173,32 @@ async function hubstaffGet<T>(path: string, params?: Record<string, string>): Pr
   const url = new URL(`${HUBSTAFF_API}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  // Use DPoP only if config has stored DPoP keys (token was DPoP-bound)
-  const hasDpop = !!config?.dpopPrivateKey && !!config?.dpopPublicKey;
-  const dpopUrl = `${url.origin}${url.pathname}`;
+  // First attempt: plain Bearer (token obtained without DPoP binding)
+  let res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
-  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-  if (hasDpop) {
-    const keyPair = await getDpopKeyPair(config!.id);
-    headers["DPoP"] = createDpopProof(keyPair, "GET", dpopUrl, token);
+  // If 401 with plain Bearer, try with DPoP (in case token IS DPoP-bound)
+  if (res.status === 401 && config?.dpopPrivateKey && config?.dpopPublicKey) {
+    console.log(`[Hubstaff] 401 on ${path} — retrying with DPoP proof`);
+    const dpopUrl = `${url.origin}${url.pathname}`;
+    const keyPair = await getDpopKeyPair(config.id);
+    res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        DPoP: createDpopProof(keyPair, "GET", dpopUrl, token),
+      },
+    });
   }
 
-  let res = await fetch(url.toString(), { headers });
-
-  // Auto-recover from 401: force refresh token and retry once
+  // If still 401, force refresh token and retry plain
   if (res.status === 401 && config) {
     console.log(`[Hubstaff] 401 on ${path} — force-refreshing token`);
     cachedKeyPair = null;
     token = await refreshAccessToken(config);
-    const retryHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
-    if (hasDpop) {
-      const keyPair = await getDpopKeyPair(config.id);
-      retryHeaders["DPoP"] = createDpopProof(keyPair, "GET", dpopUrl, token);
-    }
-    res = await fetch(url.toString(), { headers: retryHeaders });
+    res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   }
 
   if (!res.ok) {
