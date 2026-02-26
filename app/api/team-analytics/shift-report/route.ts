@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
-  getDailyActivities,
   getActivities,
   getToolUsages,
-  listMembers,
 } from "@/lib/hubstaff";
 
 export const dynamic = "force-dynamic";
