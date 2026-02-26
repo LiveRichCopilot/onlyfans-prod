@@ -87,6 +87,8 @@ export async function GET(request: Request) {
         }> = [];
 
         const MAX_PAIRS = 10;
+        const MAX_STORY_PAIRS = 3; // Only run expensive story analysis on first 3 pairs
+        let storyCount = 0;
 
         // Shuffle for fairness — prevents same pairs always getting priority
         for (let i = unscoredWindows.length - 1; i > 0; i--) {
@@ -102,9 +104,11 @@ export async function GET(request: Request) {
             }
 
             const window = unscoredWindows[i];
+            const shouldRunStory = storyCount < MAX_STORY_PAIRS;
 
             try {
-                const result = await scoreChatter(window, true);
+                const result = await scoreChatter(window, true, shouldRunStory);
+                if (result && shouldRunStory) storyCount++;
 
                 results.push({
                     chatter: window.chatterEmail,

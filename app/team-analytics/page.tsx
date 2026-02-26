@@ -28,15 +28,26 @@ export default function TeamAnalytics() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
+  const [creatorFilter, setCreatorFilter] = useState<string>("all");
+  const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/team-analytics?days=${days}`);
-      if (res.ok) setData(await res.json());
+      const params = new URLSearchParams({ days: String(days) });
+      if (creatorFilter !== "all") params.set("creatorId", creatorFilter);
+      const res = await fetch(`/api/team-analytics?${params}`);
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+        // Build creator list from unfiltered allCreators (always complete)
+        if (json.allCreators?.length) {
+          setCreators(json.allCreators.map((c: any) => ({ id: c.creatorId, name: c.creatorName })));
+        }
+      }
     } catch { /* silent */ }
     setLoading(false);
-  }, [days]);
+  }, [days, creatorFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -65,7 +76,19 @@ export default function TeamAnalytics() {
             <p className="text-white/40 text-sm">Chatter performance dashboard</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Creator Filter */}
+          <select
+            value={creatorFilter}
+            onChange={(e) => setCreatorFilter(e.target.value)}
+            className="glass-button rounded-xl px-3 py-1.5 text-xs font-medium text-white/70 bg-transparent border border-white/10 appearance-none cursor-pointer max-w-[180px] truncate"
+          >
+            <option value="all" className="bg-[#111]">All Creators</option>
+            {creators.map(c => (
+              <option key={c.id} value={c.id} className="bg-[#111]">{c.name}</option>
+            ))}
+          </select>
+          {/* Time Range */}
           {RANGES.map(r => (
             <button key={r.days} onClick={() => setDays(r.days)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${days === r.days ? "glass-prominent text-white" : "glass-button text-white/50"}`}>
               {r.label}

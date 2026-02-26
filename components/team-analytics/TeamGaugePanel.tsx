@@ -45,7 +45,7 @@ export function TeamGaugePanel({ avgScore, categoryAverages }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-white font-semibold text-sm">Team Gauges</h3>
-          <p className="text-white/40 text-xs mt-0.5">At-a-glance score dials</p>
+          <p className="text-white/40 text-xs mt-0.5">Average chatter performance across all scored conversations this period</p>
         </div>
         <ExportButtons data={exportData} filename="team-gauges" />
       </div>

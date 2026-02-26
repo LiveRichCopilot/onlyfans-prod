@@ -15,7 +15,7 @@ export function CreatorWorkloadPie({ data }: { data: WorkloadEntry[] }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-white font-semibold text-sm">Creator Workload</h3>
-          <p className="text-white/40 text-xs mt-0.5">Hours split by creator</p>
+          <p className="text-white/40 text-xs mt-0.5">Total chatter hours assigned to each model/creator account</p>
         </div>
         <ExportButtons data={data} filename="creator-workload" />
       </div>

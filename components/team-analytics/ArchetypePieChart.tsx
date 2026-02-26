@@ -28,7 +28,7 @@ export function ArchetypePieChart({ data }: { data: ArchetypeEntry[] }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-white font-semibold text-sm">Chatter Archetypes</h3>
-          <p className="text-white/40 text-xs mt-0.5">Detected styles distribution</p>
+          <p className="text-white/40 text-xs mt-0.5">AI-detected chatting personality styles — "Tease" sells well, "Friend Zone" doesn't</p>
         </div>
         <ExportButtons data={data.map(d => ({ archetype: ARCHETYPE_LABELS[d.archetype] || d.archetype, count: d.count }))} filename="archetype-distribution" />
       </div>

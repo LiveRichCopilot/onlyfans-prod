@@ -6,7 +6,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const days = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
+  const creatorId = req.nextUrl.searchParams.get("creatorId") || null;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // Optional creator filter — when set, all data scoped to that creator
+  const creatorWhere = creatorId ? { creatorId } : {};
 
   try {
     const [
@@ -17,18 +21,19 @@ export async function GET(req: NextRequest) {
       creators,
     ] = await Promise.all([
       prisma.chatterSession.findMany({
-        where: { clockIn: { gte: since } },
+        where: { clockIn: { gte: since }, ...creatorWhere },
         include: { creator: { select: { name: true } } },
       }),
       prisma.chatterHourlyScore.findMany({
-        where: { createdAt: { gte: since } },
+        where: { createdAt: { gte: since }, ...creatorWhere },
         include: { creator: { select: { name: true } } },
       }),
       prisma.chatterProfile.findMany({
+        where: creatorWhere,
         include: { creator: { select: { name: true } } },
       }),
-      prisma.chatterSession.count({ where: { isLive: true } }),
-      prisma.creator.findMany({ select: { id: true, name: true } }),
+      prisma.chatterSession.count({ where: { isLive: true, ...creatorWhere } }),
+      prisma.creator.findMany({ where: { active: true }, select: { id: true, name: true } }),
     ]);
 
     // --- KPIs ---
@@ -141,29 +146,41 @@ export async function GET(req: NextRequest) {
       return { hour: i, sessionCount: b?.count || 0, avgScore: b ? Math.round(avg(b.scores)) : 0 };
     });
 
-    // --- Tag Cloud ---
-    const strengthMap = new Map<string, number>();
-    const weaknessMap = new Map<string, number>();
+    // --- Tag Cloud (with chatter names) ---
+    const strengthMap = new Map<string, { count: number; chatters: Set<string> }>();
+    const weaknessMap = new Map<string, { count: number; chatters: Set<string> }>();
     for (const h of hourlyScores) {
-      for (const t of h.strengthTags) strengthMap.set(t, (strengthMap.get(t) || 0) + 1);
-      for (const t of h.mistakeTags) weaknessMap.set(t, (weaknessMap.get(t) || 0) + 1);
+      const name = h.chatterEmail.split("@")[0];
+      for (const t of h.strengthTags) {
+        if (!strengthMap.has(t)) strengthMap.set(t, { count: 0, chatters: new Set() });
+        const e = strengthMap.get(t)!;
+        e.count++;
+        e.chatters.add(name);
+      }
+      for (const t of h.mistakeTags) {
+        if (!weaknessMap.has(t)) weaknessMap.set(t, { count: 0, chatters: new Set() });
+        const e = weaknessMap.get(t)!;
+        e.count++;
+        e.chatters.add(name);
+      }
     }
     const tagCloud = {
-      strengths: [...strengthMap.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count),
-      weaknesses: [...weaknessMap.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count),
+      strengths: [...strengthMap.entries()].map(([tag, e]) => ({ tag, count: e.count, chatters: [...e.chatters] })).sort((a, b) => b.count - a.count),
+      weaknesses: [...weaknessMap.entries()].map(([tag, e]) => ({ tag, count: e.count, chatters: [...e.chatters] })).sort((a, b) => b.count - a.count),
     };
 
     // --- Creator Workload ---
-    const creatorMap = new Map<string, { name: string; sessionCount: number; totalHours: number }>();
+    const creatorMap = new Map<string, { id: string; name: string; sessionCount: number; totalHours: number }>();
     for (const s of sessions) {
       const name = s.creator.name || "Unknown";
-      if (!creatorMap.has(s.creatorId)) creatorMap.set(s.creatorId, { name, sessionCount: 0, totalHours: 0 });
+      if (!creatorMap.has(s.creatorId)) creatorMap.set(s.creatorId, { id: s.creatorId, name, sessionCount: 0, totalHours: 0 });
       const c = creatorMap.get(s.creatorId)!;
       c.sessionCount++;
       const end = s.clockOut ? new Date(s.clockOut).getTime() : Date.now();
       c.totalHours += (end - new Date(s.clockIn).getTime()) / 3600000;
     }
     const creatorWorkload = [...creatorMap.values()].map(c => ({
+      creatorId: c.id,
       creatorName: c.name,
       sessionCount: c.sessionCount,
       totalHours: parseFloat(c.totalHours.toFixed(1)),
@@ -171,7 +188,7 @@ export async function GET(req: NextRequest) {
 
     // --- Conversation Samples (for scoring detail section) ---
     const recentScored = await prisma.chatterHourlyScore.findMany({
-      where: { aiNotes: { not: null }, createdAt: { gte: since } },
+      where: { aiNotes: { not: null }, createdAt: { gte: since }, ...creatorWhere },
       include: { creator: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
       take: 15,
@@ -202,7 +219,7 @@ export async function GET(req: NextRequest) {
 
     // --- Copy-Paste Blasting (aggregated across all scored hours) ---
     const blastScores = await prisma.chatterHourlyScore.findMany({
-      where: { NOT: { copyPasteBlasts: { equals: Prisma.DbNull } }, createdAt: { gte: since } },
+      where: { NOT: { copyPasteBlasts: { equals: Prisma.DbNull } }, createdAt: { gte: since }, ...creatorWhere },
       include: { creator: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -226,6 +243,9 @@ export async function GET(req: NextRequest) {
       blasts: [...e.blasts.entries()].sort((a, b) => b[1] - a[1]).map(([message, fanCount]) => ({ message, fanCount })),
     })).filter(e => e.totalBlastSends > 0);
 
+    // Include all active creators for the filter dropdown (unfiltered)
+    const allCreators = creators.map(c => ({ creatorId: c.id, creatorName: c.name || "Unknown" }));
+
     return NextResponse.json({
       kpis,
       performanceTrend,
@@ -239,6 +259,7 @@ export async function GET(req: NextRequest) {
       creatorWorkload,
       conversationSamples,
       copyPasteBlasters,
+      allCreators,
     });
   } catch (err: any) {
     console.error("Team analytics error:", err.message);

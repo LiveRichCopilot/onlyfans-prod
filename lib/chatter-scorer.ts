@@ -181,6 +181,7 @@ export async function fetchAndAttributeMessages(
 export async function scoreChatter(
     window: ScoringWindow,
     useAI: boolean = true,
+    runStory: boolean = false,
 ): Promise<ScoringResult | null> {
     try {
         const existing = await prisma.chatterHourlyScore.findUnique({
@@ -279,8 +280,9 @@ export async function scoreChatter(
         }));
 
         // Story analysis: labels BUYING_SIGNAL, SELL, STORY_START etc. on messages
+        // Only runs when explicitly requested (runStory=true) to control throughput
         let storyAnalysis = null;
-        if (useAI && allMessages.length >= 8) {
+        if (runStory && useAI && allMessages.length >= 8) {
             storyAnalysis = await runStoryAnalysis(formatted, allMessages.length).catch((e) => {
                 console.error("[Scorer] Story analysis failed:", e.message);
                 return null;

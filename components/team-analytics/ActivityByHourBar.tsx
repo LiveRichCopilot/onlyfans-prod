@@ -13,7 +13,7 @@ export function ActivityByHourBar({ data }: { data: HourEntry[] }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-white font-semibold text-sm">Activity by Hour</h3>
-          <p className="text-white/40 text-xs mt-0.5">Scoring sessions per hour of day</p>
+          <p className="text-white/40 text-xs mt-0.5">When chatters are active (UK time) — gaps mean nobody's working that hour</p>
         </div>
         <ExportButtons data={data.map(d => ({ hour: `${d.hour}:00`, sessions: d.sessionCount, avgScore: d.avgScore }))} filename="activity-by-hour" />
       </div>
