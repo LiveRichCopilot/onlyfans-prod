@@ -172,7 +172,7 @@ export function DateRangePicker({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute top-full right-0 mt-2 z-50 w-72 glass-card rounded-2xl p-3 shadow-2xl border border-white/10 space-y-2">
+        <div className="absolute top-full right-0 mt-2 z-50 w-72 rounded-2xl p-3 shadow-2xl border border-white/10 space-y-2" style={{ background: "#111827" }}>
           {/* Preset grid */}
           <div className="grid grid-cols-4 gap-1.5">
             {PRESETS.map(p => (

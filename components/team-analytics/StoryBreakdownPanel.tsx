@@ -73,8 +73,8 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
             </div>
           </div>
           {storyAnalysis.fanInvestmentMoment && (
-            <p className="text-white/40 text-[11px] leading-relaxed">
-              <Heart size={10} className="inline text-pink-400/60 mr-1" />
+            <p className="text-white/80 text-[11px] leading-relaxed">
+              <Heart size={10} className="inline text-pink-400 mr-1" />
               {storyAnalysis.fanInvestmentMoment}
             </p>
           )}
@@ -120,17 +120,17 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Story flow analysis */}
           {arc.storyFlowAnalysis && (
             <div>
-              <p className="text-white/25 text-[9px] uppercase tracking-wider font-semibold mb-1">Story Flow</p>
-              <p className="text-white/45 text-[11px] leading-relaxed">{arc.storyFlowAnalysis}</p>
+              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1">Story Flow</p>
+              <p className="text-white/80 text-[11px] leading-relaxed">{arc.storyFlowAnalysis}</p>
             </div>
           )}
 
           {/* Fan investment */}
           {arc.fanInvestment && (
             <div>
-              <p className="text-white/25 text-[9px] uppercase tracking-wider font-semibold mb-1">Fan Investment</p>
-              <p className="text-white/45 text-[11px] leading-relaxed">
-                <TrendingUp size={10} className="inline text-emerald-400/50 mr-1" />
+              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1">Fan Investment</p>
+              <p className="text-white/80 text-[11px] leading-relaxed">
+                <TrendingUp size={10} className="inline text-emerald-400 mr-1" />
                 {arc.fanInvestment}
               </p>
             </div>
@@ -139,10 +139,10 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Key elements */}
           {arc.keyElements.length > 0 && (
             <div>
-              <p className="text-white/25 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Key Elements</p>
+              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Key Elements</p>
               <div className="flex flex-wrap gap-1">
                 {arc.keyElements.map((el, ei) => (
-                  <span key={ei} className="text-[9px] bg-white/[0.04] text-white/40 px-2 py-0.5 rounded-full border border-white/[0.06]">
+                  <span key={ei} className="text-[9px] bg-white/[0.04] text-white/70 px-2 py-0.5 rounded-full border border-white/[0.06]">
                     {el}
                   </span>
                 ))}
@@ -153,7 +153,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Selling pattern checklist */}
           {arc.sellingPattern.length > 0 && (
             <div>
-              <p className="text-white/25 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Selling Pattern</p>
+              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Selling Pattern</p>
               <div className="space-y-1">
                 {arc.sellingPattern.map((step, si) => (
                   <div key={si} className="flex items-start gap-1.5">
@@ -162,7 +162,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
                     ) : (
                       <XCircle size={11} className="text-red-400/60 shrink-0 mt-0.5" />
                     )}
-                    <span className={`text-[10px] leading-relaxed ${step.achieved ? "text-white/50" : "text-white/30"}`}>
+                    <span className={`text-[10px] leading-relaxed ${step.achieved ? "text-white/90" : "text-white/60"}`}>
                       {step.description}
                       {step.messageRef != null && (
                         <span className="text-white/20 ml-1">#{step.messageRef}</span>
@@ -179,25 +179,25 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
       {/* AI Notes */}
       {aiNotes && (
         <div className="glass-inset rounded-2xl p-4">
-          <p className="text-white/25 text-[9px] uppercase tracking-wider font-semibold mb-1.5">AI Analysis</p>
-          <p className="text-white/45 text-[11px] leading-relaxed">{aiNotes}</p>
+          <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1.5">AI Analysis</p>
+          <p className="text-white/90 text-[11px] leading-relaxed">{aiNotes}</p>
         </div>
       )}
 
       {/* Strengths & Mistakes */}
       {(strengthTags.length > 0 || mistakeTags.length > 0) && (
         <div className="glass-inset rounded-2xl p-4 space-y-2">
-          <p className="text-white/25 text-[9px] uppercase tracking-wider font-semibold mb-1">What Worked / What Didn&apos;t</p>
+          <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1">What Worked / What Didn&apos;t</p>
           {strengthTags.map((t) => (
             <div key={t} className="flex items-center gap-2">
               <CheckCircle size={11} className="text-teal-400 shrink-0" />
-              <span className="text-teal-300/60 text-[10px]">{formatTag(t)}</span>
+              <span className="text-teal-300 text-[10px]">{formatTag(t)}</span>
             </div>
           ))}
           {mistakeTags.map((t) => (
             <div key={t} className="flex items-center gap-2">
               <XCircle size={11} className="text-red-400 shrink-0" />
-              <span className="text-red-300/60 text-[10px]">{formatTag(t)}</span>
+              <span className="text-red-300 text-[10px]">{formatTag(t)}</span>
             </div>
           ))}
         </div>

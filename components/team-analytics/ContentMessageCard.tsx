@@ -71,8 +71,22 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const hasSales = revenue > 0;
+  const hasNoBites = msg.viewedCount > 0 && msg.purchasedCount === 0 && msg.price > 0;
+
   return (
-    <div className="glass-inset rounded-xl p-3 space-y-2.5">
+    <div className={`rounded-xl p-3 space-y-2.5 ${hasSales ? "bg-teal-500/[0.08] border border-teal-500/20" : "glass-inset"}`}>
+      {/* Revenue banner — only when there are actual sales */}
+      {hasSales && (
+        <div className="flex items-center gap-2 bg-teal-500/15 rounded-lg px-3 py-1.5">
+          <DollarSign size={14} className="text-teal-400" />
+          <span className="text-teal-400 text-sm font-bold">${revenue.toFixed(0)}</span>
+          <span className="text-teal-300/70 text-[10px]">earned</span>
+          <span className="text-white/40 text-[10px] ml-1">{msg.purchasedCount} sale{msg.purchasedCount !== 1 ? "s" : ""}</span>
+          {msg.viewedCount > 0 && <span className="text-white/40 text-[10px]">({cvr}% CVR)</span>}
+        </div>
+      )}
+
       {/* Row 1: Thumbnails + Text */}
       <div className="flex gap-3">
         {/* Thumbnails */}
@@ -103,16 +117,16 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="flex items-center gap-2">
               {rank && (
-                <span className="text-[10px] font-bold text-white/20 tabular-nums">#{rank}</span>
+                <span className="text-[10px] font-bold text-white/40 tabular-nums">#{rank}</span>
               )}
-              <span className="text-white/40 text-[10px]">{msg.creatorName}</span>
+              <span className="text-white/60 text-[10px]">{msg.creatorName}</span>
             </div>
-            <span className="text-white/20 text-[10px] shrink-0">{msg.date ? new Date(msg.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</span>
+            <span className="text-white/50 text-[10px] shrink-0">{msg.date ? new Date(msg.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</span>
           </div>
 
           {/* Full message text */}
           <div className="relative">
-            <p className={`text-white/70 text-xs leading-relaxed ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+            <p className={`text-white/80 text-xs leading-relaxed ${!expanded && isLong ? "line-clamp-3" : ""}`}>
               {msg.rawText || "(no text)"}
             </p>
             {isLong && (
@@ -129,28 +143,33 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
         <Pill label={msg.hookCategory} />
         <Pill label={msg.contentType} color="#5eead4" />
         {msg.hasCTA && <Pill label="CTA" color="#fbbf24" />}
-        {msg.price > 0 && <span className="text-teal-400/70 text-[10px] font-bold">${msg.price}</span>}
+        {msg.price > 0 && <span className="text-teal-400 text-[10px] font-bold">${msg.price}</span>}
         {msg.price === 0 && msg.hasMedia && <Pill label="Free" color="rgba(255,255,255,0.25)" />}
         {msg.isFreePreview && <Pill label="Preview" color="rgba(255,255,255,0.25)" />}
         <div className="flex items-center gap-0.5 ml-auto">
           <MediaTypeIcon type={msg.mediaType} />
-          <span className="text-white/30 text-[10px]">{msg.mediaType.replace("-", " ")}</span>
+          <span className="text-white/50 text-[10px]">{msg.mediaType.replace("-", " ")}</span>
         </div>
       </div>
 
       {/* Row 3: Metrics */}
-      <div className="flex items-center gap-3 text-[10px] text-white/40 flex-wrap">
+      <div className="flex items-center gap-3 text-[10px] text-white/60 flex-wrap">
         {msg.source === "mass" && msg.sentCount > 0 && (
-          <span className="flex items-center gap-1"><Send size={9} /> <span className="text-white/60 font-medium">{msg.sentCount.toLocaleString()}</span> sent</span>
+          <span className="flex items-center gap-1"><Send size={9} /> <span className="text-white/80 font-medium">{msg.sentCount.toLocaleString()}</span> sent</span>
         )}
-        <span className="flex items-center gap-1"><Eye size={9} /> <span className="text-white/60 font-medium">{msg.viewedCount.toLocaleString()}</span>
-          {msg.source === "mass" && msg.sentCount > 0 && <span className="text-white/30">({viewRate}%)</span>}
+        <span className="flex items-center gap-1"><Eye size={9} /> <span className="text-white/80 font-medium">{msg.viewedCount.toLocaleString()}</span> viewed
+          {msg.source === "mass" && msg.sentCount > 0 && <span className="text-white/50">({viewRate}%)</span>}
         </span>
-        <span className="flex items-center gap-1"><ShoppingCart size={9} /> <span className="text-white/60 font-medium">{msg.purchasedCount.toLocaleString()}</span>
-          {msg.viewedCount > 0 && <span className="text-white/30">({cvr}%)</span>}
+        <span className="flex items-center gap-1"><ShoppingCart size={9} /> <span className={`font-medium ${msg.purchasedCount > 0 ? "text-teal-400" : "text-white/80"}`}>{msg.purchasedCount.toLocaleString()}</span> bought
+          {msg.viewedCount > 0 && <span className="text-white/50">({cvr}%)</span>}
         </span>
-        <span className="flex items-center gap-1"><DollarSign size={9} /> <span className={`font-semibold ${revenue > 0 ? "text-teal-400/80" : "text-white/20"}`}>${revenue.toFixed(0)}</span></span>
-        <button onClick={copyText} className="ml-auto text-white/20 hover:text-white/50 transition" title="Copy message text">
+        {!hasSales && msg.price > 0 && (
+          <span className="flex items-center gap-1"><DollarSign size={9} /> <span className="text-white/30">$0</span></span>
+        )}
+        {hasNoBites && (
+          <span className="text-red-400/60 text-[9px] font-medium">No sales yet</span>
+        )}
+        <button onClick={copyText} className="ml-auto text-white/30 hover:text-white/60 transition" title="Copy message text">
           {copied ? <Check size={11} className="text-teal-400" /> : <Copy size={11} />}
         </button>
       </div>
@@ -158,9 +177,9 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
       {/* Row 4: Reply attribution (if available) */}
       {replyStats && replyStats.uniqueRepliers["24h"] > 0 && (
         <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-          <span className="text-[9px] text-white/25 shrink-0">Fans replied:</span>
+          <span className="text-[9px] text-white/50 shrink-0">Fans replied:</span>
           {(["30m", "1h", "6h", "24h"] as const).map(w => (
-            <span key={w} className={`text-[9px] px-1.5 py-0.5 rounded ${replyStats.uniqueRepliers[w] > 0 ? "bg-teal-400/10 text-teal-400/70" : "bg-white/5 text-white/15"}`}>
+            <span key={w} className={`text-[9px] px-1.5 py-0.5 rounded ${replyStats.uniqueRepliers[w] > 0 ? "bg-teal-400/10 text-teal-400" : "bg-white/5 text-white/30"}`}>
               {w}: <span className="font-semibold">{replyStats.uniqueRepliers[w]}</span>
             </span>
           ))}

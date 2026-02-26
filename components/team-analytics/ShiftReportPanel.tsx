@@ -74,7 +74,7 @@ function ActivityBar({ value, label, icon: Icon }: { value: number; label: strin
       <Icon size={14} className="text-white/40 shrink-0" />
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] text-white/50">{label}</span>
+          <span className="text-[11px] text-white/70">{label}</span>
           <span className="text-[11px] font-bold tabular-nums" style={{ color }}>{value}%</span>
         </div>
         <div className="h-2 glass-inset rounded-full overflow-hidden">
@@ -89,7 +89,7 @@ function ScoreBar({ label, value, max, color }: { label: string; value: number; 
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-white/40 w-16 shrink-0">{label}</span>
+      <span className="text-[10px] text-white/70 w-16 shrink-0">{label}</span>
       <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
@@ -177,21 +177,21 @@ function ShiftSummaryRow({ data }: { data: ShiftReportData }) {
       {/* Verdict banner */}
       <div className="glass-inset rounded-2xl p-4 flex items-center gap-4">
         <div className="flex-1 space-y-1">
-          <div className="text-[11px] text-white/40">Activity Verdict</div>
+          <div className="text-[11px] text-white/60">Activity Verdict</div>
           <div className="text-sm font-bold flex items-center gap-1.5" style={{ color: activity.color }}>
             <activity.icon size={14} /> {activity.label}
           </div>
         </div>
         <div className="w-px h-8 bg-white/10" />
         <div className="flex-1 space-y-1">
-          <div className="text-[11px] text-white/40">Effort Verdict</div>
+          <div className="text-[11px] text-white/60">Effort Verdict</div>
           <div className="text-sm font-bold flex items-center gap-1.5" style={{ color: effort.color }}>
             <effort.icon size={14} /> {effort.label}
           </div>
         </div>
         <div className="w-px h-8 bg-white/10" />
         <div className="flex-1 space-y-1">
-          <div className="text-[11px] text-white/40">Avg Score</div>
+          <div className="text-[11px] text-white/60">Avg Score</div>
           <div className="text-sm font-bold tabular-nums" style={{ color: activityColor(data.avgScore) }}>
             {data.avgScore}/100
           </div>
@@ -213,11 +213,11 @@ function StatPill({ icon: Icon, label, value, sub, warn }: { icon: typeof Clock;
   return (
     <div className="glass-inset rounded-xl px-3 py-2.5">
       <div className="flex items-center gap-1.5 mb-1">
-        <Icon size={11} className="text-white/30" />
-        <span className="text-[10px] text-white/40">{label}</span>
+        <Icon size={11} className="text-white/50" />
+        <span className="text-[10px] text-white/60">{label}</span>
       </div>
       <div className={`text-sm font-bold tabular-nums ${warn ? "text-red-400" : "text-white"}`}>{value}</div>
-      {sub && <div className="text-[10px] text-white/30 mt-0.5">{sub}</div>}
+      {sub && <div className="text-[10px] text-white/50 mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -241,7 +241,7 @@ function HubstaffSection({ data }: { data: ShiftReportData }) {
         <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
           <Activity size={12} className="text-teal-400" /> Hubstaff Activity
         </h4>
-        <span className="text-[10px] text-white/30">Tracked: {hs.totalTrackedHrs}h of {data.totalShiftDurationHrs}h shift</span>
+        <span className="text-[10px] text-white/60">Tracked: {hs.totalTrackedHrs}h of {data.totalShiftDurationHrs}h shift</span>
       </div>
       <div className="space-y-2.5">
         <ActivityBar value={hs.keyboard} label="Keyboard" icon={Keyboard} />
@@ -307,12 +307,12 @@ function TopAppsSection({ apps }: { apps: ShiftReportData["topApps"] }) {
       <div className="space-y-1.5">
         {apps.map((app, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="text-[11px] text-white/60 w-28 truncate">{app.name}</span>
+            <span className="text-[11px] text-white/80 w-28 truncate">{app.name}</span>
             <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-teal-400/60" style={{ width: `${app.pct}%` }} />
             </div>
-            <span className="text-[10px] tabular-nums text-white/40 w-10 text-right">{app.pct}%</span>
-            <span className="text-[10px] tabular-nums text-white/20 w-12 text-right">{formatSeconds(app.seconds)}</span>
+            <span className="text-[10px] tabular-nums text-white/70 w-10 text-right">{app.pct}%</span>
+            <span className="text-[10px] tabular-nums text-white/50 w-12 text-right">{formatSeconds(app.seconds)}</span>
           </div>
         ))}
       </div>
@@ -340,7 +340,7 @@ function HourlyTimeline({ timeline }: { timeline: ShiftReportData["hourlyTimelin
       <div className="space-y-1.5">
         {timeline.map((h, i) => (
           <div key={i} className="flex items-center gap-2 group">
-            <span className="text-[10px] text-white/30 w-14 shrink-0 tabular-nums">
+            <span className="text-[10px] text-white/60 w-14 shrink-0 tabular-nums">
               {formatTime(h.windowStart)}
             </span>
             <div className="flex-1 h-5 glass-inset rounded-lg overflow-hidden relative">
@@ -352,7 +352,7 @@ function HourlyTimeline({ timeline }: { timeline: ShiftReportData["hourlyTimelin
                 {h.totalScore}
               </span>
             </div>
-            <span className="text-[9px] text-white/20 w-12 shrink-0 text-right">{h.messagesAnalyzed} msgs</span>
+            <span className="text-[9px] text-white/50 w-12 shrink-0 text-right">{h.messagesAnalyzed} msgs</span>
           </div>
         ))}
       </div>

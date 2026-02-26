@@ -34,11 +34,11 @@ function ScoreBar({ label, score, max }: { label: string; score: number; max: nu
   const pct = Math.min(100, Math.round((score / max) * 100));
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-white/40 w-16 shrink-0">{label}</span>
+      <span className="text-[10px] text-white/70 w-16 shrink-0">{label}</span>
       <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: scoreColor(pct) }} />
       </div>
-      <span className="text-[10px] text-white/30 tabular-nums w-8 text-right">{score}/{max}</span>
+      <span className="text-[10px] text-white/70 tabular-nums w-8 text-right">{score}/{max}</span>
     </div>
   );
 }
@@ -78,17 +78,17 @@ function ConversationCard({ sample }: { sample: ConversationSample }) {
           {/* What Worked Here / What Didn't */}
           {(sample.strengthTags.length > 0 || sample.mistakeTags.length > 0) && (
             <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5 space-y-2">
-              <p className="text-white/50 text-[10px] font-semibold uppercase tracking-wider mb-1.5">What Worked / What Didn&apos;t</p>
+              <p className="text-white/70 text-[10px] font-semibold uppercase tracking-wider mb-1.5">What Worked / What Didn&apos;t</p>
               {sample.strengthTags.map(t => (
                 <div key={t} className="flex items-center gap-2">
                   <CheckCircle size={12} className="text-teal-400 shrink-0" />
-                  <span className="text-teal-300/70 text-[11px]">{formatTag(t)}</span>
+                  <span className="text-teal-300 text-[11px]">{formatTag(t)}</span>
                 </div>
               ))}
               {sample.mistakeTags.map(t => (
                 <div key={t} className="flex items-center gap-2">
                   <XCircle size={12} className="text-red-400 shrink-0" />
-                  <span className="text-red-300/70 text-[11px]">{formatTag(t)}</span>
+                  <span className="text-red-300 text-[11px]">{formatTag(t)}</span>
                 </div>
               ))}
             </div>
@@ -115,8 +115,8 @@ function ConversationCard({ sample }: { sample: ConversationSample }) {
           {/* AI Notes */}
           {sample.aiNotes && (
             <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
-              <p className="text-white/30 text-[10px] font-semibold uppercase tracking-wider mb-1">AI Analysis</p>
-              <p className="text-white/50 text-[11px] leading-relaxed">{sample.aiNotes}</p>
+              <p className="text-white/60 text-[10px] font-semibold uppercase tracking-wider mb-1">AI Analysis</p>
+              <p className="text-white/90 text-[11px] leading-relaxed">{sample.aiNotes}</p>
             </div>
           )}
         </div>

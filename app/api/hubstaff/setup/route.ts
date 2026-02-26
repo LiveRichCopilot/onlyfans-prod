@@ -3,9 +3,12 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const TOKEN_URL = "https://account.hubstaff.com/access_tokens";
+
 /**
  * POST /api/hubstaff/setup
- * Bootstrap Hubstaff credentials. Called once during initial setup.
+ * Bootstrap or update Hubstaff credentials.
+ * Body: { refreshToken, organizationId }
  */
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +18,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Exchange refresh token for an access token
-    const TOKEN_URL = "https://account.hubstaff.com/access_tokens";
     const res = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
-    // Upsert config
+    // Upsert config — works for both initial setup AND token updates
     const config = await prisma.hubstaffConfig.upsert({
       where: { organizationId },
       update: {
@@ -37,6 +39,9 @@ export async function POST(req: NextRequest) {
         refreshToken: data.refresh_token || refreshToken,
         tokenExpiresAt: new Date(Date.now() + (data.expires_in || 7200) * 1000),
         syncEnabled: true,
+        // Clear DPoP keys so they get regenerated fresh with the new token
+        dpopPrivateKey: null,
+        dpopPublicKey: null,
       },
       create: {
         organizationId,
