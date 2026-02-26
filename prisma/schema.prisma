@@ -475,6 +475,8 @@ model HubstaffConfig {
   accessToken    String
   refreshToken   String
   tokenExpiresAt DateTime
+  dpopPrivateKey String?
+  dpopPublicKey  String?
   lastSyncAt     DateTime?
   syncEnabled    Boolean   @default(true)
   createdAt      DateTime  @default(now())
