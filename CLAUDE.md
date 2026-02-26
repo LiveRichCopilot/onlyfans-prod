@@ -29,6 +29,12 @@
 - If the page is working, don't touch things that aren't related to the current task.
 - Keep changes minimal and focused.
 
+### 5. Cloud database only — never local
+- Always use the real cloud Supabase/PostgreSQL database. Never local databases.
+- Database migrations must run against production (via `prisma db push` in the build script).
+- Never attempt to run Prisma commands locally without POSTGRES_URL — all DB operations happen through Vercel deployments.
+- Store real data only. No mock data, no local dev databases.
+
 ## Tech stack
 - Next.js (App Router) + Tailwind CSS + Prisma + PostgreSQL
 - iOS 26 Liquid Glass design system (see `app/globals.css`)
