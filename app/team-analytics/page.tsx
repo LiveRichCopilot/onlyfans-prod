@@ -17,6 +17,7 @@ import { TeamGaugePanel } from "@/components/team-analytics/TeamGaugePanel";
 import { ConversationPhoneGallery } from "@/components/team-analytics/ConversationPhoneGallery";
 import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting";
 import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
+import { ShiftReportPanel } from "@/components/team-analytics/ShiftReportPanel";
 
 const RANGES = [
   { label: "7d", days: 7 },
@@ -32,6 +33,7 @@ export default function TeamAnalytics() {
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [showGuide, setShowGuide] = useState(false);
+  const [shiftReportEmail, setShiftReportEmail] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,8 +158,8 @@ export default function TeamAnalytics() {
         <ActivityByHourBar data={d.activityByHour || []} />
       </div>
 
-      {/* Row 4: Chatter Rankings (full width) */}
-      <ChatterComparisonBar data={d.chatterComparison || []} />
+      {/* Row 4: Chatter Rankings (full width) — click name for shift report */}
+      <ChatterComparisonBar data={d.chatterComparison || []} onChatterClick={(email) => setShiftReportEmail(email)} />
 
       {/* Row 5: Hours + Tags */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -170,6 +172,15 @@ export default function TeamAnalytics() {
 
       {/* Row 7: Conversation Scoring with Chat Bubbles (full width) */}
       <ConversationPhoneGallery data={d.conversationSamples || []} />
+
+      {/* Shift Report Modal */}
+      {shiftReportEmail && (
+        <ShiftReportPanel
+          email={shiftReportEmail}
+          creatorId={creatorFilter !== "all" ? creatorFilter : undefined}
+          onClose={() => setShiftReportEmail(null)}
+        />
+      )}
     </div>
   );
 }
