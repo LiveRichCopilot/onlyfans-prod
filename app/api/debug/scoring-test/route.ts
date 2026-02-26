@@ -100,17 +100,20 @@ export async function GET() {
     return NextResponse.json(results);
   }
 
-  // Show first 3 chat shapes
+  // Show first 3 chat shapes — include fan object since withUser may be null
   results.sampleChats = chats.slice(0, 3).map((c: any) => ({
     id: c.id,
     withUser: c.withUser ? { id: c.withUser.id, name: c.withUser.name, username: c.withUser.username } : null,
+    fan: c.fan ? { id: c.fan.id, name: c.fan.name, username: c.fan.username } : null,
     lastMessage: c.lastMessage ? { createdAt: c.lastMessage.createdAt, text: (c.lastMessage.text || "").slice(0, 80) } : null,
-    topLevelKeys: Object.keys(c).slice(0, 15),
+    topLevelKeys: Object.keys(c),
   }));
 
   // Step 2: Get messages from first chat
   const firstChat = chats[0];
-  const chatId = firstChat.withUser?.id || firstChat.id;
+  // OFAPI returns fan object, not withUser — try both
+  const chatId = firstChat.withUser?.id || firstChat.fan?.id || firstChat.id;
+  results.resolvedChatId = { chatId, source: firstChat.withUser?.id ? "withUser" : firstChat.fan?.id ? "fan" : "chat.id" };
 
   let msgData: any;
   try {

@@ -119,8 +119,8 @@ export async function fetchAndAttributeMessages(
         const chats = Array.isArray(chatData?.data) ? chatData.data : chatData?.data?.list || [];
 
         for (const chat of chats.slice(0, maxChats)) {
-            const chatId = chat.withUser?.id || chat.id;
-            const fanName = chat.withUser?.name || chat.withUser?.username || undefined;
+            const chatId = chat.withUser?.id || chat.fan?.id || chat.id;
+            const fanName = chat.withUser?.name || chat.withUser?.username || chat.fan?.name || chat.fan?.username || undefined;
             if (!chatId) continue;
 
             try {
