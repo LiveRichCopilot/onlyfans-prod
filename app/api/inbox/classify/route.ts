@@ -6,7 +6,7 @@ import type { AnalysisMetadata, ClassificationResult, PersonalFact } from "@/lib
 import { saveClassificationToDb } from "@/lib/classify-persist";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 function extractMessages(res: any): any[] {
     const list = res?.data?.list ?? res?.list ?? res?.data;
@@ -44,18 +44,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ classified: false, reason: "OPENAI_API_KEY not set — add it in Vercel Settings → Environment Variables" });
         }
 
-        const apiKey = process.env.OFAPI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json({ error: "OFAPI_API_KEY not configured" }, { status: 500 });
-        }
-
         const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
-        if (!creator?.ofapiCreatorId) {
-            return NextResponse.json({ error: "Creator not linked" }, { status: 404 });
+        if (!creator?.ofapiCreatorId || !creator?.ofapiToken) {
+            return NextResponse.json({ error: "Creator not linked or missing OFAPI token" }, { status: 404 });
         }
 
         const accountName = creator.ofapiCreatorId;
         const creatorOfId = creator.ofapiCreatorId;
+        const apiKey = creator.ofapiToken;
 
         // --- STEP 1: Read existing facts ---
         const fan = await prisma.fan.findFirst({
@@ -76,8 +72,8 @@ export async function POST(request: Request) {
 
         const MAX_API_CALLS = 4;
         const MAX_MESSAGES = 400;
-        const HARD_DEADLINE_MS = 28000;
-        const OFAPI_DEADLINE_MS = 15000;
+        const HARD_DEADLINE_MS = 55000;
+        const OFAPI_DEADLINE_MS = 25000;
         const isOfapiOverBudget = () => Date.now() - startTime > OFAPI_DEADLINE_MS;
 
         if (!isIncremental) {

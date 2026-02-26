@@ -86,7 +86,13 @@ export async function GET(request: Request) {
             status: string;
         }> = [];
 
-        const MAX_PAIRS = 6;
+        const MAX_PAIRS = 10;
+
+        // Shuffle for fairness — prevents same pairs always getting priority
+        for (let i = unscoredWindows.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [unscoredWindows[i], unscoredWindows[j]] = [unscoredWindows[j], unscoredWindows[i]];
+        }
 
         for (let i = 0; i < Math.min(unscoredWindows.length, MAX_PAIRS); i++) {
             // Time guard: stop with 15s safety margin for DB writes + response

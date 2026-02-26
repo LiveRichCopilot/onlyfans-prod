@@ -102,7 +102,7 @@ export async function buildScoringWindows(
  */
 export async function fetchAndAttributeMessages(
     window: ScoringWindow,
-    maxChats: number = 5,
+    maxChats: number = 3,
 ): Promise<{
     chatterMessages: string[];
     fanMessages: string[];
@@ -124,7 +124,7 @@ export async function fetchAndAttributeMessages(
             if (!chatId) continue;
 
             try {
-                const msgData = await getChatMessages(window.ofapiCreatorId, chatId, window.ofapiToken, 50);
+                const msgData = await getChatMessages(window.ofapiCreatorId, chatId, window.ofapiToken, 20);
                 const rawMsgs = msgData?.data?.list || msgData?.list || (Array.isArray(msgData?.data) ? msgData.data : []);
 
                 const sorted = rawMsgs.sort(
@@ -278,14 +278,13 @@ export async function scoreChatter(
             })),
         }));
 
-        // Run story analysis on conversations with enough messages (best-effort, non-blocking)
+        // Story analysis: labels BUYING_SIGNAL, SELL, STORY_START etc. on messages
         let storyAnalysis = null;
         if (useAI && allMessages.length >= 8) {
-            try {
-                storyAnalysis = await runStoryAnalysis(formatted, allMessages.length);
-            } catch (e: any) {
+            storyAnalysis = await runStoryAnalysis(formatted, allMessages.length).catch((e) => {
                 console.error("[Scorer] Story analysis failed:", e.message);
-            }
+                return null;
+            });
         }
 
         // Enrich conversationData with story analysis if available

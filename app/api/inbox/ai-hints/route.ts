@@ -10,7 +10,7 @@ import {
 import { buildContextBundle, compressBundle } from "@/lib/ai-context-bundle";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 25;
+export const maxDuration = 45;
 
 /**
  * POST /api/inbox/ai-hints (v2)

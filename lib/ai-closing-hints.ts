@@ -222,6 +222,9 @@ ${intelLine}
 ${params.compressedContext}`;
 
     try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000); // 20s timeout for OpenAI
+
         const response = await fetch(OPENAI_BASE, {
             method: "POST",
             headers: {
@@ -238,7 +241,8 @@ ${params.compressedContext}`;
                 max_completion_tokens: 500,
                 response_format: { type: "json_object" },
             }),
-        });
+            signal: controller.signal,
+        }).finally(() => clearTimeout(timer));
 
         if (!response.ok) {
             const errText = await response.text();
