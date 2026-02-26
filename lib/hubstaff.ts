@@ -212,6 +212,7 @@ export type HubstaffActivity = {
   overall: number;
   keyboard: number;
   mouse: number;
+  project_id?: number;
 };
 
 export type LastActivity = {
@@ -262,23 +263,43 @@ export async function getOrganizationActivities(
   return data.activities || [];
 }
 
-/** Get who's online right now — simpler than polling activities */
-export async function getLastActivities(orgId: string): Promise<LastActivity[]> {
-  const data = await hubstaffGet<LastActivitiesResponse>(`/organizations/${orgId}/last_activities`, {
+/** Get who's online right now — simpler than polling activities. orgId is auto-resolved if omitted. */
+export async function getLastActivities(orgId?: string): Promise<LastActivity[]> {
+  const resolvedOrgId = orgId || await getOrgId();
+  const data = await hubstaffGet<LastActivitiesResponse>(`/organizations/${resolvedOrgId}/last_activities`, {
     page_limit: "100",
   });
   return data.last_activities || [];
 }
 
-/** Get actual attendance shifts (clock-in/out records) for a date range */
+/**
+ * Get actual attendance shifts (clock-in/out records) for a date range.
+ * Can be called as (orgId, startDate, stopDate) or (startDate, stopDate) with auto orgId.
+ */
 export async function getAttendanceShifts(
-  orgId: string,
-  startDate: string,
-  stopDate: string
+  orgIdOrStartDate: string,
+  startOrStopDate: string,
+  stopDate?: string,
 ): Promise<AttendanceShift[]> {
-  const data = await hubstaffGet<AttendanceShiftsResponse>(`/organizations/${orgId}/attendance_shifts`, {
-    "date[start]": startDate,
-    "date[stop]": stopDate,
+  let resolvedOrgId: string;
+  let start: string;
+  let stop: string;
+
+  if (stopDate) {
+    // Called as (orgId, startDate, stopDate)
+    resolvedOrgId = orgIdOrStartDate;
+    start = startOrStopDate;
+    stop = stopDate;
+  } else {
+    // Called as (startDate, stopDate)
+    resolvedOrgId = await getOrgId();
+    start = orgIdOrStartDate;
+    stop = startOrStopDate;
+  }
+
+  const data = await hubstaffGet<AttendanceShiftsResponse>(`/organizations/${resolvedOrgId}/attendance_shifts`, {
+    "date[start]": start,
+    "date[stop]": stop,
     page_limit: "500",
   });
   return data.attendance_shifts || [];
@@ -286,6 +307,73 @@ export async function getAttendanceShifts(
 
 export async function getConfig() {
   return prisma.hubstaffConfig.findFirst();
+}
+
+// --- Auto Org ID Helper ---
+
+async function getOrgId(): Promise<string> {
+  const config = await prisma.hubstaffConfig.findFirst({ select: { organizationId: true } });
+  if (config) return config.organizationId;
+  const envOrgId = process.env.HUBSTAFF_ORG_ID;
+  if (!envOrgId) throw new Error("No Hubstaff organization configured");
+  return envOrgId;
+}
+
+// --- Convenience wrappers (auto-resolve org ID from DB) ---
+
+/**
+ * List org members with sideloaded user objects.
+ * Returns { members, users } matching Hubstaff V2 response shape.
+ */
+export async function listMembers(): Promise<{ members: any[]; users: any[] }> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ members: any[]; users: any[] }>(
+    `/organizations/${orgId}/members`,
+    { page_limit: "100", include: "users" },
+  );
+  return { members: data.members || [], users: data.users || [] };
+}
+
+/** Get activity slots for a time range (10-min intervals). */
+export async function getActivities(startTime: string, stopTime: string): Promise<HubstaffActivity[]> {
+  const orgId = await getOrgId();
+  return getOrganizationActivities(orgId, startTime, stopTime);
+}
+
+/** Get daily activity aggregates (one row per user per day). */
+export async function getDailyActivities(startDate: string, stopDate: string): Promise<any[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ daily_activities: any[] }>(
+    `/organizations/${orgId}/activities/daily`,
+    { "date[start]": startDate, "date[stop]": stopDate, page_limit: "500" },
+  );
+  return data.daily_activities || [];
+}
+
+/** Get attendance schedules (expected shifts) for a date range. */
+export async function getAttendanceSchedules(
+  startDate: string,
+  stopDate: string,
+): Promise<{ schedules: any[]; users: any[] }> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<any>(
+    `/organizations/${orgId}/attendance/schedules`,
+    { "date[start]": startDate, "date[stop]": stopDate, page_limit: "500" },
+  );
+  return {
+    schedules: data.attendance_schedules || data.schedules || [],
+    users: data.users || [],
+  };
+}
+
+/** Get all projects in the organization. */
+export async function getProjects(): Promise<any[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ projects: any[] }>(
+    `/organizations/${orgId}/projects`,
+    { page_limit: "100" },
+  );
+  return data.projects || [];
 }
 
 export async function updateLastSync() {
