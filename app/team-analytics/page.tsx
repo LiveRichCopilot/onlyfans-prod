@@ -16,6 +16,7 @@ import { TagCloudPanel } from "@/components/team-analytics/TagCloudPanel";
 import { TeamGaugePanel } from "@/components/team-analytics/TeamGaugePanel";
 import { ConversationPhoneGallery } from "@/components/team-analytics/ConversationPhoneGallery";
 import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting";
+import { ContentPerformancePanel } from "@/components/team-analytics/ContentPerformancePanel";
 import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
 import { ShiftReportPanel } from "@/components/team-analytics/ShiftReportPanel";
 
@@ -170,7 +171,10 @@ export default function TeamAnalytics() {
       {/* Row 6: Copy-Paste Blasting (full width) */}
       <CopyPasteBlasting data={d.copyPasteBlasters || []} />
 
-      {/* Row 7: Conversation Scoring with Chat Bubbles (full width) */}
+      {/* Row 7: Content Performance (full width) */}
+      <ContentPerformancePanel days={days} creatorFilter={creatorFilter} />
+
+      {/* Row 8: Conversation Scoring with Chat Bubbles (full width) */}
       <ConversationPhoneGallery data={d.conversationSamples || []} />
 
       {/* Shift Report Modal */}
