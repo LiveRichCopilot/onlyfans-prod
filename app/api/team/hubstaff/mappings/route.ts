@@ -31,29 +31,30 @@ export async function GET() {
       userMap.set(u.id, u);
     }
 
-    const mappingMap = new Map<string, any>();
+    // Group mappings by hubstaffUserId (multiple creators per member)
+    const mappingsByUser = new Map<string, any[]>();
     for (const m of existingMappings) {
-      mappingMap.set(m.hubstaffUserId, m);
+      const list = mappingsByUser.get(m.hubstaffUserId) || [];
+      list.push(m);
+      mappingsByUser.set(m.hubstaffUserId, list);
     }
 
     const members = membersData.members
       .filter((m) => m.membership_status === "active")
       .map((m) => {
         const user = userMap.get(m.user_id);
-        const mapping = mappingMap.get(String(m.user_id));
+        const userMappings = mappingsByUser.get(String(m.user_id)) || [];
         return {
           hubstaffUserId: String(m.user_id),
           name: user?.name || "Unknown",
           email: user?.email || "",
           role: m.membership_role,
           lastActive: m.last_client_activity,
-          mapping: mapping
-            ? {
-                id: mapping.id,
-                chatterEmail: mapping.chatterEmail,
-                creatorId: mapping.creatorId,
-              }
-            : null,
+          mappings: userMappings.map((mp: any) => ({
+            id: mp.id,
+            chatterEmail: mp.chatterEmail,
+            creatorId: mp.creatorId,
+          })),
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -137,24 +138,28 @@ async function upsertMapping(data: {
   hubstaffUserId: string;
   hubstaffName: string;
   chatterEmail: string;
-  creatorId?: string;
+  creatorId: string;
 }) {
-  if (!data.hubstaffUserId || !data.chatterEmail) {
-    throw new Error("hubstaffUserId and chatterEmail are required");
+  if (!data.hubstaffUserId || !data.chatterEmail || !data.creatorId) {
+    throw new Error("hubstaffUserId, chatterEmail, and creatorId are required");
   }
 
   return prisma.hubstaffUserMapping.upsert({
-    where: { hubstaffUserId: data.hubstaffUserId },
+    where: {
+      hubstaffUserId_creatorId: {
+        hubstaffUserId: data.hubstaffUserId,
+        creatorId: data.creatorId,
+      },
+    },
     create: {
       hubstaffUserId: data.hubstaffUserId,
       hubstaffName: data.hubstaffName || "Unknown",
       chatterEmail: data.chatterEmail,
-      creatorId: data.creatorId || null,
+      creatorId: data.creatorId,
     },
     update: {
       hubstaffName: data.hubstaffName || undefined,
       chatterEmail: data.chatterEmail,
-      creatorId: data.creatorId || null,
     },
   });
 }

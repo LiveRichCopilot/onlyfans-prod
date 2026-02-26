@@ -467,8 +467,8 @@ model HubstaffUserMapping {
   hubstaffUserId String
   hubstaffName   String?
   chatterEmail   String
-  creatorId      String?
-  creator        Creator? @relation(fields: [creatorId], references: [id])
+  creatorId      String
+  creator        Creator  @relation(fields: [creatorId], references: [id])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
