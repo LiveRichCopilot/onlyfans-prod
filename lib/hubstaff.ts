@@ -94,16 +94,10 @@ async function bootstrapFromEnv(): Promise<string> {
   const orgId = process.env.HUBSTAFF_ORG_ID;
   if (!refreshToken || !orgId) throw new Error("Missing HUBSTAFF_REFRESH_TOKEN or HUBSTAFF_ORG_ID");
 
-  // Generate DPoP key pair before first token request
-  const keyPair = await getDpopKeyPair();
-  const dpopProof = createDpopProof(keyPair, "POST", TOKEN_URL);
-
+  // Token endpoint is plain OAuth2 — NO DPoP
   const res = await fetch(TOKEN_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "DPoP": dpopProof,
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
   });
 
@@ -113,6 +107,9 @@ async function bootstrapFromEnv(): Promise<string> {
   }
 
   const data = await res.json();
+
+  // Generate DPoP key pair for subsequent API calls (not token exchange)
+  const keyPair = await getDpopKeyPair();
   const privatePem = keyPair.privateKey.export({ type: "pkcs8", format: "pem" }) as string;
 
   await prisma.hubstaffConfig.create({
@@ -130,20 +127,10 @@ async function bootstrapFromEnv(): Promise<string> {
 }
 
 async function refreshAccessToken(config: { id: string; refreshToken: string; dpopPrivateKey?: string | null; dpopPublicKey?: string | null }): Promise<string> {
-  // Use DPoP only if the config has stored DPoP keys (meaning token was DPoP-bound)
-  const hasDpop = !!config.dpopPrivateKey && !!config.dpopPublicKey;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
-
-  if (hasDpop) {
-    const keyPair = await getDpopKeyPair(config.id);
-    headers["DPoP"] = createDpopProof(keyPair, "POST", TOKEN_URL);
-  }
-
+  // Token endpoint is plain OAuth2 — NO DPoP (DPoP is only for API calls)
   const res = await fetch(TOKEN_URL, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: config.refreshToken }),
   });
 

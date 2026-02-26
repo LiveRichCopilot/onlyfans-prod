@@ -6,44 +6,13 @@ export const dynamic = "force-dynamic";
 
 const TOKEN_URL = "https://account.hubstaff.com/access_tokens";
 
-// --- DPoP helpers (inline to avoid circular deps) ---
-
-function base64url(buf: Buffer): string {
-  return buf.toString("base64url");
-}
-
-function generateKeyPair() {
-  const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
-  const publicJwk = publicKey.export({ format: "jwk" });
-  const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
-  return { privateKey, publicJwk, privatePem };
-}
-
-function createDpopProof(
-  privateKey: crypto.KeyObject,
-  publicJwk: JsonWebKey,
-  method: string,
-  url: string,
-): string {
-  const header = { typ: "dpop+jwt", alg: "ES256", jwk: publicJwk };
-  const payload = {
-    htm: method,
-    htu: url,
-    iat: Math.floor(Date.now() / 1000),
-    jti: crypto.randomUUID(),
-  };
-
-  const headerB64 = base64url(Buffer.from(JSON.stringify(header)));
-  const payloadB64 = base64url(Buffer.from(JSON.stringify(payload)));
-  const sig = crypto.sign("sha256", Buffer.from(`${headerB64}.${payloadB64}`), privateKey);
-
-  return `${headerB64}.${payloadB64}.${base64url(sig)}`;
-}
-
 /**
  * POST /api/hubstaff/setup
  * Bootstrap or update Hubstaff credentials.
  * Body: { refreshToken, organizationId }
+ *
+ * Token endpoint is plain OAuth2 (no DPoP).
+ * DPoP keys are generated for API calls and stored alongside.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -52,17 +21,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "refreshToken and organizationId required" }, { status: 400 });
     }
 
-    // Generate DPoP key pair for token exchange (Hubstaff requires DPoP RFC 9449)
-    const { privateKey, publicJwk, privatePem } = generateKeyPair();
-    const dpopProof = createDpopProof(privateKey, publicJwk, "POST", TOKEN_URL);
-
-    // Exchange refresh token for an access token WITH DPoP
+    // Exchange refresh token — plain OAuth2, NO DPoP on token endpoint
     const res = await fetch(TOKEN_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "DPoP": dpopProof,
-      },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
     });
 
@@ -73,7 +35,12 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
-    // Upsert config — store tokens AND DPoP keys together
+    // Generate DPoP key pair for subsequent API calls (not token exchange)
+    const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+    const publicJwk = publicKey.export({ format: "jwk" });
+    const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }) as string;
+
+    // Upsert config — store tokens + DPoP keys for API use
     const config = await prisma.hubstaffConfig.upsert({
       where: { organizationId },
       update: {
