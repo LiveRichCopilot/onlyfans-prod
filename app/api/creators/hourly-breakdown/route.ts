@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         // --- Auth & role scoping ---
         const session = await getServerSession(authOptions);
@@ -23,19 +23,45 @@ export async function GET() {
             allowedCreatorIds = assignments.map((a) => a.creatorId);
             if (allowedCreatorIds.length === 0) {
                 const ukNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
-                return NextResponse.json({ currentHour: ukNow.getHours(), creators: [] });
+                return NextResponse.json({ currentHour: ukNow.getHours(), creators: [], isToday: true });
             }
         }
 
-        // --- UK day window (midnight UK → now) ---
+        // --- Check for date query param (e.g. ?date=2026-02-25) ---
+        const { searchParams } = new URL(req.url);
+        const dateParam = searchParams.get("date");
+
         const now = new Date();
         const ukNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/London" }));
-        const todayStart = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), 0, 0, 0, 0);
         const ukOffset = ukNow.getTime() - now.getTime();
-        const todayStartUtc = new Date(todayStart.getTime() - ukOffset);
-        const currentHour = ukNow.getHours();
 
-        // --- Fetch creators first ---
+        let dayStart: Date;
+        let dayEnd: Date;
+        let currentHour: number;
+        let isToday: boolean;
+
+        if (dateParam) {
+            // Parse the requested date as UK midnight
+            const [year, month, day] = dateParam.split("-").map(Number);
+            dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
+            dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+            // Check if this is today
+            const todayStr = `${ukNow.getFullYear()}-${String(ukNow.getMonth() + 1).padStart(2, "0")}-${String(ukNow.getDate()).padStart(2, "0")}`;
+            isToday = dateParam === todayStr;
+            currentHour = isToday ? ukNow.getHours() : 23;
+        } else {
+            // Default: today
+            dayStart = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), 0, 0, 0, 0);
+            dayEnd = ukNow;
+            currentHour = ukNow.getHours();
+            isToday = true;
+        }
+
+        // Convert UK times to UTC for DB query
+        const dayStartUtc = new Date(dayStart.getTime() - ukOffset);
+        const dayEndUtc = isToday ? now : new Date(dayEnd.getTime() - ukOffset);
+
+        // --- Fetch creators ---
         const creators = await prisma.creator.findMany({
             where: allowedCreatorIds ? { id: { in: allowedCreatorIds } } : undefined,
             select: { id: true, name: true, avatarUrl: true, hourlyTarget: true, active: true },
@@ -43,10 +69,10 @@ export async function GET() {
         });
 
         if (creators.length === 0) {
-            return NextResponse.json({ currentHour, creators: [] });
+            return NextResponse.json({ currentHour, creators: [], isToday });
         }
 
-        // --- Hourly revenue query (use Prisma.sql for safe array interpolation) ---
+        // --- Hourly revenue query ---
         const creatorIds = creators.map((c) => c.id);
 
         const rows: { creatorId: string; bucket: Date; total: number }[] = await prisma.$queryRaw`
@@ -54,7 +80,7 @@ export async function GET() {
                    date_trunc('hour', "date") AS bucket,
                    COALESCE(SUM("amount"), 0)::float AS total
             FROM "Transaction"
-            WHERE "date" >= ${todayStartUtc} AND "date" < ${now}
+            WHERE "date" >= ${dayStartUtc} AND "date" < ${dayEndUtc}
               AND "creatorId" IN (${Prisma.join(creatorIds)})
             GROUP BY "creatorId", bucket
             ORDER BY bucket
@@ -71,7 +97,6 @@ export async function GET() {
         for (const row of rows) {
             const hourly = creatorMap.get(row.creatorId);
             if (!hourly) continue;
-            // Convert bucket to UK hour
             const bucketUk = new Date(row.bucket.getTime() + ukOffset);
             const hourIndex = bucketUk.getHours();
             if (hourIndex >= 0 && hourIndex < hoursCount) {
@@ -92,7 +117,7 @@ export async function GET() {
             };
         });
 
-        return NextResponse.json({ currentHour, creators: result });
+        return NextResponse.json({ currentHour, creators: result, isToday });
     } catch (error: any) {
         console.error("Hourly breakdown error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
