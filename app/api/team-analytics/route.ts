@@ -247,7 +247,7 @@ export async function GET(req: NextRequest) {
       uniqueBlasts: e.blasts.size,
       totalBlastSends: [...e.blasts.values()].reduce((a, b) => a + b, 0),
       blasts: [...e.blasts.entries()].sort((a, b) => b[1] - a[1]).map(([message, fanCount]) => ({ message, fanCount })),
-    })).filter(e => e.totalBlastSends > 0);
+    })).filter(e => e.totalBlastSends >= 5);
 
     // Include all active creators for the filter dropdown (unfiltered)
     const allCreators = creators.map(c => ({ creatorId: c.id, creatorName: c.name || "Unknown" }));

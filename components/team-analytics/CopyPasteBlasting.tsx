@@ -14,8 +14,9 @@ type ChatterBlasts = {
 };
 
 function getSeverity(totalBlasts: number): { label: string; color: string; bg: string; border: string } {
-  if (totalBlasts >= 30) return { label: "CRITICAL", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
-  if (totalBlasts >= 15) return { label: "WARNING", color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" };
+  if (totalBlasts >= 50) return { label: "CRITICAL", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
+  if (totalBlasts >= 20) return { label: "WARNING", color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" };
+  if (totalBlasts >= 10) return { label: "MODERATE", color: "text-orange-400/70", bg: "bg-orange-500/8", border: "border-orange-500/15" };
   return { label: "MINOR", color: "text-yellow-400/60", bg: "bg-yellow-500/5", border: "border-yellow-500/10" };
 }
 

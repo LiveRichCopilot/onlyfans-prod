@@ -376,6 +376,129 @@ export async function getProjects(): Promise<any[]> {
   return data.projects || [];
 }
 
+// --- Screenshots ---
+
+export type HubstaffScreenshot = {
+  id: number;
+  url: string;
+  time_slot: string;
+  recorded_at: string;
+  user_id: number;
+  project_id: number;
+  task_id: number | null;
+  activity_id: number;
+  offset_x: number;
+  offset_y: number;
+  width: number;
+  height: number;
+  screen: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Get screenshots for a time range. Max 7-day range. */
+export async function getScreenshots(startTime: string, stopTime: string): Promise<HubstaffScreenshot[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ screenshots: HubstaffScreenshot[] }>(
+    `/organizations/${orgId}/screenshots`,
+    { "time_slot[start]": startTime, "time_slot[stop]": stopTime, page_limit: "500" },
+  );
+  return data.screenshots || [];
+}
+
+// --- App / Tool Usage ---
+
+export type ToolUsage = {
+  id: number;
+  user_id: number;
+  project_id: number;
+  task_id: number | null;
+  name: string;
+  tracked: number; // seconds spent in this app
+  time_slot: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Get app/tool usage for a time range (which apps chatters are using). Max 7-day range. */
+export async function getToolUsages(startTime: string, stopTime: string): Promise<ToolUsage[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ tool_usages: ToolUsage[] }>(
+    `/organizations/${orgId}/tool_usages`,
+    { "time_slot[start]": startTime, "time_slot[stop]": stopTime, page_limit: "500" },
+  );
+  return data.tool_usages || [];
+}
+
+/** Get daily aggregated app/tool usage. Max 31-day range. */
+export async function getDailyToolUsages(startDate: string, stopDate: string): Promise<ToolUsage[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ daily_tool_usages: ToolUsage[] }>(
+    `/organizations/${orgId}/tool_usages/daily`,
+    { "date[start]": startDate, "date[stop]": stopDate, page_limit: "500" },
+  );
+  return data.daily_tool_usages || [];
+}
+
+// --- Unusual Activity Detection ---
+
+export type UnusualActivity = {
+  id: number;
+  user_id: number;
+  activity_id: number;
+  classification: string; // "slightly_unusual" | "unusual" | "highly_unusual"
+  starts_at: string;
+  duration: number; // seconds
+  overall: number; // activity %
+  mouse: number;
+  keyboard: number;
+  screenshots_count: number;
+  top_apps: string[];
+  created_at: string;
+};
+
+/** Get unusual/suspicious activity flags. */
+export async function getUnusualActivities(startDate: string, stopDate: string): Promise<UnusualActivity[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ unusual_activities: UnusualActivity[] }>(
+    `/organizations/${orgId}/insights/unusual_activities`,
+    { "date[start]": startDate, "date[stop]": stopDate, page_limit: "500" },
+  );
+  return data.unusual_activities || [];
+}
+
+// --- Teams ---
+
+export type HubstaffTeam = {
+  id: number;
+  organization_id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+};
+
+/** Get all teams in the organization. */
+export async function getTeams(): Promise<HubstaffTeam[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ teams: HubstaffTeam[] }>(
+    `/organizations/${orgId}/teams`,
+    { page_limit: "100" },
+  );
+  return data.teams || [];
+}
+
+// --- Time Edit Logs (audit trail) ---
+
+/** Get manual time modifications (for detecting gaming). */
+export async function getTimeEditLogs(startDate: string, stopDate: string): Promise<any[]> {
+  const orgId = await getOrgId();
+  const data = await hubstaffGet<{ time_edit_logs: any[] }>(
+    `/organizations/${orgId}/time_edit_logs`,
+    { "date[start]": startDate, "date[stop]": stopDate, page_limit: "500" },
+  );
+  return data.time_edit_logs || [];
+}
+
 export async function updateLastSync() {
   const config = await prisma.hubstaffConfig.findFirst();
   if (config) {
