@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchAllTransactions, getActiveFans } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * GET /api/cron/sync-transactions — Sync ALL creators per invocation
@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
         }
     }
 
-    const apiKey = process.env.OFAPI_API_KEY;
-    if (!apiKey) {
+    const globalApiKey = process.env.OFAPI_API_KEY;
+    if (!globalApiKey) {
         return NextResponse.json({ error: "OFAPI_API_KEY not configured" }, { status: 500 });
     }
 
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
             const c = await prisma.creator.findUnique({ where: { id: forceCreatorId } });
             creators = c ? [c] : [];
         } else {
+            // Order by least recently synced — ensures all creators get fair rotation
             creators = await prisma.creator.findMany({
                 where: {
                     AND: [
@@ -48,6 +49,7 @@ export async function GET(req: NextRequest) {
                         { ofapiToken: { not: "unlinked" } },
                     ],
                 },
+                orderBy: { lastSyncCursor: "asc" },
             });
         }
 
@@ -63,6 +65,8 @@ export async function GET(req: NextRequest) {
         }
 
         const accountName = creator.ofapiCreatorId || creator.telegramId;
+        // Use per-creator token when available, fall back to global key
+        const apiKey = (creator.ofapiToken && creator.ofapiToken !== "unlinked") ? creator.ofapiToken : globalApiKey;
         const timing: Record<string, number> = {};
         const result = {
             creatorId: creator.id,
@@ -330,12 +334,13 @@ export async function GET(req: NextRequest) {
             data: { lastSyncCursor: new Date().toISOString() },
         });
 
-        console.log(`[Cron Sync] ${result.name}: ${result.fansUpserted} fans, ${result.txUpserted} tx`, timing);
+        const creatorElapsed = Date.now() - startTime;
+        console.log(`[Cron Sync] ${result.name}: ${result.fansUpserted} fans, ${result.txUpserted} tx (${Math.round(creatorElapsed / 1000)}s total)`, timing, result.errors.length > 0 ? result.errors : "");
         allResults.push(result);
 
         // Safety: if we're running long, stop and finish the rest next cycle
-        if (Date.now() - startTime > 50000) {
-            console.log(`[Cron Sync] Time limit reached after ${allResults.length} creators`);
+        if (Date.now() - startTime > 100000) {
+            console.log(`[Cron Sync] Time limit reached after ${allResults.length}/${creators.length} creators`);
             break;
         }
 
