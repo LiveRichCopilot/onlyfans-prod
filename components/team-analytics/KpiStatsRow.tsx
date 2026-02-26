@@ -17,7 +17,7 @@ const cards = [
   { key: "activeChatters", label: "Active Chatters", icon: Users, format: (v: number) => String(v) },
   { key: "avgTeamScore", label: "Avg Score", icon: Trophy, format: (v: number) => String(v) },
   { key: "totalSessions", label: "Sessions", icon: Zap, format: (v: number) => String(v) },
-  { key: "totalHoursWorked", label: "Hours Worked", icon: Clock, format: (v: number) => `${v}h` },
+  { key: "totalHoursWorked", label: "Hours Worked", icon: Clock, format: (v: number) => `${parseFloat(v.toFixed(1))}h` },
   { key: "scoringSessionsCount", label: "Scored", icon: BarChart3, format: (v: number) => String(v) },
 ] as const;
 

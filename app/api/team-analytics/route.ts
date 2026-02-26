@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       activeChatters: uniqueEmails.size,
       totalSessions: sessions.length,
       avgTeamScore,
-      totalHoursWorked: Math.round(totalHours * 10) / 10,
+      totalHoursWorked: parseFloat(totalHours.toFixed(1)),
       scoringSessionsCount: hourlyScores.length,
       liveNow: liveSessions,
     };
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
       const hrs = (end - new Date(s.clockIn).getTime()) / 3600000;
       if (!hoursMap.has(date)) hoursMap.set(date, {});
       const d = hoursMap.get(date)!;
-      d[name] = (d[name] || 0) + Math.round(hrs * 10) / 10;
+      d[name] = parseFloat(((d[name] || 0) + hrs).toFixed(1));
     }
     const hoursOverTime = [...hoursMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
     const creatorWorkload = [...creatorMap.values()].map(c => ({
       creatorName: c.name,
       sessionCount: c.sessionCount,
-      totalHours: Math.round(c.totalHours * 10) / 10,
+      totalHours: parseFloat(c.totalHours.toFixed(1)),
     }));
 
     // --- Conversation Samples (for scoring detail section) ---
