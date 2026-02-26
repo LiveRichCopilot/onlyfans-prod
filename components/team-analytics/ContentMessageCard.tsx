@@ -5,6 +5,11 @@ import { Eye, ShoppingCart, DollarSign, Send, Image, Video, Mic, Type, ChevronDo
 
 type MediaThumb = { url: string; type: string };
 
+export type ReplyStats = {
+  uniqueRepliers: { "30m": number; "1h": number; "6h": number; "24h": number };
+  inboundMessages: { "30m": number; "1h": number; "6h": number; "24h": number };
+};
+
 export type MessageCardData = {
   id: string;
   rawText: string;
@@ -50,7 +55,7 @@ function Pill({ label, color }: { label: string; color?: string }) {
   );
 }
 
-export function ContentMessageCard({ msg, rank }: { msg: MessageCardData; rank?: number }) {
+export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCardData; rank?: number; replyStats?: ReplyStats }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const revenue = msg.purchasedCount * msg.price;
@@ -150,6 +155,18 @@ export function ContentMessageCard({ msg, rank }: { msg: MessageCardData; rank?:
           {copied ? <Check size={11} className="text-teal-400" /> : <Copy size={11} />}
         </button>
       </div>
+
+      {/* Row 4: Reply attribution (if available) */}
+      {replyStats && replyStats.uniqueRepliers["24h"] > 0 && (
+        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+          <span className="text-[9px] text-white/25 shrink-0">Fans replied:</span>
+          {(["30m", "1h", "6h", "24h"] as const).map(w => (
+            <span key={w} className={`text-[9px] px-1.5 py-0.5 rounded ${replyStats.uniqueRepliers[w] > 0 ? "bg-teal-400/10 text-teal-400/70" : "bg-white/5 text-white/15"}`}>
+              {w}: <span className="font-semibold">{replyStats.uniqueRepliers[w]}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

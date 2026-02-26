@@ -5,7 +5,7 @@ import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Calendar, Download } fro
 import { ContentMessageCard, ContentEmptyState } from "./ContentMessageCard";
 import { ContentCreatorTab } from "./ContentCreatorTab";
 import { MassMessageImpactChart } from "./MassMessageImpactChart";
-import type { MessageCardData } from "./ContentMessageCard";
+import type { MessageCardData, ReplyStats } from "./ContentMessageCard";
 
 type AggEntry = {
   name: string; count: number; sentCount: number; viewedCount: number;
@@ -88,11 +88,11 @@ function AggTable({ data, metric }: { data: AggEntry[]; metric: "revenue" | "cvr
   );
 }
 
-function MessageList({ messages, emptyMsg }: { messages: MessageCardData[]; emptyMsg?: string }) {
+function MessageList({ messages, emptyMsg, replyMap }: { messages: MessageCardData[]; emptyMsg?: string; replyMap?: Map<string, ReplyStats> }) {
   if (messages.length === 0) return <ContentEmptyState message={emptyMsg} />;
   return (
     <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
-      {messages.map((m, i) => <ContentMessageCard key={m.id} msg={m} rank={i + 1} />)}
+      {messages.map((m, i) => <ContentMessageCard key={m.id} msg={m} rank={i + 1} replyStats={replyMap?.get(m.id)} />)}
     </div>
   );
 }
@@ -121,6 +121,7 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("Direct Messages");
   const [hookMetric, setHookMetric] = useState<"revenue" | "cvr" | "rpm">("revenue");
+  const [replyMap, setReplyMap] = useState<Map<string, ReplyStats>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,6 +144,24 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
   }, [days, creatorFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Fetch reply attribution data (separate lightweight call)
+  useEffect(() => {
+    if (!data) return;
+    const params = new URLSearchParams({ days: String(days) });
+    if (creatorFilter && creatorFilter !== "all") params.set("creatorId", creatorFilter);
+    fetch(`/api/team-analytics/mass-reply-stats?${params}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json?.stats) return;
+        const map = new Map<string, ReplyStats>();
+        for (const s of json.stats) {
+          map.set(s.massMessageId, { uniqueRepliers: s.uniqueRepliers, inboundMessages: s.inboundMessages });
+        }
+        setReplyMap(map);
+      })
+      .catch(() => {});
+  }, [data, days, creatorFilter]);
 
   const k = data?.kpis;
   const dr = data?.dateRange;
@@ -237,7 +256,7 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
               <MassMessageImpactChart days={days} creatorFilter={creatorFilter} />
               <div className="border-t border-white/5 pt-3">
                 <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Top Performing Mass Messages</p>
-                <MessageList messages={data.topMass} emptyMsg="No mass messages in this period" />
+                <MessageList messages={data.topMass} emptyMsg="No mass messages in this period" replyMap={replyMap} />
               </div>
             </div>
           )}

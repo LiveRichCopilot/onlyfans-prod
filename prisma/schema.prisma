@@ -34,6 +34,7 @@ model Creator {
   chatterHourlyScores ChatterHourlyScore[]
   chatterProfiles      ChatterProfile[]
   hubstaffMappings     HubstaffUserMapping[]
+  massMessageReplies   MassMessageReply[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -486,4 +487,27 @@ model HubstaffConfig {
   syncEnabled    Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+}
+
+model MassMessageReply {
+  id                  String   @id @default(cuid())
+  creatorId           String
+  massMessageId       String
+  sentAt              DateTime
+  sentCount           Int      @default(0)
+  uniqueRepliers30m   Int      @default(0)
+  uniqueRepliers1h    Int      @default(0)
+  uniqueRepliers6h    Int      @default(0)
+  uniqueRepliers24h   Int      @default(0)
+  inboundCount30m     Int      @default(0)
+  inboundCount1h      Int      @default(0)
+  inboundCount6h      Int      @default(0)
+  inboundCount24h     Int      @default(0)
+  replyRate24h        Float    @default(0)
+  computedAt          DateTime @default(now())
+  creator             Creator  @relation(fields: [creatorId], references: [id])
+
+  @@unique([creatorId, massMessageId])
+  @@index([creatorId])
+  @@index([sentAt])
 }
