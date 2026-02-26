@@ -24,6 +24,7 @@ const CATEGORIES = [
 export function ScoreCategoryBars({ data }: { data: CategoryAverages }) {
   const chartData = CATEGORIES.map(c => ({
     name: c.label,
+    hint: c.hint,
     score: data[c.key as keyof CategoryAverages],
     max: c.max,
     color: c.color,
