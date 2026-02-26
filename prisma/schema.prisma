@@ -431,7 +431,9 @@ model ChatterSession {
   clockIn   DateTime  @default(now())
   clockOut  DateTime?
   isLive    Boolean   @default(true)
+  source    String    @default("manual") // "manual" | "schedule" | "hubstaff"
 
+  @@unique([email, creatorId, clockIn])
   @@index([email])
   @@index([creatorId])
   @@index([isLive])
@@ -449,4 +451,27 @@ model ChatterSchedule {
 
   @@unique([email, creatorId, shift])
   @@index([email])
+}
+
+model HubstaffUserMapping {
+  id             String   @id @default(cuid())
+  hubstaffUserId String   @unique
+  hubstaffName   String?
+  chatterEmail   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([chatterEmail])
+}
+
+model HubstaffConfig {
+  id             String    @id @default(cuid())
+  organizationId String    @unique
+  accessToken    String
+  refreshToken   String
+  tokenExpiresAt DateTime
+  lastSyncAt     DateTime?
+  syncEnabled    Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

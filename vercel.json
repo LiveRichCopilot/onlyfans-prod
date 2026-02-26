@@ -25,7 +25,7 @@
             "schedule": "*/30 * * * *"
         },
         {
-            "path": "/api/cron/auto-clock-in",
+            "path": "/api/cron/hubstaff-sync",
             "schedule": "*/5 * * * *"
         }
     ]

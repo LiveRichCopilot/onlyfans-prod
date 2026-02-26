@@ -200,6 +200,10 @@ export default function ChatterClockIn() {
             <p className="text-white/40 text-sm mt-1">
               Enter your email to start your shift
             </p>
+            <div className="mt-3 inline-flex items-center gap-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full px-3 py-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+              <span className="text-teal-400 text-[11px] font-medium">Hubstaff sync active</span>
+            </div>
           </div>
 
           {/* Chatter Info Banner */}
