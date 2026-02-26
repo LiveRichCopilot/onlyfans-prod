@@ -21,10 +21,10 @@ type HourlyData = {
 
 function cellStyle(amount: number) {
     if (amount === 0) return "text-white/15";
-    if (amount >= 1001) return "text-emerald-300 bg-emerald-500/15 border border-emerald-400/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]";
+    if (amount >= 1001) return "text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/20 shadow-[0_0_20px_rgba(255,215,0,0.15)]";
     if (amount >= 501) return "text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 shadow-[0_0_12px_rgba(16,185,129,0.08)]";
     if (amount >= 201) return "text-blue-400 bg-blue-500/10 border border-blue-500/15 shadow-[0_0_12px_rgba(59,130,246,0.08)]";
-    if (amount >= 101) return "text-orange-400 bg-orange-500/10 border border-orange-500/15 shadow-[0_0_12px_rgba(249,115,22,0.08)]";
+    if (amount >= 101) return "text-pink-300 bg-pink-400/10 border border-pink-300/15 shadow-[0_0_12px_rgba(249,168,212,0.08)]";
     return "text-purple-400 bg-purple-500/10 border border-purple-500/15 shadow-[0_0_12px_rgba(168,85,247,0.08)]";
 }
 
