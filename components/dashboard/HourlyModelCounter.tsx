@@ -32,17 +32,25 @@ function formatHour(hour: number) {
     return `${h}${ampm}`;
 }
 
+function ukNow() {
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
+}
+
 function toDateStr(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function ukTodayStr() {
+    return toDateStr(ukNow());
+}
+
 function formatDateLabel(dateStr: string | null) {
     if (!dateStr) return "Today";
-    const today = toDateStr(new Date());
+    const today = ukTodayStr();
     if (dateStr === today) return "Today";
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (dateStr === toDateStr(yesterday)) return "Yesterday";
+    const yd = ukNow();
+    yd.setDate(yd.getDate() - 1);
+    if (dateStr === toDateStr(yd)) return "Yesterday";
     const [y, m, d] = dateStr.split("-").map(Number);
     const date = new Date(y, m - 1, d);
     return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
@@ -125,7 +133,7 @@ export function HourlyModelCounter() {
     }, [selectedDate, fetchData]);
 
     function goBack() {
-        const current = selectedDate ? new Date(selectedDate + "T00:00:00") : new Date();
+        const current = selectedDate ? new Date(selectedDate + "T00:00:00") : ukNow();
         current.setDate(current.getDate() - 1);
         setSelectedDate(toDateStr(current));
         setExpandedId(null);
@@ -135,7 +143,7 @@ export function HourlyModelCounter() {
         if (!selectedDate) return; // Already on today
         const current = new Date(selectedDate + "T00:00:00");
         current.setDate(current.getDate() + 1);
-        const todayStr = toDateStr(new Date());
+        const todayStr = ukTodayStr();
         setSelectedDate(toDateStr(current) === todayStr ? null : toDateStr(current));
         setExpandedId(null);
     }
