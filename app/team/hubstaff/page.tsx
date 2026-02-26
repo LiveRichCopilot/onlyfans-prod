@@ -7,7 +7,7 @@ type MappedCreator = { creatorId: string; creatorName: string };
 type HubstaffMember = { hubstaffUserId: string; name: string; email: string; status: string; mappedCreators: MappedCreator[] };
 type Mapping = { id: string; hubstaffUserId: string; hubstaffName: string | null; chatterEmail: string; creatorId: string | null; creator?: { name: string | null } | null };
 type Config = { configured: boolean; organizationId?: string; syncEnabled?: boolean; lastSyncAt?: string; tokenExpiresAt?: string };
-type Creator = { id: string; name: string | null };
+type Creator = { id: string; name: string | null; ofUsername?: string | null };
 
 export default function HubstaffAdmin() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -365,11 +365,13 @@ function MemberRow({ member, creators, onMap }: {
           <select
             value={selectedCreator}
             onChange={e => setSelectedCreator(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm max-w-[180px]"
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm max-w-[280px]"
           >
             <option value="">+ Add model...</option>
             {availableCreators.map(c => (
-              <option key={c.id} value={c.id} className="bg-neutral-900">{c.name || c.id}</option>
+              <option key={c.id} value={c.id} className="bg-neutral-900">
+                {c.name || c.id}{c.ofUsername ? ` (@${c.ofUsername})` : ""}
+              </option>
             ))}
           </select>
           <button
