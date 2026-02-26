@@ -32,7 +32,7 @@ export function HoursStackedArea({ data }: { data: Record<string, any>[] }) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} tickFormatter={d => d.slice(5)} />
           <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} unit="h" />
-          <Tooltip content={<GlassTooltip formatter={(v: number) => `${v}h`} />} />
+          <Tooltip content={<GlassTooltip formatter={(v: number) => `${parseFloat(v.toFixed(1))}h`} />} />
           <Legend wrapperStyle={{ fontSize: 9, color: "rgba(255,255,255,0.4)" }} />
           {chatters.slice(0, 10).map((name, i) => (
             <Area key={name} type="monotone" dataKey={name} stackId="1" stroke={COLOR_ARRAY[i % COLOR_ARRAY.length]} fill={COLOR_ARRAY[i % COLOR_ARRAY.length]} fillOpacity={0.3} strokeWidth={1.5} />
