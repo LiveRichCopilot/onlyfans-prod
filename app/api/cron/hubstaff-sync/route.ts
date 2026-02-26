@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrganizationActivities, getConfig, updateLastSync } from "@/lib/hubstaff";
+import { getLastActivities, getConfig, updateLastSync } from "@/lib/hubstaff";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
 /**
  * GET /api/cron/hubstaff-sync
- * Runs every 5 min. Syncs Hubstaff activity data → ChatterSession records.
- * Replaces manual clock-in for chatters who are tracked via Hubstaff.
+ * Runs every 5 min. Uses Hubstaff last_activities endpoint to detect
+ * who's online right now, then creates/closes ChatterSession records.
  */
 export async function GET(req: NextRequest) {
   if (process.env.NODE_ENV === "production") {
@@ -30,25 +30,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "no_mappings" });
     }
 
-    // Fetch activities for the last 10 minutes
-    const now = new Date();
-    const tenMinAgo = new Date(now.getTime() - 10 * 60 * 1000);
+    // Use last_activities — shows who's online right now (simpler than activity windows)
+    const lastActivities = await getLastActivities(config.organizationId);
 
-    const activities = await getOrganizationActivities(
-      config.organizationId,
-      tenMinAgo.toISOString(),
-      now.toISOString()
-    );
-
-    // Group activities by user_id
-    const activityByUser = new Map<number, boolean>();
-    for (const act of activities) {
-      if (act.tracked > 0) {
-        activityByUser.set(act.user_id, true);
+    // Build set of online user IDs
+    const onlineUserIds = new Set<number>();
+    for (const act of lastActivities) {
+      if (act.online) {
+        onlineUserIds.add(act.user_id);
       }
     }
 
     // Get all currently live hubstaff sessions
+    const now = new Date();
     const liveSessions = await prisma.chatterSession.findMany({
       where: { isLive: true, source: "hubstaff" },
       select: { id: true, email: true, creatorId: true },
@@ -59,12 +53,12 @@ export async function GET(req: NextRequest) {
     let clockedOut = 0;
     const activeEmails = new Set<string>();
 
-    // For each mapping, check if user has recent activity
+    // For each mapping, check if user is online
     for (const mapping of mappings) {
       const userId = parseInt(mapping.hubstaffUserId, 10);
-      const hasActivity = activityByUser.has(userId);
+      const isOnline = onlineUserIds.has(userId);
 
-      if (hasActivity) {
+      if (isOnline) {
         activeEmails.add(mapping.chatterEmail);
 
         // Get creator IDs: prefer direct mapping, fall back to schedule
@@ -96,7 +90,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Clock out hubstaff sessions where user is no longer active
+    // Clock out hubstaff sessions where user is no longer online
     for (const session of liveSessions) {
       if (!activeEmails.has(session.email)) {
         await prisma.chatterSession.update({
@@ -109,12 +103,13 @@ export async function GET(req: NextRequest) {
 
     await updateLastSync();
 
-    console.log(`[Hubstaff Sync] In: ${clockedIn} | Out: ${clockedOut} | Active: ${activeEmails.size} | Mappings: ${mappings.length}`);
+    console.log(`[Hubstaff Sync] In: ${clockedIn} | Out: ${clockedOut} | Online: ${onlineUserIds.size} | Active: ${activeEmails.size} | Mappings: ${mappings.length}`);
 
     return NextResponse.json({
       status: "ok",
       clockedIn,
       clockedOut,
+      onlineUsers: onlineUserIds.size,
       activeUsers: activeEmails.size,
       totalMappings: mappings.length,
     });

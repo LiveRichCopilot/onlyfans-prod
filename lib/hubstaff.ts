@@ -214,8 +214,33 @@ export type HubstaffActivity = {
   mouse: number;
 };
 
+export type LastActivity = {
+  last_client_activity: string;
+  online: boolean;
+  last_project_id: number | null;
+  last_task_id: number | null;
+  user_id: number;
+};
+
+export type AttendanceShift = {
+  id: number;
+  user_id: number;
+  organization_id: number;
+  attendance_schedule_id: number;
+  date: string;
+  start_time: string;
+  duration: number;
+  minimum_time: number;
+  status: string; // ontime, early, late, abandoned, missed
+  actual_start_time: string | null;
+  actual_stop_time: string | null;
+  actual_duration: number | null;
+};
+
 type MembersResponse = { members: HubstaffMember[] };
 type ActivitiesResponse = { activities: HubstaffActivity[] };
+type LastActivitiesResponse = { last_activities: LastActivity[] };
+type AttendanceShiftsResponse = { attendance_shifts: AttendanceShift[] };
 
 export async function getOrganizationMembers(orgId: string): Promise<HubstaffMember[]> {
   const data = await hubstaffGet<MembersResponse>(`/organizations/${orgId}/members`, {
@@ -235,6 +260,28 @@ export async function getOrganizationActivities(
     page_limit: "500",
   });
   return data.activities || [];
+}
+
+/** Get who's online right now — simpler than polling activities */
+export async function getLastActivities(orgId: string): Promise<LastActivity[]> {
+  const data = await hubstaffGet<LastActivitiesResponse>(`/organizations/${orgId}/last_activities`, {
+    page_limit: "100",
+  });
+  return data.last_activities || [];
+}
+
+/** Get actual attendance shifts (clock-in/out records) for a date range */
+export async function getAttendanceShifts(
+  orgId: string,
+  startDate: string,
+  stopDate: string
+): Promise<AttendanceShift[]> {
+  const data = await hubstaffGet<AttendanceShiftsResponse>(`/organizations/${orgId}/attendance_shifts`, {
+    "date[start]": startDate,
+    "date[stop]": stopDate,
+    page_limit: "500",
+  });
+  return data.attendance_shifts || [];
 }
 
 export async function getConfig() {
