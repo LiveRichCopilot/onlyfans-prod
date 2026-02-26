@@ -6,6 +6,7 @@ import {
   Keyboard, Mouse, Activity, AlertTriangle, CheckCircle,
   TrendingUp, TrendingDown, Copy, Shield, AppWindow,
 } from "lucide-react";
+import { ScreenshotTimeline } from "./ScreenshotTimeline";
 
 type ShiftReportData = {
   email: string;
@@ -156,6 +157,7 @@ export function ShiftReportPanel({ email, creatorId, date, onClose }: Props) {
             <HubstaffSection data={data} />
             <ScoringSection data={data} />
             <TopAppsSection apps={data.topApps} />
+            <ScreenshotTimeline email={email} date={data.date} />
             <HourlyTimeline timeline={data.hourlyTimeline} />
             <TagsSection strengths={data.strengthTags} mistakes={data.mistakeTags} />
           </div>
