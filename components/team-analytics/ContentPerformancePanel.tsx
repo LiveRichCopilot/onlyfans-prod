@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Calendar, Download } from "lucide-react";
+import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Download } from "lucide-react";
+import { DateRangePicker, type DateRange } from "./DateRangePicker";
 import { ContentMessageCard, ContentEmptyState } from "./ContentMessageCard";
 import { ContentCreatorTab } from "./ContentCreatorTab";
 import { MassMessageImpactChart } from "./MassMessageImpactChart";
@@ -115,7 +116,7 @@ function exportCSV(messages: MessageCardData[], filename: string) {
   a.click(); URL.revokeObjectURL(url);
 }
 
-export function ContentPerformancePanel({ days, creatorFilter }: { days: number; creatorFilter: string }) {
+export function ContentPerformancePanel({ days, creatorFilter, startDate, endDate, dateLabel, onDateChange }: { days: number; creatorFilter: string; startDate?: string; endDate?: string; dateLabel?: string; onDateChange?: (range: DateRange) => void }) {
   const [data, setData] = useState<ContentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +128,13 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ days: String(days) });
+      const params = new URLSearchParams();
+      if (startDate && endDate) {
+        params.set("startDate", startDate);
+        params.set("endDate", endDate);
+      } else {
+        params.set("days", String(days));
+      }
       if (creatorFilter && creatorFilter !== "all") params.set("creatorId", creatorFilter);
       const res = await fetch(`/api/team-analytics/content-performance?${params}`);
       if (!res.ok) {
@@ -141,7 +148,7 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
       setError("Failed to fetch content performance data");
     }
     setLoading(false);
-  }, [days, creatorFilter]);
+  }, [days, creatorFilter, startDate, endDate]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -149,6 +156,10 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
   useEffect(() => {
     if (!data) return;
     const params = new URLSearchParams({ days: String(days) });
+    if (startDate && endDate) {
+      params.set("startDate", startDate);
+      params.set("endDate", endDate);
+    }
     if (creatorFilter && creatorFilter !== "all") params.set("creatorId", creatorFilter);
     fetch(`/api/team-analytics/mass-reply-stats?${params}`)
       .then(r => r.ok ? r.json() : null)
@@ -184,16 +195,18 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
           <h3 className="text-white font-semibold text-sm flex items-center gap-2">
             <Sparkles size={16} className="text-teal-400" /> Content Performance
           </h3>
-          <p className="text-white/40 text-xs mt-0.5 flex items-center gap-1.5">
+          <p className="text-white/40 text-xs mt-0.5">
             Based on messages sent in this range
-            {dr && (
-              <span className="inline-flex items-center gap-1 text-white/25">
-                <Calendar size={10} /> {dr.start} to {dr.end} ({dr.days}d)
-              </span>
-            )}
+            {dr && <span className="text-white/25 ml-1">{dr.start} to {dr.end} ({dr.days}d)</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onDateChange && (
+            <DateRangePicker
+              value={{ startDate: startDate || "", endDate: endDate || "", label: dateLabel || (dr ? `${dr.days}d` : `${days}d`), days }}
+              onChange={onDateChange}
+            />
+          )}
           {data && getExportMessages() && (
             <button
               onClick={() => { const e = getExportMessages(); if (e) exportCSV(e.messages, e.name); }}
@@ -253,7 +266,7 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
 
           {tab === "Mass Messages" && (
             <div className="space-y-4">
-              <MassMessageImpactChart days={days} creatorFilter={creatorFilter} />
+              <MassMessageImpactChart days={days} creatorFilter={creatorFilter} startDate={startDate} endDate={endDate} />
               <div className="border-t border-white/5 pt-3">
                 <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Top Performing Mass Messages</p>
                 <MessageList messages={data.topMass} emptyMsg="No mass messages in this period" replyMap={replyMap} />

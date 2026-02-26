@@ -8,13 +8,25 @@ export const maxDuration = 30;
 type DailyPoint = { date: string; sent: number; purchased: number; revenue: number };
 
 // GET /api/team-analytics/mass-message-chart?days=7&creatorId=xxx
+// OR: ?startDate=...&endDate=...&creatorId=xxx
 export async function GET(req: NextRequest) {
   const requestStart = Date.now();
-  const days = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
   const creatorId = req.nextUrl.searchParams.get("creatorId") || null;
 
-  const endDate = new Date();
-  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const startParam = req.nextUrl.searchParams.get("startDate");
+  const endParam = req.nextUrl.searchParams.get("endDate");
+  const daysParam = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
+
+  let startDate: Date;
+  let endDate: Date;
+
+  if (startParam && endParam) {
+    startDate = new Date(startParam);
+    endDate = new Date(endParam);
+  } else {
+    endDate = new Date();
+    startDate = new Date(Date.now() - daysParam * 24 * 60 * 60 * 1000);
+  }
 
   try {
     const creatorWhere: Record<string, unknown> = { active: true, ofapiToken: { not: null } };

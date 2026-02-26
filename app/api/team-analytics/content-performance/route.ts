@@ -168,13 +168,28 @@ function classifyMessage(
 }
 
 // GET /api/team-analytics/content-performance?days=7&creatorId=xxx
+// OR: ?startDate=2026-02-19T00:00:00Z&endDate=2026-02-26T23:59:59Z&creatorId=xxx
 export async function GET(req: NextRequest) {
   const requestStart = Date.now();
-  const days = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
   const creatorId = req.nextUrl.searchParams.get("creatorId") || null;
 
-  const endDate = new Date();
-  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const startParam = req.nextUrl.searchParams.get("startDate");
+  const endParam = req.nextUrl.searchParams.get("endDate");
+  const daysParam = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
+
+  let startDate: Date;
+  let endDate: Date;
+  let days: number;
+
+  if (startParam && endParam) {
+    startDate = new Date(startParam);
+    endDate = new Date(endParam);
+    days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+  } else {
+    days = daysParam;
+    endDate = new Date();
+    startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  }
 
   try {
     const creatorWhere: Record<string, unknown> = { active: true, ofapiToken: { not: null } };

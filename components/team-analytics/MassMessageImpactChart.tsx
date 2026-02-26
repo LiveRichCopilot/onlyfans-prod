@@ -26,14 +26,20 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function MassMessageImpactChart({ days, creatorFilter }: { days: number; creatorFilter: string }) {
+export function MassMessageImpactChart({ days, creatorFilter, startDate, endDate }: { days: number; creatorFilter: string; startDate?: string; endDate?: string }) {
   const [data, setData] = useState<DailyPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ days: String(days) });
+      const params = new URLSearchParams();
+      if (startDate && endDate) {
+        params.set("startDate", startDate);
+        params.set("endDate", endDate);
+      } else {
+        params.set("days", String(days));
+      }
       if (creatorFilter && creatorFilter !== "all") params.set("creatorId", creatorFilter);
       const res = await fetch(`/api/team-analytics/mass-message-chart?${params}`);
       if (res.ok) {
@@ -42,7 +48,7 @@ export function MassMessageImpactChart({ days, creatorFilter }: { days: number; 
       }
     } catch { /* silent */ }
     setLoading(false);
-  }, [days, creatorFilter]);
+  }, [days, creatorFilter, startDate, endDate]);
 
   useEffect(() => { load(); }, [load]);
 

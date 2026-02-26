@@ -4,12 +4,15 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 // GET /api/team-analytics/mass-reply-stats?creatorId=xxx&days=7
-// Returns reply attribution data for mass messages
+// OR: ?startDate=...&endDate=...&creatorId=xxx
 export async function GET(req: NextRequest) {
-  const days = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
   const creatorId = req.nextUrl.searchParams.get("creatorId") || null;
+  const startParam = req.nextUrl.searchParams.get("startDate");
+  const daysParam = parseInt(req.nextUrl.searchParams.get("days") || "7", 10);
 
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const cutoff = startParam
+    ? new Date(startParam)
+    : new Date(Date.now() - daysParam * 24 * 60 * 60 * 1000);
 
   try {
     const where: Record<string, unknown> = { sentAt: { gte: cutoff } };

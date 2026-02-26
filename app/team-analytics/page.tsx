@@ -19,6 +19,7 @@ import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting
 import { ContentPerformancePanel } from "@/components/team-analytics/ContentPerformancePanel";
 import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
 import { ShiftReportPanel } from "@/components/team-analytics/ShiftReportPanel";
+import { DateRangePicker, type DateRange } from "@/components/team-analytics/DateRangePicker";
 
 const RANGES = [
   { label: "7d", days: 7 },
@@ -35,6 +36,12 @@ export default function TeamAnalytics() {
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [showGuide, setShowGuide] = useState(false);
   const [shiftReportEmail, setShiftReportEmail] = useState<string | null>(null);
+  const [contentDateRange, setContentDateRange] = useState<DateRange>({
+    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    endDate: new Date().toISOString(),
+    label: "7d",
+    days: 7,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +102,15 @@ export default function TeamAnalytics() {
           </select>
           {/* Time Range */}
           {RANGES.map(r => (
-            <button key={r.days} onClick={() => setDays(r.days)} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${days === r.days ? "glass-prominent text-white" : "glass-button text-white/50"}`}>
+            <button key={r.days} onClick={() => {
+              setDays(r.days);
+              setContentDateRange({
+                startDate: new Date(Date.now() - r.days * 24 * 60 * 60 * 1000).toISOString(),
+                endDate: new Date().toISOString(),
+                label: r.label,
+                days: r.days,
+              });
+            }} className={`px-3 py-1.5 rounded-xl text-xs font-medium transition ${days === r.days ? "glass-prominent text-white" : "glass-button text-white/50"}`}>
               {r.label}
             </button>
           ))}
@@ -172,7 +187,14 @@ export default function TeamAnalytics() {
       <CopyPasteBlasting data={d.copyPasteBlasters || []} />
 
       {/* Row 7: Content Performance (full width) */}
-      <ContentPerformancePanel days={days} creatorFilter={creatorFilter} />
+      <ContentPerformancePanel
+        days={contentDateRange.days}
+        creatorFilter={creatorFilter}
+        startDate={contentDateRange.startDate}
+        endDate={contentDateRange.endDate}
+        dateLabel={contentDateRange.label}
+        onDateChange={setContentDateRange}
+      />
 
       {/* Row 8: Conversation Scoring with Chat Bubbles (full width) */}
       <ConversationPhoneGallery data={d.conversationSamples || []} />
