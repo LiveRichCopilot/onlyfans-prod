@@ -27,20 +27,25 @@ export async function GET(request: Request) {
     }
 
     try {
+        const startTime = Date.now();
+        const TIME_BUDGET_MS = 45_000; // Stop well before 55s Vercel limit
+
         const creators = await prisma.creator.findMany({
             where: { active: true, ofapiToken: { not: null } },
         });
 
-        const results: any[] = [];
+        const eligible = creators.filter(c => c.ofapiToken && c.ofapiCreatorId);
 
-        for (const creator of creators) {
-            if (!creator.ofapiToken || !creator.ofapiCreatorId) continue;
+        // Process all creators in parallel
+        const settled = await Promise.allSettled(
+            eligible.map(async (creator) => {
+                if (Date.now() - startTime > TIME_BUDGET_MS) {
+                    return { creator: creator.name, skipped: true };
+                }
 
-            try {
-                // Fetch online fans from OFAPI
                 const onlineData = await listAllFans(
-                    creator.ofapiCreatorId,
-                    creator.ofapiToken,
+                    creator.ofapiCreatorId!,
+                    creator.ofapiToken!,
                     { online: true },
                 );
 
@@ -50,16 +55,13 @@ export async function GET(request: Request) {
 
                 const onlineIds = new Set(onlineFans.map((f: any) => String(f.id)));
 
-                // Parse previous cache
                 const prevCache = (creator.onlineFanCache as any) || { fanIds: [], whales: [] };
                 const prevIds = new Set<string>(prevCache.fanIds || []);
 
-                // Find NEW online fans (just came online)
                 const newlyOnline = onlineFans.filter(
                     (f: any) => !prevIds.has(String(f.id)),
                 );
 
-                // Check which newly online fans are whales
                 const whaleThreshold = creator.whaleAlertTarget || 200;
                 const newWhales: any[] = [];
 
@@ -77,13 +79,11 @@ export async function GET(request: Request) {
                             spend,
                         });
 
-                        // Find or create fan in DB
                         const dbFan = await prisma.fan.findFirst({
                             where: { ofapiFanId: fanId, creatorId: creator.id },
                         });
 
                         if (dbFan) {
-                            // Log whale_online lifecycle event
                             await prisma.fanLifecycleEvent.create({
                                 data: {
                                     fanId: dbFan.id,
@@ -100,7 +100,6 @@ export async function GET(request: Request) {
                     }
                 }
 
-                // Update cache
                 await prisma.creator.update({
                     where: { id: creator.id },
                     data: {
@@ -112,21 +111,22 @@ export async function GET(request: Request) {
                     },
                 });
 
-                results.push({
+                return {
                     creator: creator.name,
                     onlineCount: onlineIds.size,
                     newlyOnline: newlyOnline.length,
                     newWhales: newWhales.length,
-                });
-            } catch (e: any) {
-                results.push({
-                    creator: creator.name,
-                    error: e.message,
-                });
-            }
-        }
+                };
+            }),
+        );
 
-        return NextResponse.json({ ok: true, results });
+        const results = settled.map((s, i) =>
+            s.status === "fulfilled"
+                ? s.value
+                : { creator: eligible[i].name, error: (s.reason as Error).message },
+        );
+
+        return NextResponse.json({ ok: true, results, durationMs: Date.now() - startTime });
     } catch (e: any) {
         console.error("[Online Poll] Error:", e);
         return NextResponse.json({ error: e.message }, { status: 500 });
