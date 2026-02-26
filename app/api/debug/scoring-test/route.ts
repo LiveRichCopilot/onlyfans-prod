@@ -100,13 +100,20 @@ export async function GET() {
     return NextResponse.json(results);
   }
 
-  // Show first 3 chat shapes — include fan object since withUser may be null
-  results.sampleChats = chats.slice(0, 3).map((c: any) => ({
-    id: c.id,
-    withUser: c.withUser ? { id: c.withUser.id, name: c.withUser.name, username: c.withUser.username } : null,
-    fan: c.fan ? { id: c.fan.id, name: c.fan.name, username: c.fan.username } : null,
-    lastMessage: c.lastMessage ? { createdAt: c.lastMessage.createdAt, text: (c.lastMessage.text || "").slice(0, 80) } : null,
-    topLevelKeys: Object.keys(c),
+  // Show first 2 chat shapes — dump full fan object to understand structure
+  results.sampleChats = chats.slice(0, 2).map((c: any) => ({
+    chatTopId: c.id,
+    withUser: c.withUser,
+    fanFull: c.fan ? {
+      allKeys: Object.keys(c.fan),
+      id: c.fan.id,
+      name: c.fan.name,
+      username: c.fan.username,
+      chatId: c.fan.chatId,
+      userId: c.fan.userId,
+    } : "fan is null/undefined",
+    lastMessage: c.lastMessage ? { createdAt: c.lastMessage.createdAt } : null,
+    allTopKeys: Object.keys(c),
   }));
 
   // Step 2: Get messages from first chat
