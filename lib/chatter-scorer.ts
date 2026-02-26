@@ -27,6 +27,7 @@ import {
     formatConversationsForAI,
 } from "./chatter-scorer-utils";
 import { updateChatterProfile } from "./chatter-scorer-profile";
+import { runStoryAnalysis } from "./chatter-story-analyzer";
 
 // Re-export types for consumers
 export type { ScoringWindow, ScoringResult } from "./chatter-scorer-utils";
@@ -213,9 +214,9 @@ export async function scoreChatter(
         const revenueScore = computeRevenueScore(revenue);
 
         // AI scoring
+        const formatted = formatConversationsForAI(allMessages);
         let aiResult: AIScoringResult | null = null;
         if (useAI && allMessages.length >= 3) {
-            const formatted = formatConversationsForAI(allMessages);
             const avgResponseTimeSec =
                 responseDelays.length > 0
                     ? responseDelays.reduce((a, b) => a + b, 0) / responseDelays.length
@@ -277,6 +278,21 @@ export async function scoreChatter(
             })),
         }));
 
+        // Run story analysis on conversations with enough messages (best-effort, non-blocking)
+        let storyAnalysis = null;
+        if (useAI && allMessages.length >= 8) {
+            try {
+                storyAnalysis = await runStoryAnalysis(formatted, allMessages.length);
+            } catch (e: any) {
+                console.error("[Scorer] Story analysis failed:", e.message);
+            }
+        }
+
+        // Enrich conversationData with story analysis if available
+        const enrichedConversationData = storyAnalysis
+            ? { conversations: conversationData, storyAnalysis }
+            : conversationData;
+
         // Detect copy-paste blasting (same message sent to 2+ fans)
         const blastMap = new Map<string, Set<string>>();
         for (const m of allMessages) {
@@ -309,7 +325,7 @@ export async function scoreChatter(
                 creativePhraseCount: result.creativePhraseCount,
                 aiNotes: result.aiNotes,
                 notableQuotes: aiResult?.notableQuotes || [],
-                conversationData: conversationData.length > 0 ? conversationData : undefined,
+                conversationData: conversationData.length > 0 ? enrichedConversationData : undefined,
                 copyPasteBlasts: copyPasteBlasts.length > 0 ? copyPasteBlasts : undefined,
                 mistakeTags: result.mistakeTags,
                 strengthTags: result.strengthTags,
