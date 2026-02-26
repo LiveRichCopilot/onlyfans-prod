@@ -58,21 +58,21 @@ function AggRow({ e, maxVal, metric }: { e: AggEntry; maxVal: number; metric: "r
   return (
     <div className="py-2 space-y-1">
       <div className="flex items-center gap-3">
-        <span className="text-white/70 text-xs w-28 shrink-0 truncate capitalize">{e.name.replace(/_/g, " ")}</span>
-        <div className="flex-1 h-6 glass-inset rounded-lg overflow-hidden relative">
-          <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${barWidth}%`, background: color }} />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/60 font-medium tabular-nums">
-            {metric === "revenue" ? `$${val.toFixed(0)}` : metric === "rpm" ? `$${val.toFixed(2)} RPM` : `${val}% CVR`}
-          </span>
+        <span className="text-white text-xs w-28 shrink-0 truncate capitalize font-medium">{e.name.replace(/_/g, " ")}</span>
+        <div className="flex-1 h-6 glass-inset rounded-lg overflow-hidden">
+          <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${Math.min(barWidth, 90)}%`, background: color, opacity: 0.5 }} />
         </div>
+        <span className="text-white text-xs font-semibold tabular-nums shrink-0 w-16 text-right">
+          {metric === "revenue" ? `$${val.toFixed(0)}` : metric === "rpm" ? `$${val.toFixed(2)}` : `${val}%`}
+        </span>
       </div>
       {/* Raw numbers under the bar */}
-      <div className="flex items-center gap-3 pl-[7.5rem] text-[9px] text-white/25 tabular-nums">
+      <div className="flex items-center gap-3 pl-[7.5rem] text-[10px] text-white/60 tabular-nums">
         <span>{e.count} msgs</span>
         {e.sentCount > 0 && <span>Sent: {fmtNum(e.sentCount)}</span>}
         <span>Viewed: {fmtNum(e.viewedCount)} {e.viewRate > 0 && `(${e.viewRate}%)`}</span>
-        <span>Bought: {fmtNum(e.purchasedCount)} {e.conversionRate > 0 && `(${e.conversionRate}% CVR)`}</span>
-        <span className="text-teal-400/50 font-medium">${e.totalRevenue.toFixed(0)}</span>
+        <span>Bought: {e.purchasedCount > 0 ? <span className="text-teal-400 font-medium">{fmtNum(e.purchasedCount)}</span> : fmtNum(e.purchasedCount)} {e.conversionRate > 0 && `(${e.conversionRate}% CVR)`}</span>
+        <span className="text-teal-400 font-medium">${e.totalRevenue.toFixed(0)}</span>
       </div>
     </div>
   );
@@ -268,7 +268,7 @@ export function ContentPerformancePanel({ days, creatorFilter, startDate, endDat
             <div className="space-y-4">
               <MassMessageImpactChart days={days} creatorFilter={creatorFilter} startDate={startDate} endDate={endDate} />
               <div className="border-t border-white/5 pt-3">
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Top Performing Mass Messages</p>
+                <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider mb-2">Top Performing Mass Messages</p>
                 <MessageList messages={data.topMass} emptyMsg="No mass messages in this period" replyMap={replyMap} />
               </div>
             </div>
@@ -286,11 +286,11 @@ export function ContentPerformancePanel({ days, creatorFilter, startDate, endDat
               </div>
               <AggTable data={data.hookPerformance} metric={hookMetric} />
               <div className="border-t border-white/5 pt-3 mt-3">
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">By Content Type</p>
+                <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider mb-2">By Content Type</p>
                 <AggTable data={data.contentTypePerformance} metric={hookMetric} />
               </div>
               <div className="border-t border-white/5 pt-3 mt-3">
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">By Price Bucket</p>
+                <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider mb-2">By Price Bucket</p>
                 <AggTable data={data.priceBucketPerformance} metric={hookMetric} />
               </div>
             </div>
@@ -335,9 +335,9 @@ export function ContentPerformancePanel({ days, creatorFilter, startDate, endDat
 function KpiPill({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
     <div className="glass-inset rounded-2xl px-4 py-3">
-      <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider">{label}</p>
+      <p className="text-[10px] text-white/60 font-semibold uppercase tracking-wider">{label}</p>
       <p className={`font-bold text-lg mt-0.5 ${accent ? "text-teal-400" : "text-white"}`}>{value}</p>
-      {sub && <p className="text-white/40 text-[10px] mt-0.5">{sub}</p>}
+      {sub && <p className="text-white/60 text-[10px] mt-0.5">{sub}</p>}
     </div>
   );
 }
