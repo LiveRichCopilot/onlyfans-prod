@@ -67,20 +67,23 @@ export async function GET(req: NextRequest) {
       if (hasActivity) {
         activeEmails.add(mapping.chatterEmail);
 
-        // Find which creator(s) this chatter is scheduled for
-        const schedules = await prisma.chatterSchedule.findMany({
-          where: { email: mapping.chatterEmail },
-          select: { creatorId: true },
-        });
+        // Get creator IDs: prefer direct mapping, fall back to schedule
+        const creatorIds: string[] = [];
 
-        // Deduplicate creator assignments
-        const creatorIds = [...new Set(schedules.map(s => s.creatorId))];
+        if (mapping.creatorId) {
+          creatorIds.push(mapping.creatorId);
+        } else {
+          const schedules = await prisma.chatterSchedule.findMany({
+            where: { email: mapping.chatterEmail },
+            select: { creatorId: true },
+          });
+          creatorIds.push(...[...new Set(schedules.map(s => s.creatorId))]);
+        }
 
         for (const creatorId of creatorIds) {
           const key = `${mapping.chatterEmail}|${creatorId}`;
           if (liveSet.has(key)) continue; // Already clocked in
 
-          // Create a new session
           await prisma.chatterSession.create({
             data: {
               email: mapping.chatterEmail,

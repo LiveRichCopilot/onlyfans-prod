@@ -11,6 +11,7 @@ export async function GET() {
   try {
     const mappings = await prisma.hubstaffUserMapping.findMany({
       orderBy: { createdAt: "desc" },
+      include: { creator: { select: { name: true } } },
     });
     return NextResponse.json({ mappings });
   } catch (err: any) {
@@ -24,15 +25,15 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { hubstaffUserId, hubstaffName, chatterEmail } = await req.json();
+    const { hubstaffUserId, hubstaffName, chatterEmail, creatorId } = await req.json();
     if (!hubstaffUserId || !chatterEmail) {
       return NextResponse.json({ error: "hubstaffUserId and chatterEmail required" }, { status: 400 });
     }
 
     const mapping = await prisma.hubstaffUserMapping.upsert({
       where: { hubstaffUserId },
-      update: { chatterEmail, hubstaffName },
-      create: { hubstaffUserId, hubstaffName, chatterEmail },
+      update: { chatterEmail, hubstaffName, ...(creatorId ? { creatorId } : {}) },
+      create: { hubstaffUserId, hubstaffName, chatterEmail, ...(creatorId ? { creatorId } : {}) },
     });
 
     return NextResponse.json({ mapping });

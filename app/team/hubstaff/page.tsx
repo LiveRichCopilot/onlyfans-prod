@@ -4,35 +4,34 @@ import { useState, useEffect, useCallback } from "react";
 import { Users, RefreshCw, Trash2, Plus, CheckCircle, XCircle, Link2 } from "lucide-react";
 
 type HubstaffMember = { hubstaffUserId: string; name: string; email: string; status: string; isMapped: boolean };
-type Mapping = { id: string; hubstaffUserId: string; hubstaffName: string | null; chatterEmail: string };
+type Mapping = { id: string; hubstaffUserId: string; hubstaffName: string | null; chatterEmail: string; creatorId: string | null; creator?: { name: string | null } | null };
 type Config = { configured: boolean; organizationId?: string; syncEnabled?: boolean; lastSyncAt?: string; tokenExpiresAt?: string };
+type Creator = { id: string; name: string | null };
 
 export default function HubstaffAdmin() {
   const [config, setConfig] = useState<Config | null>(null);
   const [members, setMembers] = useState<HubstaffMember[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
-  const [chatterEmails, setChatterEmails] = useState<string[]>([]);
+  const [creators, setCreators] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(true);
   const [setupToken, setSetupToken] = useState("");
   const [setupOrg, setSetupOrg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [cfgRes, mapRes, schedRes] = await Promise.all([
+    const [cfgRes, mapRes, creatorsRes] = await Promise.all([
       fetch("/api/hubstaff/setup"),
       fetch("/api/hubstaff/mapping"),
-      fetch("/api/chatter/creators"),
+      fetch("/api/creators"),
     ]);
     const cfgData = await cfgRes.json();
     const mapData = await mapRes.json();
     setConfig(cfgData);
     setMappings(mapData.mappings || []);
 
-    // Get unique chatter emails from schedules
     try {
-      const schedData = await schedRes.json();
-      const emails = [...new Set((schedData.schedules || []).map((s: any) => s.email))];
-      setChatterEmails(emails as string[]);
+      const creatorsData = await creatorsRes.json();
+      setCreators(creatorsData.creators || creatorsData || []);
     } catch { /* ignore */ }
 
     if (cfgData.configured) {
@@ -54,11 +53,11 @@ export default function HubstaffAdmin() {
     if (res.ok) load();
   }
 
-  async function addMapping(hubstaffUserId: string, hubstaffName: string, chatterEmail: string) {
+  async function addMapping(hubstaffUserId: string, hubstaffName: string, chatterEmail: string, creatorId: string) {
     await fetch("/api/hubstaff/mapping", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hubstaffUserId, hubstaffName, chatterEmail }),
+      body: JSON.stringify({ hubstaffUserId, hubstaffName, chatterEmail, creatorId }),
     });
     load();
   }
@@ -142,12 +141,21 @@ export default function HubstaffAdmin() {
           <div className="space-y-2">
             {mappings.map(m => (
               <div key={m.id} className="flex items-center justify-between glass-inset rounded-xl px-4 py-3">
-                <div>
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-white text-sm font-medium">{m.hubstaffName || m.hubstaffUserId}</span>
-                  <span className="text-white/30 mx-2">→</span>
+                  <span className="text-white/30">&rarr;</span>
                   <span className="text-teal-400 text-sm">{m.chatterEmail}</span>
+                  {m.creator?.name && (
+                    <>
+                      <span className="text-white/30">&rarr;</span>
+                      <span className="text-amber-400 text-sm">{m.creator.name}</span>
+                    </>
+                  )}
+                  {!m.creatorId && (
+                    <span className="text-red-400/60 text-xs bg-red-500/10 px-2 py-0.5 rounded-full">No model assigned</span>
+                  )}
                 </div>
-                <button onClick={() => removeMapping(m.id)} className="text-red-400/60 hover:text-red-400 transition">
+                <button onClick={() => removeMapping(m.id)} className="text-red-400/60 hover:text-red-400 transition shrink-0 ml-2">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -164,7 +172,7 @@ export default function HubstaffAdmin() {
           </h2>
           <div className="space-y-2">
             {members.filter(m => !m.isMapped).map(m => (
-              <MemberRow key={m.hubstaffUserId} member={m} chatterEmails={chatterEmails} onMap={addMapping} />
+              <MemberRow key={m.hubstaffUserId} member={m} creators={creators} onMap={addMapping} />
             ))}
             {members.filter(m => !m.isMapped).length === 0 && (
               <p className="text-white/40 text-sm">All members are mapped</p>
@@ -176,26 +184,34 @@ export default function HubstaffAdmin() {
   );
 }
 
-function MemberRow({ member, chatterEmails, onMap }: {
+function MemberRow({ member, creators, onMap }: {
   member: HubstaffMember;
-  chatterEmails: string[];
-  onMap: (userId: string, name: string, email: string) => void;
+  creators: Creator[];
+  onMap: (userId: string, name: string, email: string, creatorId: string) => void;
 }) {
-  const [selected, setSelected] = useState("");
+  const [email, setEmail] = useState(member.email || "");
+  const [selectedCreator, setSelectedCreator] = useState(creators[0]?.id || "");
+
   return (
-    <div className="flex items-center gap-3 glass-inset rounded-xl px-4 py-3">
-      <span className="text-white text-sm font-medium flex-1">{member.name}</span>
+    <div className="flex items-center gap-3 glass-inset rounded-xl px-4 py-3 flex-wrap">
+      <span className="text-white text-sm font-medium min-w-[120px]">{member.name}</span>
+      <input
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="chatter@email.com"
+        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm flex-1 min-w-[160px] placeholder-white/25"
+      />
       <select
-        value={selected}
-        onChange={e => setSelected(e.target.value)}
-        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm max-w-[200px]"
+        value={selectedCreator}
+        onChange={e => setSelectedCreator(e.target.value)}
+        className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm max-w-[180px]"
       >
-        <option value="">Select chatter...</option>
-        {chatterEmails.map(e => <option key={e} value={e}>{e}</option>)}
+        <option value="">Select model...</option>
+        {creators.map(c => <option key={c.id} value={c.id} className="bg-neutral-900">{c.name || c.id}</option>)}
       </select>
       <button
-        onClick={() => selected && onMap(member.hubstaffUserId, member.name, selected)}
-        disabled={!selected}
+        onClick={() => email && selectedCreator && onMap(member.hubstaffUserId, member.name, email, selectedCreator)}
+        disabled={!email || !selectedCreator}
         className="glass-button rounded-lg px-3 py-1.5 text-sm text-teal-400 disabled:opacity-30"
       >
         Map

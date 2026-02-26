@@ -32,7 +32,8 @@ model Creator {
   chatterSessions     ChatterSession[]
   chatterSchedules    ChatterSchedule[]
   chatterHourlyScores ChatterHourlyScore[]
-  chatterProfiles     ChatterProfile[]
+  chatterProfiles      ChatterProfile[]
+  hubstaffMappings     HubstaffUserMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -460,6 +461,8 @@ model HubstaffUserMapping {
   hubstaffUserId String   @unique
   hubstaffName   String?
   chatterEmail   String
+  creatorId      String?
+  creator        Creator? @relation(fields: [creatorId], references: [id])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
