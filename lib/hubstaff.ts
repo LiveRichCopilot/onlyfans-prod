@@ -172,21 +172,36 @@ export async function getAccessToken(): Promise<string> {
 
 async function hubstaffGet<T>(path: string, params?: Record<string, string>): Promise<T> {
   const config = await prisma.hubstaffConfig.findFirst();
-  const token = await getAccessToken();
+  let token = await getAccessToken();
   const url = new URL(`${HUBSTAFF_API}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   // DPoP proof must use scheme+host+path only (no query/fragment)
   const dpopUrl = `${url.origin}${url.pathname}`;
-  const keyPair = await getDpopKeyPair(config?.id);
-  const dpopProof = createDpopProof(keyPair, "GET", dpopUrl, token);
+  let keyPair = await getDpopKeyPair(config?.id);
+  let dpopProof = createDpopProof(keyPair, "GET", dpopUrl, token);
 
-  const res = await fetch(url.toString(), {
+  let res = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${token}`,
       DPoP: dpopProof,
     },
   });
+
+  // Auto-recover from 401: force refresh token with DPoP and retry once
+  if (res.status === 401 && config) {
+    console.log(`[Hubstaff] 401 on ${path} — force-refreshing token with DPoP`);
+    cachedKeyPair = null; // Clear stale keys
+    token = await refreshAccessToken(config);
+    keyPair = await getDpopKeyPair(config.id);
+    dpopProof = createDpopProof(keyPair, "GET", dpopUrl, token);
+    res = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        DPoP: dpopProof,
+      },
+    });
+  }
 
   if (!res.ok) {
     const text = await res.text();
