@@ -51,6 +51,9 @@ function scoreColor(score: number): string {
 export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, strengthTags, mistakeTags }: Props) {
   const arcs = storyAnalysis?.storyArcs || [];
   const hasStory = arcs.length > 0;
+  const totalSells = arcs.reduce((sum, a) => sum + (a.sellCount || 0), 0);
+  // If there are actual sells, badge should be green regardless of technique score
+  const sellingBadgeColor = totalSells > 0 ? "#34D399" : scoreColor(storyAnalysis?.overallSellingScore || 0);
 
   return (
     <div className="flex-1 min-w-[280px] max-w-[420px] space-y-3 overflow-y-auto max-h-[580px] custom-scrollbar">
@@ -58,18 +61,19 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
       {hasStory && storyAnalysis && (
         <div className="glass-inset rounded-2xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
+            <h4 className="text-white text-xs font-semibold flex items-center gap-1.5">
               <Sparkles size={13} className="text-amber-400" /> Selling Technique
             </h4>
             <div
               className="px-2.5 py-1 rounded-lg text-xs font-bold"
               style={{
-                background: `${scoreColor(storyAnalysis.overallSellingScore)}15`,
-                color: scoreColor(storyAnalysis.overallSellingScore),
-                border: `1px solid ${scoreColor(storyAnalysis.overallSellingScore)}30`,
+                background: `${sellingBadgeColor}15`,
+                color: sellingBadgeColor,
+                border: `1px solid ${sellingBadgeColor}30`,
               }}
             >
               {storyAnalysis.overallSellingScore}/100
+              {totalSells > 0 && <span className="ml-1">({totalSells} sale{totalSells > 1 ? "s" : ""})</span>}
             </div>
           </div>
           {storyAnalysis.fanInvestmentMoment && (
@@ -86,31 +90,31 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
         <div key={ai} className="glass-inset rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <BookOpen size={13} className="text-purple-400 shrink-0" />
-            <h4 className="text-white/80 text-xs font-semibold">
+            <h4 className="text-white text-xs font-semibold">
               Story {ai + 1}: {arc.title}
             </h4>
           </div>
 
           {/* Story length */}
           <div className="flex items-center gap-3 text-[10px]">
-            <span className="text-white/30">
+            <span className="text-white/60">
               Messages #{arc.messageRange[0]}–#{arc.messageRange[1]}
             </span>
-            <span className="text-white/20">|</span>
-            <span className="text-white/30">
+            <span className="text-white/30">|</span>
+            <span className="text-white/60">
               {arc.messageRange[1] - arc.messageRange[0] + 1} messages
             </span>
           </div>
 
-          {/* Sells within story */}
+          {/* Sells within story — GREEN because sales are always positive */}
           {arc.sellCount > 0 && (
-            <div className="bg-orange-500/[0.06] rounded-xl p-2.5 border border-orange-500/10">
-              <p className="text-orange-300/70 text-[10px] font-semibold mb-1.5">
+            <div className="bg-emerald-500/[0.08] rounded-xl p-2.5 border border-emerald-500/15">
+              <p className="text-emerald-400 text-[10px] font-semibold mb-1.5">
                 <Zap size={10} className="inline mr-1" />
                 {arc.sellCount} Sell{arc.sellCount > 1 ? "s" : ""} Within Story
               </p>
               {arc.sellQuotes.slice(0, 3).map((q, qi) => (
-                <p key={qi} className="text-orange-200/40 text-[10px] leading-relaxed pl-3 border-l border-orange-500/15 mb-1">
+                <p key={qi} className="text-white/70 text-[10px] leading-relaxed pl-3 border-l border-emerald-500/20 mb-1">
                   &ldquo;{q.slice(0, 200)}&rdquo;
                 </p>
               ))}
@@ -120,7 +124,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Story flow analysis */}
           {arc.storyFlowAnalysis && (
             <div>
-              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1">Story Flow</p>
+              <p className="text-white/80 text-[9px] uppercase tracking-wider font-semibold mb-1">Story Flow</p>
               <p className="text-white/80 text-[11px] leading-relaxed">{arc.storyFlowAnalysis}</p>
             </div>
           )}
@@ -128,7 +132,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Fan investment */}
           {arc.fanInvestment && (
             <div>
-              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1">Fan Investment</p>
+              <p className="text-white/80 text-[9px] uppercase tracking-wider font-semibold mb-1">Fan Investment</p>
               <p className="text-white/80 text-[11px] leading-relaxed">
                 <TrendingUp size={10} className="inline text-emerald-400 mr-1" />
                 {arc.fanInvestment}
@@ -139,10 +143,10 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Key elements */}
           {arc.keyElements.length > 0 && (
             <div>
-              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Key Elements</p>
+              <p className="text-white/80 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Key Elements</p>
               <div className="flex flex-wrap gap-1">
                 {arc.keyElements.map((el, ei) => (
-                  <span key={ei} className="text-[9px] bg-white/[0.04] text-white/70 px-2 py-0.5 rounded-full border border-white/[0.06]">
+                  <span key={ei} className="text-[9px] bg-white/[0.06] text-white/80 px-2 py-0.5 rounded-full border border-white/10">
                     {el}
                   </span>
                 ))}
@@ -153,7 +157,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
           {/* Selling pattern checklist */}
           {arc.sellingPattern.length > 0 && (
             <div>
-              <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Selling Pattern</p>
+              <p className="text-white/80 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Selling Pattern</p>
               <div className="space-y-1">
                 {arc.sellingPattern.map((step, si) => (
                   <div key={si} className="flex items-start gap-1.5">
@@ -165,7 +169,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
                     <span className={`text-[10px] leading-relaxed ${step.achieved ? "text-white/90" : "text-white/60"}`}>
                       {step.description}
                       {step.messageRef != null && (
-                        <span className="text-white/20 ml-1">#{step.messageRef}</span>
+                        <span className="text-white/50 ml-1">#{step.messageRef}</span>
                       )}
                     </span>
                   </div>
@@ -179,7 +183,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
       {/* AI Notes */}
       {aiNotes && (
         <div className="glass-inset rounded-2xl p-4">
-          <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1.5">AI Analysis</p>
+          <p className="text-white/80 text-[9px] uppercase tracking-wider font-semibold mb-1.5">AI Analysis</p>
           <p className="text-white/90 text-[11px] leading-relaxed">{aiNotes}</p>
         </div>
       )}
@@ -187,7 +191,7 @@ export function StoryBreakdownPanel({ storyAnalysis, totalScore, aiNotes, streng
       {/* Strengths & Mistakes */}
       {(strengthTags.length > 0 || mistakeTags.length > 0) && (
         <div className="glass-inset rounded-2xl p-4 space-y-2">
-          <p className="text-white/60 text-[9px] uppercase tracking-wider font-semibold mb-1">What Worked / What Didn&apos;t</p>
+          <p className="text-white/80 text-[9px] uppercase tracking-wider font-semibold mb-1">What Worked / What Didn&apos;t</p>
           {strengthTags.map((t) => (
             <div key={t} className="flex items-center gap-2">
               <CheckCircle size={11} className="text-teal-400 shrink-0" />

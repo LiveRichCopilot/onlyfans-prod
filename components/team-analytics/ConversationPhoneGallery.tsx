@@ -54,11 +54,11 @@ function ScoreBar({ label, score, max }: { label: string; score: number; max: nu
   const pct = Math.min(100, Math.round((score / max) * 100));
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-white/40 w-14 shrink-0">{label}</span>
+      <span className="text-[10px] text-white/70 w-14 shrink-0">{label}</span>
       <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: scoreColor(pct) }} />
       </div>
-      <span className="text-[10px] text-white/30 tabular-nums w-8 text-right">{score}/{max}</span>
+      <span className="text-[10px] text-white/70 tabular-nums w-8 text-right">{score}/{max}</span>
     </div>
   );
 }
@@ -106,7 +106,7 @@ function ExpandedConversation({
               <span className="text-white/50 text-sm">{sample.creator}</span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-white/30 text-[10px]">
+              <span className="text-white/60 text-[10px]">
                 {new Date(sample.date).toLocaleDateString("en-GB", {
                   timeZone: "Europe/London",
                   day: "2-digit",
@@ -147,7 +147,7 @@ function ExpandedConversation({
           >
             <ChevronLeft size={14} />
           </button>
-          <span className="text-white/30 text-xs tabular-nums">
+          <span className="text-white/60 text-xs tabular-nums">
             Chat {convoIndex + 1} of {conversations.length}: {convo.fanName}
           </span>
           <button
