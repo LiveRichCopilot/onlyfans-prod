@@ -3,7 +3,7 @@ import { buildScoringWindows, scoreChatter } from "@/lib/chatter-scorer";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 55;
+export const maxDuration = 120;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -56,9 +56,28 @@ export async function GET(request: Request) {
             });
         }
 
-        // Round-robin: rotate through pairs across cron runs
-        const offset = Math.floor(Date.now() / (60 * 60 * 1000)) % allWindows.length;
-        const rotated = [...allWindows.slice(offset), ...allWindows.slice(0, offset)];
+        // Pre-filter: skip pairs already scored for this window
+        const existingScores = await prisma.chatterHourlyScore.findMany({
+            where: { windowStart },
+            select: { chatterEmail: true, creatorId: true },
+        });
+        const scoredSet = new Set(existingScores.map(s => `${s.chatterEmail}::${s.creatorId}`));
+        const unscoredWindows = allWindows.filter(
+            w => !scoredSet.has(`${w.chatterEmail}::${w.creatorId}`),
+        );
+
+        console.log(
+            `[PerfScore] ${allWindows.length} total pairs, ${existingScores.length} already scored, ${unscoredWindows.length} remaining`,
+        );
+
+        if (unscoredWindows.length === 0) {
+            return NextResponse.json({
+                ok: true,
+                message: "All pairs already scored for this window",
+                totalPairs: allWindows.length,
+                alreadyScored: existingScores.length,
+            });
+        }
 
         const results: Array<{
             chatter: string;
@@ -67,16 +86,16 @@ export async function GET(request: Request) {
             status: string;
         }> = [];
 
-        const MAX_PAIRS = 2;
+        const MAX_PAIRS = 6;
 
-        for (let i = 0; i < Math.min(rotated.length, MAX_PAIRS); i++) {
-            // Time guard: stop if running low on budget (leave 10s for DB writes + response)
-            if (Date.now() - startTime > 42_000) {
+        for (let i = 0; i < Math.min(unscoredWindows.length, MAX_PAIRS); i++) {
+            // Time guard: stop with 15s safety margin for DB writes + response
+            if (Date.now() - startTime > 100_000) {
                 console.log("[PerfScore] Time guard hit — stopping early");
                 break;
             }
 
-            const window = rotated[i];
+            const window = unscoredWindows[i];
 
             try {
                 const result = await scoreChatter(window, true);
