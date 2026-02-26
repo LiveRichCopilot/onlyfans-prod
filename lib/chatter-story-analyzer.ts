@@ -69,15 +69,25 @@ Given a conversation between a CHATTER (the agency employee) and a FAN, you must
 - SOFT_SELL — gentle sell attempt disguised as part of the story
 
 ## Selling Pattern Checklist
-Evaluate whether the chatter followed this ideal pattern:
-1. Start with "imagine" / "dream" setup
-2. Build 3-5 story messages before first sell
-3. Sell #1 embedded naturally in story
-4. Continue story 10+ messages after sell
-5. Drop emotional hook
-6. Continue story maintaining engagement
-7. Sell #2 as soft question
-8. Wind down naturally
+There are TWO valid selling approaches. Evaluate which the chatter used:
+
+**APPROACH A: Buying Signal → Immediate Sell (BEST when fan signals intent)**
+When a fan gives a buying signal ("show me", "I want to see", "send it"), the correct move is to sell IMMEDIATELY. Do NOT penalize fast sells after buying signals — that's perfect execution.
+1. Fan gives buying signal (request, desire, curiosity)
+2. Chatter responds with sell IMMEDIATELY (within 1-2 messages) ← THIS IS CORRECT
+3. Sell matches what the fan asked for (relevant content)
+4. Follow-up after sell to keep engagement alive
+5. Look for next opportunity
+
+**APPROACH B: Story Arc → Embedded Sell (when no buying signal yet)**
+When no buying signal exists, the chatter should build interest first:
+1. Start with "imagine" / visual setup
+2. Build 2-3 story messages to create desire
+3. Sell embedded naturally in story flow
+4. Continue engagement after sell
+5. Drop emotional hook for next opportunity
+
+CRITICAL: If a fan explicitly asks for content or signals buying intent, and the chatter sells immediately — that is a PERFECT sell, NOT a mistake. Score it highly. The worst thing a chatter can do is ignore a buying signal to "build more story".
 
 ## Output Format
 Return valid JSON only. No markdown wrapping.
@@ -96,9 +106,10 @@ Return valid JSON only. No markdown wrapping.
       "storyFlowAnalysis": "Brief analysis of whether sells broke the narrative",
       "fanInvestment": "Description of when/how the fan became invested",
       "keyElements": ["kitchen setting", "imagine visual setup"],
+      "sellingApproach": "A_BUYING_SIGNAL or B_STORY_ARC",
       "sellingPattern": [
-        { "description": "Start with imagine/dream setup", "achieved": true, "messageRef": 0 },
-        { "description": "Build 3-5 story messages", "achieved": true, "messageRef": null }
+        { "description": "Fan gave buying signal", "achieved": true, "messageRef": 5 },
+        { "description": "Chatter sold immediately after signal", "achieved": true, "messageRef": 6 }
       ]
     }
   ],

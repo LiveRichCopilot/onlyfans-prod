@@ -16,7 +16,7 @@ type CategoryAverages = {
 const CATEGORIES = [
   { key: "sla", label: "SLA", hint: "How fast they reply — under 5 min = full marks", max: 25, color: CHART_COLORS.blue },
   { key: "followup", label: "Follow-up", hint: "Do they chase fans who go quiet, or let them drift?", max: 20, color: CHART_COLORS.teal },
-  { key: "trigger", label: "Triggers", hint: "Fan says \"I wish I could see more\" — did they act on it?", max: 20, color: CHART_COLORS.purple },
+  { key: "trigger", label: "Triggers", hint: "Fan hints they want content — did the chatter sell immediately?", max: 20, color: CHART_COLORS.purple },
   { key: "quality", label: "Quality", hint: "Personal, in-character messages vs robotic copy-paste", max: 20, color: CHART_COLORS.amber },
   { key: "revenue", label: "Revenue", hint: "Did they actually close? PPV sent, tip received, sub renewed", max: 15, color: CHART_COLORS.emerald },
 ];

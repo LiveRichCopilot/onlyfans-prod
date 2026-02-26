@@ -13,7 +13,7 @@ const GAUGE_TOOLTIPS: Record<string, string> = {
   Overall: "Total score out of 100 — combines all 5 categories below",
   SLA: "Response speed — are they replying within 5 minutes? (out of 25)",
   "Follow-up": "Re-engaging quiet fans — do they chase fans who stop replying? (out of 20)",
-  Triggers: "Catching buying signals — when a fan hints they want content, does the chatter act on it? (out of 20)",
+  Triggers: "Buying signals — when a fan hints they want content, does the chatter sell immediately? Hesitating = lost money (out of 20)",
   Quality: "Message creativity — are messages personal and in-character, or copy-paste robotic? (out of 20)",
   Revenue: "Closing sales — did they actually send PPVs, get tips, or renew subs? (out of 15)",
 };

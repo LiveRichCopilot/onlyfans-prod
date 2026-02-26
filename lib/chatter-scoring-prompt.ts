@@ -76,11 +76,13 @@ SCORING RUBRIC (85 points from AI, revenue is separate):
    - 0 = never follows up / gives free emotional labor, 20 = excellent follow-up game
 
 3. Trigger Handling / Buying Cue Detection (0-20):
-   - BUYING SIGNALS to catch: "how much", "unlock", "send me", "I want", "price?", "I'm bored", "I'm lonely", "I just got paid", "payday", "show me", "I've been thinking about you"
+   - BUYING SIGNALS to catch: "how much", "unlock", "send me", "I want", "price?", "I'm bored", "I'm lonely", "I just got paid", "payday", "show me", "I've been thinking about you", "I wanna see", "send me something"
    - SOFT REFUSALS to reframe: "maybe later", "not now", "I'll think about it" — these are NOT hard no's
+   - CRITICAL: When a fan gives a buying signal, the chatter MUST sell IMMEDIATELY (within 1-2 messages). Do NOT penalize fast selling after a signal — that is PERFECT execution.
+   - Building story/tension AFTER a buying signal is WRONG — that's hesitating and losing the sale
    - Must respond with clear CTA, not just "yes babe" or "ok babe"
-   - Deduct heavily if fan gave buying signal and chatter changed subject or went platonic
-   - 0 = missed all triggers, 20 = caught and converted every signal
+   - Deduct heavily if fan gave buying signal and chatter changed subject, went platonic, or tried to "build up" instead of closing
+   - 0 = missed all triggers, 20 = caught and sold immediately on every signal
 
 4. Quality / Persona Mastery / Personalization (0-20):
    PERSONA TYPES (chatter should use the right one for each fan):

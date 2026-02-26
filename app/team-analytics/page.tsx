@@ -118,7 +118,7 @@ export default function TeamAnalytics() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
               <div><span className="text-blue-400 font-medium">SLA (25 pts)</span> — How fast they reply. Under 5 minutes = full marks. Slow replies lose points.</div>
               <div><span className="text-teal-400 font-medium">Follow-up (20 pts)</span> — When a fan goes quiet, does the chatter re-engage them? Or let them disappear?</div>
-              <div><span className="text-purple-400 font-medium">Triggers (20 pts)</span> — Catching buying signals. Fan says "I wish I could see more" — did the chatter offer content?</div>
+              <div><span className="text-purple-400 font-medium">Triggers (20 pts)</span> — When a fan hints they want content, did the chatter sell immediately? Hesitating on a buying signal = lost money.</div>
               <div><span className="text-amber-400 font-medium">Quality (20 pts)</span> — Are messages creative, personal, in-character? Or copy-paste robotic garbage?</div>
               <div><span className="text-emerald-400 font-medium">Revenue (15 pts)</span> — Did they actually close a sale? PPV sent, tip received, subscription renewed.</div>
               <div><span className="text-red-400 font-medium">Penalties</span> — Copy-paste blasting, missed buying signals, and spamming all reduce the score.</div>
