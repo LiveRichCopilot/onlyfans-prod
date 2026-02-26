@@ -163,7 +163,10 @@ export default function TeamAnalytics() {
       {/* Row 2: Gauges + Category Bars + Score Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <TeamGaugePanel avgScore={d.kpis?.avgTeamScore || 0} categoryAverages={d.categoryAverages || { sla: 0, followup: 0, trigger: 0, quality: 0, revenue: 0 }} />
-        <ScoreCategoryBars data={d.categoryAverages || { sla: 0, followup: 0, trigger: 0, quality: 0, revenue: 0 }} />
+        <ScoreCategoryBars
+          data={d.categoryAverages || { sla: 0, followup: 0, trigger: 0, quality: 0, revenue: 0 }}
+          conversations={d.conversationSamples || []}
+        />
         <ChatterRadarChart data={d.chatterRadar || []} />
       </div>
 

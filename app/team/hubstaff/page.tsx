@@ -150,10 +150,15 @@ export default function HubstaffAdmin() {
             />
             <textarea
               value={setupToken}
-              onChange={e => setSetupToken(e.target.value)}
+              onChange={e => setSetupToken(e.target.value.replace(/[\s\n\r]+/g, ""))}
+              onPaste={e => {
+                e.preventDefault();
+                const pasted = e.clipboardData.getData("text").replace(/[\s\n\r]+/g, "");
+                setSetupToken(pasted);
+              }}
               placeholder="Paste your Hubstaff refresh token here..."
               rows={3}
-              className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none"
+              className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono break-all"
             />
             <button onClick={handleSetup} className="glass-prominent rounded-xl px-6 py-2.5 text-white font-medium text-sm">
               Connect Hubstaff
@@ -216,10 +221,15 @@ export default function HubstaffAdmin() {
               <p className="text-white/60 text-sm font-medium">Paste new Hubstaff refresh token:</p>
               <textarea
                 value={updateToken}
-                onChange={e => setUpdateToken(e.target.value)}
+                onChange={e => setUpdateToken(e.target.value.replace(/[\s\n\r]+/g, ""))}
+                onPaste={e => {
+                  e.preventDefault();
+                  const pasted = e.clipboardData.getData("text").replace(/[\s\n\r]+/g, "");
+                  setUpdateToken(pasted);
+                }}
                 placeholder="eyJ0eXAiOiJKV1Qi..."
                 rows={3}
-                className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono"
+                className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono break-all"
               />
               <div className="flex items-center gap-3">
                 <button
