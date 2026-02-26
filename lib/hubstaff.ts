@@ -129,16 +129,21 @@ async function bootstrapFromEnv(): Promise<string> {
   return data.access_token;
 }
 
-async function refreshAccessToken(config: { id: string; refreshToken: string }): Promise<string> {
-  const keyPair = await getDpopKeyPair(config.id);
-  const dpopProof = createDpopProof(keyPair, "POST", TOKEN_URL);
+async function refreshAccessToken(config: { id: string; refreshToken: string; dpopPrivateKey?: string | null; dpopPublicKey?: string | null }): Promise<string> {
+  // Use DPoP only if the config has stored DPoP keys (meaning token was DPoP-bound)
+  const hasDpop = !!config.dpopPrivateKey && !!config.dpopPublicKey;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  if (hasDpop) {
+    const keyPair = await getDpopKeyPair(config.id);
+    headers["DPoP"] = createDpopProof(keyPair, "POST", TOKEN_URL);
+  }
 
   const res = await fetch(TOKEN_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "DPoP": dpopProof,
-    },
+    headers,
     body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: config.refreshToken }),
   });
 
@@ -165,7 +170,12 @@ export async function getAccessToken(): Promise<string> {
   const config = await prisma.hubstaffConfig.findFirst();
   if (!config) return bootstrapFromEnv();
   if (config.tokenExpiresAt > new Date(Date.now() + 60000)) return config.accessToken;
-  return refreshAccessToken(config);
+  return refreshAccessToken({
+    id: config.id,
+    refreshToken: config.refreshToken,
+    dpopPrivateKey: config.dpopPrivateKey,
+    dpopPublicKey: config.dpopPublicKey,
+  });
 }
 
 // --- API Helpers ---
@@ -176,31 +186,29 @@ async function hubstaffGet<T>(path: string, params?: Record<string, string>): Pr
   const url = new URL(`${HUBSTAFF_API}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  // DPoP proof must use scheme+host+path only (no query/fragment)
+  // Use DPoP only if config has stored DPoP keys (token was DPoP-bound)
+  const hasDpop = !!config?.dpopPrivateKey && !!config?.dpopPublicKey;
   const dpopUrl = `${url.origin}${url.pathname}`;
-  let keyPair = await getDpopKeyPair(config?.id);
-  let dpopProof = createDpopProof(keyPair, "GET", dpopUrl, token);
 
-  let res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      DPoP: dpopProof,
-    },
-  });
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (hasDpop) {
+    const keyPair = await getDpopKeyPair(config!.id);
+    headers["DPoP"] = createDpopProof(keyPair, "GET", dpopUrl, token);
+  }
 
-  // Auto-recover from 401: force refresh token with DPoP and retry once
+  let res = await fetch(url.toString(), { headers });
+
+  // Auto-recover from 401: force refresh token and retry once
   if (res.status === 401 && config) {
-    console.log(`[Hubstaff] 401 on ${path} — force-refreshing token with DPoP`);
-    cachedKeyPair = null; // Clear stale keys
+    console.log(`[Hubstaff] 401 on ${path} — force-refreshing token`);
+    cachedKeyPair = null;
     token = await refreshAccessToken(config);
-    keyPair = await getDpopKeyPair(config.id);
-    dpopProof = createDpopProof(keyPair, "GET", dpopUrl, token);
-    res = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        DPoP: dpopProof,
-      },
-    });
+    const retryHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (hasDpop) {
+      const keyPair = await getDpopKeyPair(config.id);
+      retryHeaders["DPoP"] = createDpopProof(keyPair, "GET", dpopUrl, token);
+    }
+    res = await fetch(url.toString(), { headers: retryHeaders });
   }
 
   if (!res.ok) {
