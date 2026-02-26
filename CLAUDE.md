@@ -1,5 +1,12 @@
 # Project Rules
 
+## OWNER CONTEXT — Read this first
+- The owner operates entirely by voice. No manual code edits. No manual terminal commands. No manual env var changes.
+- All code, config, deployments, and debugging are handled by Claude (terminal or web).
+- Never say "you added" or "you changed" — the owner does not touch code or settings directly.
+- If something is misconfigured, Claude did it or it was already there. Investigate and fix it, don't blame the owner.
+- Push directly to `main` via `github-direct` remote. The proxy remote blocks `main` pushes — always use `github-direct`.
+
 ## HARD RULES — Never break these
 
 ### 1. One branch only: `main`
