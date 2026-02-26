@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDirectMessageStats, getMassMessageStats, getTopMessage } from "@/lib/ofapi-engagement";
-import { classifyHook, getContentType, HookCategory } from "@/lib/content-analyzer";
+import { classifyHook, getContentType, extractThumb, extractMediaType, HookCategory, MediaType } from "@/lib/content-analyzer";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+type MediaThumb = { url: string; type: string };
 
 type ClassifiedMessage = {
   id: string;
@@ -12,45 +14,56 @@ type ClassifiedMessage = {
   hookCategory: HookCategory;
   hookText: string;
   contentType: string;
+  mediaType: MediaType;
   hasMedia: boolean;
+  hasCTA: boolean;
   isPPV: boolean;
+  isFreePreview: boolean;
   priceBucket: string;
   textLength: string;
   viewedCount: number;
   purchasedCount: number;
+  sentCount: number;
   price: number;
   date: string;
   creatorId: string;
   creatorName: string;
   source: "direct" | "mass";
-  sentCount?: number;
+  thumbnails: MediaThumb[];
 };
 
 type AggregatedEntry = {
   name: string;
   count: number;
+  sentCount: number;
   viewedCount: number;
   purchasedCount: number;
   conversionRate: number;
+  viewRate: number;
+  purchaseRate: number;
   totalRevenue: number;
   avgPrice: number;
+  rpm: number;
+  ctaRate: number;
 };
 
 function aggregateByField(messages: ClassifiedMessage[], field: keyof ClassifiedMessage): AggregatedEntry[] {
-  const map = new Map<
-    string,
-    { count: number; viewed: number; purchased: number; revenue: number; priceSum: number; pricedCount: number }
-  >();
+  const map = new Map<string, {
+    count: number; sent: number; viewed: number; purchased: number;
+    revenue: number; priceSum: number; pricedCount: number; ctaCount: number;
+  }>();
 
   for (const m of messages) {
     const key = String(m[field]) || "unknown";
     if (!map.has(key))
-      map.set(key, { count: 0, viewed: 0, purchased: 0, revenue: 0, priceSum: 0, pricedCount: 0 });
+      map.set(key, { count: 0, sent: 0, viewed: 0, purchased: 0, revenue: 0, priceSum: 0, pricedCount: 0, ctaCount: 0 });
     const e = map.get(key)!;
     e.count++;
+    e.sent += m.sentCount || 0;
     e.viewed += m.viewedCount || 0;
     e.purchased += m.purchasedCount || 0;
     e.revenue += (m.purchasedCount || 0) * (m.price || 0);
+    if (m.hasCTA) e.ctaCount++;
     if (m.price > 0) {
       e.priceSum += m.price;
       e.pricedCount++;
@@ -60,50 +73,98 @@ function aggregateByField(messages: ClassifiedMessage[], field: keyof Classified
   return [...map.entries()].map(([name, e]) => ({
     name,
     count: e.count,
+    sentCount: e.sent,
     viewedCount: e.viewed,
     purchasedCount: e.purchased,
     conversionRate: e.viewed > 0 ? Math.round((e.purchased / e.viewed) * 100) : 0,
+    viewRate: e.sent > 0 ? Math.round((e.viewed / e.sent) * 100) : 0,
+    purchaseRate: e.sent > 0 ? Math.round((e.purchased / e.sent) * 100) : 0,
     totalRevenue: Math.round(e.revenue * 100) / 100,
     avgPrice: e.pricedCount > 0 ? Math.round((e.priceSum / e.pricedCount) * 100) / 100 : 0,
+    rpm: e.sent > 0 ? Math.round((e.revenue / e.sent) * 1000 * 100) / 100 : 0,
+    ctaRate: e.count > 0 ? Math.round((e.ctaCount / e.count) * 100) : 0,
   }));
 }
 
-/** Fetch engagement data for one creator (direct + mass + top). Returns partial results on timeout. */
+/** Fetch engagement data for one creator. Returns partial results on timeout. */
 async function fetchCreatorEngagement(
   creator: { id: string; name: string | null; ofapiCreatorId: string; ofapiToken: string },
-  startDate: Date,
-  endDate: Date,
+  startDate: Date, endDate: Date,
 ): Promise<{ direct: Record<string, unknown>[]; mass: Record<string, unknown>[]; top: Record<string, unknown> | null }> {
   const result: { direct: Record<string, unknown>[]; mass: Record<string, unknown>[]; top: Record<string, unknown> | null } = {
     direct: [], mass: [], top: null,
   };
 
-  // Run all 3 calls in parallel for this creator
   const [directRes, massRes, topRes] = await Promise.all([
     getDirectMessageStats(creator.ofapiCreatorId, creator.ofapiToken, startDate, endDate, 50, 0).catch(() => null),
     getMassMessageStats(creator.ofapiCreatorId, creator.ofapiToken, startDate, endDate, 50, 0).catch(() => null),
     getTopMessage(creator.ofapiCreatorId, creator.ofapiToken).catch(() => null),
   ]);
 
-  // Direct messages
   const directItems = (directRes as any)?.data?.items || (directRes as any)?.items || (directRes as any)?.data?.list || [];
   for (const item of directItems) {
     result.direct.push({ ...item, creatorId: creator.id, creatorName: creator.name });
   }
 
-  // Mass messages
   const massItems = (massRes as any)?.data?.items || (massRes as any)?.items || (massRes as any)?.data?.list || [];
   for (const item of massItems) {
     result.mass.push({ ...item, creatorId: creator.id, creatorName: creator.name });
   }
 
-  // Top message
   if (topRes) {
     const top = (topRes as any)?.data || topRes;
     result.top = { ...top, creatorId: creator.id, creatorName: creator.name };
   }
 
   return result;
+}
+
+/** Extract thumbnails from OFAPI media array */
+function extractThumbnails(mediaArr: unknown): MediaThumb[] {
+  if (!Array.isArray(mediaArr)) return [];
+  return mediaArr.slice(0, 4).map((med: Record<string, unknown>) => ({
+    url: extractThumb(med),
+    type: extractMediaType(med),
+  })).filter(t => t.url);
+}
+
+/** Classify a raw OFAPI message into our format */
+function classifyMessage(
+  m: Record<string, any>, source: "direct" | "mass"
+): ClassifiedMessage {
+  const text = m.rawText || m.text || "";
+  const mediaArr = m.media || [];
+  const mediaCount = m.mediaCount || mediaArr.length || 0;
+  const price = m.price || 0;
+  const isFree = m.isFree !== false;
+  const mediaTypes = Array.isArray(mediaArr) ? mediaArr.map((med: any) => extractMediaType(med)) : [];
+
+  const features = classifyHook(text, mediaCount, price, isFree, mediaTypes);
+  const thumbnails = extractThumbnails(mediaArr);
+
+  return {
+    id: String(m.id || m.messageId || Math.random()),
+    rawText: text,
+    hookCategory: features.hookCategory,
+    hookText: features.hookText,
+    contentType: getContentType(mediaCount, price, isFree, features.mediaType),
+    mediaType: features.mediaType,
+    hasMedia: features.hasMedia,
+    hasCTA: features.hasCTA,
+    isPPV: features.isPPV,
+    isFreePreview: isFree && mediaCount > 0,
+    priceBucket: features.priceBucket,
+    textLength: features.textLength,
+    viewedCount: m.viewedCount || 0,
+    purchasedCount: m.purchasedCount || 0,
+    sentCount: m.sentCount || 0,
+    price,
+    date: m.date || m.createdAt || "",
+    creatorId: String(m.creatorId),
+    creatorName: String(m.creatorName || "Unknown"),
+    source,
+    thumbnails,
+  };
 }
 
 // GET /api/team-analytics/content-performance?days=7&creatorId=xxx
@@ -132,14 +193,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No creators with OFAPI access" }, { status: 404 });
     }
 
-    // Fetch all creators in parallel (batches of 5 to avoid overwhelming OFAPI)
     const allDirectMessages: Record<string, unknown>[] = [];
     const allMassMessages: Record<string, unknown>[] = [];
     const topMessages: Record<string, unknown>[] = [];
     const batchSize = 5;
 
     for (let i = 0; i < validCreators.length; i += batchSize) {
-      // Time guard: return what we have if nearing timeout
       if (Date.now() - requestStart > 40000) {
         console.log(`[content-perf] Time guard hit at ${i}/${validCreators.length} creators`);
         break;
@@ -161,118 +220,77 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // --- CLASSIFY HOOKS ---
-    const classified: ClassifiedMessage[] = [];
+    // Classify all messages
+    const directClassified = allDirectMessages.map(msg => classifyMessage(msg as Record<string, any>, "direct"));
+    const massClassified = allMassMessages.map(msg => classifyMessage(msg as Record<string, any>, "mass"));
+    const allClassified = [...directClassified, ...massClassified];
 
-    for (const msg of allDirectMessages) {
-      const m = msg as Record<string, any>;
-      const text = m.rawText || m.text || "";
-      const mediaCount = m.mediaCount || 0;
-      const price = m.price || 0;
-      const isFree = m.isFree !== false;
+    // Aggregations
+    const hookPerformance = aggregateByField(allClassified, "hookCategory");
+    const contentTypePerformance = aggregateByField(allClassified, "contentType");
+    const priceBucketPerformance = aggregateByField(allClassified, "priceBucket");
+    const creatorPerformance = aggregateByField(allClassified, "creatorName");
 
-      const features = classifyHook(text, mediaCount, price, isFree);
-      classified.push({
-        id: String(m.id || m.messageId || Math.random()),
-        rawText: text,
-        hookCategory: features.hookCategory,
-        hookText: features.hookText,
-        contentType: getContentType(mediaCount, price, isFree),
-        hasMedia: features.hasMedia,
-        isPPV: features.isPPV,
-        priceBucket: features.priceBucket,
-        textLength: features.textLength,
-        viewedCount: m.viewedCount || 0,
-        purchasedCount: m.purchasedCount || 0,
-        price,
-        date: m.date || m.createdAt || "",
-        creatorId: String(m.creatorId),
-        creatorName: String(m.creatorName || "Unknown"),
-        source: "direct",
-      });
-    }
+    // Top performing — sorted by revenue
+    const topDirect = [...directClassified]
+      .filter(m => m.purchasedCount > 0)
+      .sort((a, b) => (b.purchasedCount * b.price) - (a.purchasedCount * a.price))
+      .slice(0, 15);
 
-    for (const msg of allMassMessages) {
-      const m = msg as Record<string, any>;
-      const text = m.rawText || m.text || "";
-      const mediaCount = m.mediaCount || 0;
-      const price = m.price || 0;
-      const isFree = m.isFree !== false;
+    const topMass = [...massClassified]
+      .filter(m => m.purchasedCount > 0 || m.viewedCount > 0)
+      .sort((a, b) => (b.purchasedCount * b.price) - (a.purchasedCount * a.price))
+      .slice(0, 15);
 
-      const features = classifyHook(text, mediaCount, price, isFree);
-      classified.push({
-        id: String(m.id || m.messageId || Math.random()),
-        rawText: text,
-        hookCategory: features.hookCategory,
-        hookText: features.hookText,
-        contentType: getContentType(mediaCount, price, isFree),
-        hasMedia: features.hasMedia,
-        isPPV: features.isPPV,
-        priceBucket: features.priceBucket,
-        textLength: features.textLength,
-        viewedCount: m.viewedCount || 0,
-        purchasedCount: m.purchasedCount || 0,
-        price,
-        date: m.date || m.createdAt || "",
-        creatorId: String(m.creatorId),
-        creatorName: String(m.creatorName || "Unknown"),
-        source: "mass",
-        sentCount: m.sentCount || 0,
-      });
-    }
+    // "No bites" — messages with views but zero purchases
+    const noBitesDirect = [...directClassified]
+      .filter(m => m.viewedCount > 0 && m.purchasedCount === 0 && m.price > 0)
+      .sort((a, b) => b.viewedCount - a.viewedCount)
+      .slice(0, 10);
 
-    // --- AGGREGATIONS ---
-    const hookPerformance = aggregateByField(classified, "hookCategory");
-    const contentTypePerformance = aggregateByField(classified, "contentType");
-    const priceBucketPerformance = aggregateByField(classified, "priceBucket");
-    const creatorPerformance = aggregateByField(classified, "creatorName");
+    const noBitesMass = [...massClassified]
+      .filter(m => (m.viewedCount > 0 || m.sentCount > 0) && m.purchasedCount === 0 && m.price > 0)
+      .sort((a, b) => b.viewedCount - a.viewedCount)
+      .slice(0, 10);
 
-    const topPerformingDirect = [...classified]
-      .filter((m) => m.source === "direct" && m.purchasedCount > 0)
-      .sort((a, b) => b.purchasedCount - a.purchasedCount)
-      .slice(0, 10)
-      .map((m) => ({
-        hookText: m.hookText, hookCategory: m.hookCategory, contentType: m.contentType,
-        price: m.price, purchasedCount: m.purchasedCount, viewedCount: m.viewedCount,
-        conversionRate: m.viewedCount > 0 ? Math.round((m.purchasedCount / m.viewedCount) * 100) : 0,
-        revenue: m.purchasedCount * m.price, creatorName: m.creatorName, date: m.date,
-      }));
-
-    const topPerformingMass = [...classified]
-      .filter((m) => m.source === "mass" && (m.purchasedCount > 0 || m.viewedCount > 0))
-      .sort((a, b) => b.purchasedCount - a.purchasedCount)
-      .slice(0, 10)
-      .map((m) => ({
-        hookText: m.hookText, hookCategory: m.hookCategory, contentType: m.contentType,
-        price: m.price, sentCount: m.sentCount || 0, viewedCount: m.viewedCount,
-        purchasedCount: m.purchasedCount,
-        openRate: m.sentCount && m.sentCount > 0 ? Math.round((m.viewedCount / m.sentCount) * 100) : 0,
-        conversionRate: m.viewedCount > 0 ? Math.round((m.purchasedCount / m.viewedCount) * 100) : 0,
-        revenue: m.purchasedCount * m.price, creatorName: m.creatorName, date: m.date,
-      }));
-
-    // --- KPIs ---
-    const totalMessages = classified.length;
-    const totalDirect = classified.filter((m) => m.source === "direct").length;
-    const totalMass = classified.filter((m) => m.source === "mass").length;
-    const totalViewed = classified.reduce((s, m) => s + m.viewedCount, 0);
-    const totalPurchased = classified.reduce((s, m) => s + m.purchasedCount, 0);
-    const totalRevenue = classified.reduce((s, m) => s + m.purchasedCount * m.price, 0);
+    // KPIs
+    const totalDirect = directClassified.length;
+    const totalMass = massClassified.length;
+    const totalMessages = allClassified.length;
+    const totalSent = allClassified.reduce((s, m) => s + (m.sentCount || 0), 0);
+    const totalViewed = allClassified.reduce((s, m) => s + m.viewedCount, 0);
+    const totalPurchased = allClassified.reduce((s, m) => s + m.purchasedCount, 0);
+    const totalRevenue = allClassified.reduce((s, m) => s + m.purchasedCount * m.price, 0);
     const avgConversionRate = totalViewed > 0 ? Math.round((totalPurchased / totalViewed) * 100) : 0;
-    const sorted = [...hookPerformance].sort((a, b) => b.conversionRate - a.conversionRate);
+    const ctaCount = allClassified.filter(m => m.hasCTA).length;
+    const sorted = [...hookPerformance].sort((a, b) => b.totalRevenue - a.totalRevenue);
     const bestHook = sorted[0]?.name || "N/A";
 
     const elapsed = Date.now() - requestStart;
-    console.log(`[content-perf] Done in ${elapsed}ms — ${validCreators.length} creators, ${classified.length} messages`);
+    console.log(`[content-perf] Done in ${elapsed}ms — ${validCreators.length} creators, ${allClassified.length} messages`);
 
     return NextResponse.json({
-      kpis: { totalMessages, totalDirect, totalMass, totalViewed, totalPurchased, totalRevenue: Math.round(totalRevenue * 100) / 100, avgConversionRate, bestHook },
+      dateRange: {
+        start: startDate.toISOString().split("T")[0],
+        end: endDate.toISOString().split("T")[0],
+        days,
+      },
+      kpis: {
+        totalMessages, totalDirect, totalMass, totalSent,
+        totalViewed, totalPurchased,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        avgConversionRate, bestHook, ctaCount,
+        ctaRate: totalMessages > 0 ? Math.round((ctaCount / totalMessages) * 100) : 0,
+        rpm: totalSent > 0 ? Math.round((totalRevenue / totalSent) * 1000 * 100) / 100 : 0,
+      },
       hookPerformance: sorted,
-      contentTypePerformance: contentTypePerformance.sort((a, b) => b.conversionRate - a.conversionRate),
+      contentTypePerformance: contentTypePerformance.sort((a, b) => b.totalRevenue - a.totalRevenue),
       priceBucketPerformance: priceBucketPerformance.sort((a, b) => b.totalRevenue - a.totalRevenue),
       creatorPerformance: creatorPerformance.sort((a, b) => b.totalRevenue - a.totalRevenue),
-      topPerformingDirect,
-      topPerformingMass,
+      topDirect,
+      topMass,
+      noBitesDirect,
+      noBitesMass,
       topMessages: topMessages.slice(0, 5),
     });
   } catch (err: unknown) {

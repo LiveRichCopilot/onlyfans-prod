@@ -1,13 +1,4 @@
 // Hook categories for message classification
-// "question" — asks fan something ("rate me", "choose A or B", "what do you think")
-// "teaser" — curiosity hook ("guess what", "you won't believe", "I have something")
-// "personal" — intimate/targeted ("I was thinking about you", "made this just for you")
-// "urgency" — scarcity/FOMO ("only today", "limited time", "before I delete")
-// "direct_offer" — straight PPV/sale ("unlock this", "new content for you")
-// "casual" — check-in/warmup ("hey babe", "miss you", "how's your day")
-// "game" — interactive ("truth or dare", "would you rather", "play a game")
-// "flirty" — sexual tension building ("I'm so bored", "wish you were here")
-
 export type HookCategory =
   | "question"
   | "teaser"
@@ -19,30 +10,38 @@ export type HookCategory =
   | "flirty"
   | "other";
 
+export type MediaType = "photo" | "video" | "audio" | "text-only";
+
 export type MessageFeatures = {
   hookCategory: HookCategory;
   hookText: string; // first 12 words
   hasQuestion: boolean;
   hasMedia: boolean;
+  hasCTA: boolean;
   isPPV: boolean;
-  priceBucket: string; // "free" | "$1-10" | "$10-25" | "$25-50" | "$50+"
-  textLength: "short" | "medium" | "long"; // <20 chars, 20-100, 100+
+  priceBucket: string;
+  textLength: "short" | "medium" | "long";
+  mediaType: MediaType;
 };
+
+// CTA detection patterns
+const CTA_PATTERNS = /\b(unlock|open|click|tap|check|see|watch|view|buy|get|grab|claim|subscribe|tip|send|dm me|reply|respond|answer|vote|choose|pick)\b/i;
 
 // Rule-based fast classifier (no AI needed for basic hook detection):
 export function classifyHook(
   rawText: string,
   mediaCount: number,
   price: number,
-  isFree: boolean
+  isFree: boolean,
+  mediaTypes?: string[]
 ): MessageFeatures {
   const clean = (rawText || "").replace(/<[^>]+>/g, "").trim();
   const lower = clean.toLowerCase();
   const words = clean.split(/\s+/);
   const hookText = words.slice(0, 12).join(" ");
   const hasQuestion = lower.includes("?");
+  const hasCTA = CTA_PATTERNS.test(lower);
 
-  // Determine hook category by keyword patterns
   let hookCategory: HookCategory = "other";
 
   if (/\b(rate|choose|pick|which|would you rather|what do you|poll|vote)\b/i.test(lower)) {
@@ -65,36 +64,76 @@ export function classifyHook(
     hookCategory = "question";
   }
 
-  // Price bucket
   let priceBucket = "free";
   if (price > 50) priceBucket = "$50+";
   else if (price > 25) priceBucket = "$25-50";
   else if (price > 10) priceBucket = "$10-25";
   else if (price > 0) priceBucket = "$1-10";
 
-  // Text length
   let textLength: "short" | "medium" | "long" = "short";
   if (clean.length > 100) textLength = "long";
   else if (clean.length > 20) textLength = "medium";
+
+  // Determine media type from media array types
+  let mediaType: MediaType = "text-only";
+  if (mediaTypes && mediaTypes.length > 0) {
+    if (mediaTypes.some(t => t === "video" || t === "gif")) mediaType = "video";
+    else if (mediaTypes.some(t => t === "audio")) mediaType = "audio";
+    else if (mediaTypes.some(t => t === "photo")) mediaType = "photo";
+  } else if (mediaCount > 0) {
+    mediaType = "photo"; // fallback if we have count but no types
+  }
 
   return {
     hookCategory,
     hookText,
     hasQuestion,
     hasMedia: mediaCount > 0,
+    hasCTA,
     isPPV: !isFree && price > 0,
     priceBucket,
     textLength,
+    mediaType,
   };
 }
 
-// For the content type label
+// Detailed content type label
 export function getContentType(
   mediaCount: number,
   price: number,
-  isFree: boolean
+  isFree: boolean,
+  mediaType?: MediaType
 ): string {
-  if (price > 0 && !isFree) return "PPV";
-  if (mediaCount > 0) return "Media";
+  if (price > 0 && !isFree) {
+    if (mediaType === "video") return "PPV Video";
+    if (mediaType === "audio") return "PPV Audio";
+    if (mediaType === "photo") return "PPV Photo";
+    return "PPV";
+  }
+  if (mediaType === "video") return "Free Video";
+  if (mediaType === "audio") return "Free Audio";
+  if (mediaCount > 0) return "Free Photo";
   return "Text Only";
+}
+
+// Extract thumbnail URL from OFAPI media object
+export function extractThumb(media: Record<string, unknown>): string {
+  const m = media as Record<string, any>;
+  return (
+    m.files?.thumb?.url ||
+    m.files?.squarePreview?.url ||
+    m.files?.preview?.url ||
+    m.thumb ||
+    m.squarePreview ||
+    m.preview ||
+    m.files?.full?.url ||
+    m.src ||
+    ""
+  );
+}
+
+// Extract media type from OFAPI media object
+export function extractMediaType(media: Record<string, unknown>): string {
+  const m = media as Record<string, any>;
+  return m.type || "photo";
 }
