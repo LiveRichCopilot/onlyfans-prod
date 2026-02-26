@@ -84,7 +84,7 @@ export async function rewriteMessage(
                     },
                 ],
                 temperature: 0.7,
-                max_tokens: 100,
+                max_completion_tokens: 100,
             }),
         });
 

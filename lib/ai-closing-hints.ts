@@ -235,7 +235,7 @@ ${params.compressedContext}`;
                     { role: "user", content: userPrompt },
                 ],
                 temperature: 0.4,
-                max_tokens: 500,   // Hard cap
+                max_completion_tokens: 500,
                 response_format: { type: "json_object" },
             }),
         });

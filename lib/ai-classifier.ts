@@ -235,7 +235,7 @@ export async function classifyFan(
                     { role: "user", content: userPrompt },
                 ],
                 temperature: 0.2,
-                max_tokens: 1200, // Expanded for doNotForget + suggestedQuestions + facts
+                max_completion_tokens: 1200,
                 response_format: { type: "json_object" },
             }),
             signal: controller.signal,

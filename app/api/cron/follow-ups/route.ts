@@ -95,7 +95,7 @@ Be flirty, natural, not desperate. Return ONLY the message text, no JSON.`;
                                 { role: "user", content: prompt },
                             ],
                             temperature: 0.7,
-                            max_tokens: 100,
+                            max_completion_tokens: 100,
                         }),
                     });
 
