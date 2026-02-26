@@ -27,6 +27,7 @@ import {
     formatConversationsForAI,
 } from "./chatter-scorer-utils";
 import { updateChatterProfile } from "./chatter-scorer-profile";
+import { runStoryAnalysis } from "./chatter-story-analyzer";
 
 // Re-export types for consumers
 export type { ScoringWindow, ScoringResult } from "./chatter-scorer-utils";
@@ -213,9 +214,9 @@ export async function scoreChatter(
         const revenueScore = computeRevenueScore(revenue);
 
         // AI scoring
+        const formatted = formatConversationsForAI(allMessages);
         let aiResult: AIScoringResult | null = null;
         if (useAI && allMessages.length >= 3) {
-            const formatted = formatConversationsForAI(allMessages);
             const avgResponseTimeSec =
                 responseDelays.length > 0
                     ? responseDelays.reduce((a, b) => a + b, 0) / responseDelays.length
@@ -260,6 +261,53 @@ export async function scoreChatter(
             strengthTags: aiResult?.strengthTags || [],
         };
 
+        // Build conversation snippets grouped by chat (limit to 10 chats, 20 msgs each)
+        const chatGroups = new Map<string, typeof allMessages>();
+        for (const m of allMessages) {
+            const group = chatGroups.get(m.chatId) || [];
+            if (group.length < 20) group.push(m);
+            chatGroups.set(m.chatId, group);
+        }
+        const conversationData = [...chatGroups.entries()].slice(0, 10).map(([chatId, msgs]) => ({
+            chatId,
+            fanName: msgs.find(m => !m.isChatter)?.fanName || `Fan ${chatId.slice(-4)}`,
+            messages: msgs.map(m => ({
+                text: m.text.slice(0, 500),
+                isChatter: m.isChatter,
+                time: m.createdAt.toISOString(),
+            })),
+        }));
+
+        // Run story analysis on conversations with enough messages (best-effort, non-blocking)
+        let storyAnalysis = null;
+        if (useAI && allMessages.length >= 8) {
+            try {
+                storyAnalysis = await runStoryAnalysis(formatted, allMessages.length);
+            } catch (e: any) {
+                console.error("[Scorer] Story analysis failed:", e.message);
+            }
+        }
+
+        // Enrich conversationData with story analysis if available
+        const enrichedConversationData = storyAnalysis
+            ? { conversations: conversationData, storyAnalysis }
+            : conversationData;
+
+        // Detect copy-paste blasting (same message sent to 2+ fans)
+        const blastMap = new Map<string, Set<string>>();
+        for (const m of allMessages) {
+            if (!m.isChatter || m.text.length < 20) continue;
+            const key = m.text.toLowerCase().trim();
+            const fans = blastMap.get(key) || new Set();
+            fans.add(m.chatId);
+            blastMap.set(key, fans);
+        }
+        const copyPasteBlasts = [...blastMap.entries()]
+            .filter(([, fans]) => fans.size >= 2)
+            .sort((a, b) => b[1].size - a[1].size)
+            .slice(0, 10)
+            .map(([message, fans]) => ({ message: message.slice(0, 300), fanCount: fans.size }));
+
         // Save to DB
         await prisma.chatterHourlyScore.create({
             data: {
@@ -277,6 +325,8 @@ export async function scoreChatter(
                 creativePhraseCount: result.creativePhraseCount,
                 aiNotes: result.aiNotes,
                 notableQuotes: aiResult?.notableQuotes || [],
+                conversationData: conversationData.length > 0 ? enrichedConversationData : undefined,
+                copyPasteBlasts: copyPasteBlasts.length > 0 ? copyPasteBlasts : undefined,
                 mistakeTags: result.mistakeTags,
                 strengthTags: result.strengthTags,
             },

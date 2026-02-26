@@ -16,6 +16,7 @@ interface LiveSession {
   id: string;
   email: string;
   clockIn: string;
+  source?: string;
   creator: { name: string | null };
 }
 
@@ -175,8 +176,11 @@ export default function ChatterLive() {
                       <p className="text-white text-sm font-semibold truncate">
                         {session.email}
                       </p>
-                      <p className="text-white/40 text-xs mt-0.5">
+                      <p className="text-white/40 text-xs mt-0.5 flex items-center gap-1.5">
                         {session.creator.name || "Unknown creator"}
+                        {session.source === "hubstaff" && (
+                          <span className="bg-teal-500/15 text-teal-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-teal-500/20">HUBSTAFF</span>
+                        )}
                       </p>
                       <div className="flex items-center gap-1.5 mt-2">
                         <Clock size={11} className="text-white/25" />
