@@ -76,9 +76,9 @@ function aggregateByField(messages: ClassifiedMessage[], field: keyof Classified
     sentCount: e.sent,
     viewedCount: e.viewed,
     purchasedCount: e.purchased,
-    conversionRate: e.viewed > 0 ? Math.round((e.purchased / e.viewed) * 100) : 0,
-    viewRate: e.sent > 0 ? Math.round((e.viewed / e.sent) * 100) : 0,
-    purchaseRate: e.sent > 0 ? Math.round((e.purchased / e.sent) * 100) : 0,
+    conversionRate: e.viewed > 0 ? Math.round((e.purchased / e.viewed) * 10000) / 100 : 0,
+    viewRate: e.sent > 0 ? Math.round((e.viewed / e.sent) * 10000) / 100 : 0,
+    purchaseRate: e.sent > 0 ? Math.round((e.purchased / e.sent) * 10000) / 100 : 0,
     totalRevenue: Math.round(e.revenue * 100) / 100,
     avgPrice: e.pricedCount > 0 ? Math.round((e.priceSum / e.pricedCount) * 100) / 100 : 0,
     rpm: e.sent > 0 ? Math.round((e.revenue / e.sent) * 1000 * 100) / 100 : 0,
@@ -235,23 +235,23 @@ export async function GET(req: NextRequest) {
     const topDirect = [...directClassified]
       .filter(m => m.purchasedCount > 0)
       .sort((a, b) => (b.purchasedCount * b.price) - (a.purchasedCount * a.price))
-      .slice(0, 15);
+      .slice(0, 25);
 
     const topMass = [...massClassified]
       .filter(m => m.purchasedCount > 0 || m.viewedCount > 0)
       .sort((a, b) => (b.purchasedCount * b.price) - (a.purchasedCount * a.price))
-      .slice(0, 15);
+      .slice(0, 25);
 
     // "No bites" — messages with views but zero purchases
     const noBitesDirect = [...directClassified]
       .filter(m => m.viewedCount > 0 && m.purchasedCount === 0 && m.price > 0)
       .sort((a, b) => b.viewedCount - a.viewedCount)
-      .slice(0, 10);
+      .slice(0, 20);
 
     const noBitesMass = [...massClassified]
       .filter(m => (m.viewedCount > 0 || m.sentCount > 0) && m.purchasedCount === 0 && m.price > 0)
       .sort((a, b) => b.viewedCount - a.viewedCount)
-      .slice(0, 10);
+      .slice(0, 20);
 
     // KPIs
     const totalDirect = directClassified.length;
@@ -261,7 +261,7 @@ export async function GET(req: NextRequest) {
     const totalViewed = allClassified.reduce((s, m) => s + m.viewedCount, 0);
     const totalPurchased = allClassified.reduce((s, m) => s + m.purchasedCount, 0);
     const totalRevenue = allClassified.reduce((s, m) => s + m.purchasedCount * m.price, 0);
-    const avgConversionRate = totalViewed > 0 ? Math.round((totalPurchased / totalViewed) * 100) : 0;
+    const avgConversionRate = totalViewed > 0 ? Math.round((totalPurchased / totalViewed) * 10000) / 100 : 0;
     const ctaCount = allClassified.filter(m => m.hasCTA).length;
     const sorted = [...hookPerformance].sort((a, b) => b.totalRevenue - a.totalRevenue);
     const bestHook = sorted[0]?.name || "N/A";
@@ -291,6 +291,8 @@ export async function GET(req: NextRequest) {
       topMass,
       noBitesDirect,
       noBitesMass,
+      allDirect: directClassified.sort((a, b) => (b.purchasedCount * b.price) - (a.purchasedCount * a.price)),
+      allMass: massClassified.sort((a, b) => (b.purchasedCount * b.price) - (a.purchasedCount * a.price)),
       topMessages: topMessages.slice(0, 5),
     });
   } catch (err: unknown) {

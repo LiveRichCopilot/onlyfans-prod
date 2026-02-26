@@ -54,8 +54,10 @@ export function ContentMessageCard({ msg, rank }: { msg: MessageCardData; rank?:
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const revenue = msg.purchasedCount * msg.price;
-  const cvr = msg.viewedCount > 0 ? Math.round((msg.purchasedCount / msg.viewedCount) * 100) : 0;
-  const viewRate = msg.sentCount > 0 ? Math.round((msg.viewedCount / msg.sentCount) * 100) : 0;
+  const cvrRaw = msg.viewedCount > 0 ? (msg.purchasedCount / msg.viewedCount) * 100 : 0;
+  const cvr = cvrRaw < 1 && cvrRaw > 0 ? cvrRaw.toFixed(2) : Math.round(cvrRaw);
+  const vrRaw = msg.sentCount > 0 ? (msg.viewedCount / msg.sentCount) * 100 : 0;
+  const viewRate = vrRaw < 1 && vrRaw > 0 ? vrRaw.toFixed(2) : Math.round(vrRaw);
   const isLong = msg.rawText.length > 120;
 
   const copyText = () => {

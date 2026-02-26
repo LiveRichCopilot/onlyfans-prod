@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Calendar } from "lucide-react";
+import { Sparkles, RefreshCw, TrendingUp, TrendingDown, Calendar, Download } from "lucide-react";
 import { ContentMessageCard, ContentEmptyState } from "./ContentMessageCard";
+import { ContentCreatorTab } from "./ContentCreatorTab";
 import type { MessageCardData } from "./ContentMessageCard";
 
 type AggEntry = {
@@ -27,6 +28,8 @@ type ContentData = {
   topMass: MessageCardData[];
   noBitesDirect: MessageCardData[];
   noBitesMass: MessageCardData[];
+  allDirect: MessageCardData[];
+  allMass: MessageCardData[];
 };
 
 const TABS = ["Direct Messages", "Mass Messages", "Hooks", "By Creator", "No Bites"] as const;
@@ -40,22 +43,34 @@ const HOOK_COLORS: Record<string, string> = {
 
 function getBarColor(name: string): string { return HOOK_COLORS[name] || "#5eead4"; }
 
+function fmtNum(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
 function AggRow({ e, maxVal, metric }: { e: AggEntry; maxVal: number; metric: "revenue" | "cvr" | "rpm" }) {
   const val = metric === "revenue" ? e.totalRevenue : metric === "rpm" ? e.rpm : e.conversionRate;
   const barWidth = maxVal > 0 ? Math.max((val / maxVal) * 100, 2) : 2;
   const color = getBarColor(e.name);
   return (
-    <div className="flex items-center gap-3 py-2">
-      <span className="text-white/70 text-xs w-28 shrink-0 truncate capitalize">{e.name.replace(/_/g, " ")}</span>
-      <div className="flex-1 h-6 glass-inset rounded-lg overflow-hidden relative">
-        <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${barWidth}%`, background: color }} />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/60 font-medium tabular-nums">
-          {metric === "revenue" ? `$${val.toFixed(0)}` : metric === "rpm" ? `$${val.toFixed(2)} RPM` : `${val}% CVR`}
-        </span>
+    <div className="py-2 space-y-1">
+      <div className="flex items-center gap-3">
+        <span className="text-white/70 text-xs w-28 shrink-0 truncate capitalize">{e.name.replace(/_/g, " ")}</span>
+        <div className="flex-1 h-6 glass-inset rounded-lg overflow-hidden relative">
+          <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${barWidth}%`, background: color }} />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white/60 font-medium tabular-nums">
+            {metric === "revenue" ? `$${val.toFixed(0)}` : metric === "rpm" ? `$${val.toFixed(2)} RPM` : `${val}% CVR`}
+          </span>
+        </div>
       </div>
-      <div className="text-right shrink-0 w-24">
-        <div className="text-white/40 text-[10px] tabular-nums">{e.count} msgs</div>
-        <div className="text-teal-400/60 text-[10px] tabular-nums font-medium">${e.totalRevenue.toFixed(0)}</div>
+      {/* Raw numbers under the bar */}
+      <div className="flex items-center gap-3 pl-[7.5rem] text-[9px] text-white/25 tabular-nums">
+        <span>{e.count} msgs</span>
+        {e.sentCount > 0 && <span>Sent: {fmtNum(e.sentCount)}</span>}
+        <span>Viewed: {fmtNum(e.viewedCount)} {e.viewRate > 0 && `(${e.viewRate}%)`}</span>
+        <span>Bought: {fmtNum(e.purchasedCount)} {e.conversionRate > 0 && `(${e.conversionRate}% CVR)`}</span>
+        <span className="text-teal-400/50 font-medium">${e.totalRevenue.toFixed(0)}</span>
       </div>
     </div>
   );
@@ -66,14 +81,7 @@ function AggTable({ data, metric }: { data: AggEntry[]; metric: "revenue" | "cvr
   const vals = data.map(d => metric === "revenue" ? d.totalRevenue : metric === "rpm" ? d.rpm : d.conversionRate);
   const maxVal = Math.max(...vals, 1);
   return (
-    <div className="space-y-0.5">
-      <div className="flex items-center gap-3 pb-1 border-b border-white/5 mb-1">
-        <span className="text-white/30 text-[10px] w-28 shrink-0">Category</span>
-        <span className="text-white/30 text-[10px] flex-1">
-          {metric === "revenue" ? "Revenue" : metric === "rpm" ? "RPM ($/1K sent)" : "Conversion Rate"}
-        </span>
-        <span className="text-white/30 text-[10px] w-24 text-right">Count / Rev</span>
-      </div>
+    <div className="space-y-0">
       {data.map(e => <AggRow key={e.name} e={e} maxVal={maxVal} metric={metric} />)}
     </div>
   );
@@ -86,6 +94,24 @@ function MessageList({ messages, emptyMsg }: { messages: MessageCardData[]; empt
       {messages.map((m, i) => <ContentMessageCard key={m.id} msg={m} rank={i + 1} />)}
     </div>
   );
+}
+
+/** Export current tab's messages as CSV */
+function exportCSV(messages: MessageCardData[], filename: string) {
+  const headers = ["Creator", "Date", "Hook", "Content Type", "Media Type", "PPV", "Price", "Sent", "Viewed", "View Rate%", "Purchased", "CVR%", "Revenue", "CTA", "Full Text", "Thumbnail URL"];
+  const rows = messages.map(m => {
+    const cvr = m.viewedCount > 0 ? ((m.purchasedCount / m.viewedCount) * 100).toFixed(2) : "0";
+    const vr = m.sentCount > 0 ? ((m.viewedCount / m.sentCount) * 100).toFixed(2) : "";
+    const thumb = m.thumbnails?.[0]?.url || "";
+    const text = m.rawText.replace(/"/g, '""');
+    return [m.creatorName, m.date, m.hookCategory, m.contentType, m.mediaType, m.isPPV ? "Yes" : "No", m.price, m.sentCount, m.viewedCount, vr, m.purchasedCount, cvr, (m.purchasedCount * m.price).toFixed(2), m.hasCTA ? "Yes" : "No", `"${text}"`, thumb].join(",");
+  });
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `${filename}.csv`;
+  a.click(); URL.revokeObjectURL(url);
 }
 
 export function ContentPerformancePanel({ days, creatorFilter }: { days: number; creatorFilter: string }) {
@@ -120,6 +146,16 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
   const k = data?.kpis;
   const dr = data?.dateRange;
 
+  // Get exportable messages for current tab
+  const getExportMessages = (): { messages: MessageCardData[]; name: string } | null => {
+    if (!data) return null;
+    if (tab === "Direct Messages") return { messages: data.allDirect || data.topDirect, name: "direct-messages" };
+    if (tab === "Mass Messages") return { messages: data.allMass || data.topMass, name: "mass-messages" };
+    if (tab === "No Bites") return { messages: [...(data.noBitesDirect || []), ...(data.noBitesMass || [])], name: "no-bites" };
+    if (tab === "By Creator") return { messages: [...(data.allDirect || []), ...(data.allMass || [])], name: "all-by-creator" };
+    return null;
+  };
+
   return (
     <div className="glass-card rounded-3xl p-6">
       {/* Header */}
@@ -129,7 +165,7 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
             <Sparkles size={16} className="text-teal-400" /> Content Performance
           </h3>
           <p className="text-white/40 text-xs mt-0.5 flex items-center gap-1.5">
-            Which messages, hooks, and content actually drive purchases
+            Based on messages sent in this range
             {dr && (
               <span className="inline-flex items-center gap-1 text-white/25">
                 <Calendar size={10} /> {dr.start} to {dr.end} ({dr.days}d)
@@ -137,9 +173,19 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
             )}
           </p>
         </div>
-        <button onClick={load} className="glass-button rounded-xl p-2 text-white/40 hover:text-white">
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-        </button>
+        <div className="flex items-center gap-2">
+          {data && getExportMessages() && (
+            <button
+              onClick={() => { const e = getExportMessages(); if (e) exportCSV(e.messages, e.name); }}
+              className="glass-button rounded-xl px-3 py-2 text-white/40 hover:text-white flex items-center gap-1.5 text-[10px] font-medium"
+            >
+              <Download size={12} /> Export CSV
+            </button>
+          )}
+          <button onClick={load} className="glass-button rounded-xl p-2 text-white/40 hover:text-white">
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
       </div>
 
       {loading && !data && (
@@ -158,11 +204,11 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
         <>
           {/* KPI pills */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-            <KpiPill label="Messages" value={String(k.totalMessages)} sub={`${k.totalDirect} DM / ${k.totalMass} mass`} />
-            <KpiPill label="Sent" value={k.totalSent.toLocaleString()} />
-            <KpiPill label="Viewed" value={k.totalViewed.toLocaleString()} sub={k.totalSent > 0 ? `${Math.round((k.totalViewed / k.totalSent) * 100)}% view rate` : undefined} />
-            <KpiPill label="Purchased" value={k.totalPurchased.toLocaleString()} sub={`${k.avgConversionRate}% CVR`} />
-            <KpiPill label="Revenue" value={`$${k.totalRevenue.toFixed(0)}`} sub={k.rpm > 0 ? `$${k.rpm.toFixed(2)} RPM` : undefined} accent />
+            <KpiPill label="Unique Messages" value={String(k.totalMessages)} sub={`${k.totalDirect} DM / ${k.totalMass} mass`} />
+            <KpiPill label="Total Recipients" value={fmtNum(k.totalSent)} sub="fans messages reached" />
+            <KpiPill label="Viewed" value={fmtNum(k.totalViewed)} sub={k.totalSent > 0 ? `${(k.totalViewed / k.totalSent * 100).toFixed(1)}% view rate` : undefined} />
+            <KpiPill label="Purchased" value={k.totalPurchased.toLocaleString()} sub={`${k.avgConversionRate}% of viewers bought`} />
+            <KpiPill label="Revenue" value={`$${k.totalRevenue.toFixed(0)}`} sub={k.rpm > 0 ? `$${k.rpm.toFixed(2)} per 1K sent` : undefined} accent />
             <KpiPill label="CTA Usage" value={`${k.ctaRate}%`} sub={`${k.ctaCount} msgs with CTA`} />
           </div>
 
@@ -195,7 +241,7 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
                 {(["revenue", "cvr", "rpm"] as const).map(m => (
                   <button key={m} onClick={() => setHookMetric(m)}
                     className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition ${hookMetric === m ? "bg-white/10 text-white" : "text-white/30 hover:text-white/50"}`}>
-                    {m === "revenue" ? "By Revenue" : m === "cvr" ? "By CVR" : "By RPM"}
+                    {m === "revenue" ? "By Revenue" : m === "cvr" ? "By CVR (bought/viewed)" : "By RPM ($/1K sent)"}
                   </button>
                 ))}
               </div>
@@ -212,7 +258,11 @@ export function ContentPerformancePanel({ days, creatorFilter }: { days: number;
           )}
 
           {tab === "By Creator" && (
-            <AggTable data={data.creatorPerformance} metric="revenue" />
+            <ContentCreatorTab
+              creatorPerformance={data.creatorPerformance}
+              allDirect={data.allDirect || []}
+              allMass={data.allMass || []}
+            />
           )}
 
           {tab === "No Bites" && (
@@ -247,7 +297,7 @@ function KpiPill({ label, value, sub, accent }: { label: string; value: string; 
   return (
     <div className="glass-inset rounded-2xl px-4 py-3">
       <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider">{label}</p>
-      <p className={`font-bold text-lg mt-0.5 capitalize ${accent ? "text-teal-400" : "text-white"}`}>{value}</p>
+      <p className={`font-bold text-lg mt-0.5 ${accent ? "text-teal-400" : "text-white"}`}>{value}</p>
       {sub && <p className="text-white/40 text-[10px] mt-0.5">{sub}</p>}
     </div>
   );
