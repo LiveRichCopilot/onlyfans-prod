@@ -35,6 +35,33 @@
 - Never attempt to run Prisma commands locally without POSTGRES_URL — all DB operations happen through Vercel deployments.
 - Store real data only. No mock data, no local dev databases.
 
+## AI Models — Rulebook (Feb 2026)
+
+### Current model assignments
+| File | Model | Provider | Why |
+|------|-------|----------|-----|
+| `lib/ai-classifier.ts` | `gpt-5-mini` | OpenAI | Fast classification, JSON output |
+| `lib/ai-closing-hints.ts` | `gpt-5-mini` | OpenAI | Speed matters for live hints |
+| `lib/ai-ghost-writer.ts` | `gpt-5-mini` | OpenAI | Creative writing, fast |
+| `lib/ai-vault-tagger.ts` | `gpt-5-mini` | OpenAI | Quick tagging |
+| `lib/chatter-scoring-prompt.ts` | `kimi-k2.5` | Moonshot | 256K context for long convos, cheap bulk scoring |
+| `lib/chatter-story-analyzer.ts` | `kimi-k2.5` | Moonshot | 256K context for story analysis |
+| `lib/ai-revenue.ts` | `gpt-5.2` | OpenAI | Flagship model, strong math reasoning |
+| `app/api/inbox/qa-score/route.ts` | `gpt-5-mini` | OpenAI | QA review scoring |
+| `app/api/cron/follow-ups/route.ts` | `gpt-5-mini` | OpenAI | Follow-up message generation |
+
+### Cost tiers
+- **gpt-5-mini** ($0.25/M in, $2/M out) — fast, cheap, for well-defined tasks
+- **kimi-k2.5** ($0.60/M in, $3/M out) — huge 256K context, cheap for bulk analytical work
+- **gpt-5.2** (flagship pricing) — only for tasks needing top-tier reasoning
+
+### Rules
+- **Never revert model upgrades without first verifying model names are valid** on platform.openai.com/docs/models or platform.moonshot.ai
+- **Never downgrade back to deprecated models** (gpt-4o-mini, gpt-4o are retired Feb 2026)
+- OpenAI base URL: `https://api.openai.com/v1/chat/completions` with `OPENAI_API_KEY`
+- Moonshot base URL: `https://api.moonshot.ai/v1/chat/completions` with `MOONSHOT_API_KEY`
+- Kimi calls need `thinking: { type: "disabled" }` for structured JSON output
+
 ## Tech stack
 - Next.js (App Router) + Tailwind CSS + Prisma + PostgreSQL
 - iOS 26 Liquid Glass design system (see `app/globals.css`)

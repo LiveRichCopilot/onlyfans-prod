@@ -1,5 +1,5 @@
 /**
- * Chatter Performance Scoring Prompt — GPT-4o-mini
+ * Chatter Performance Scoring Prompt — Kimi K2.5 (Moonshot)
  *
  * Scores chatter conversations on a 100-point rubric:
  * - SLA/Responsiveness: 0-25
@@ -11,7 +11,7 @@
  * Also detects chatter archetypes and flags mistakes/strengths.
  */
 
-const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
+const KIMI_BASE = "https://api.moonshot.ai/v1/chat/completions";
 
 export type NotableQuote = {
     text: string;
@@ -141,8 +141,8 @@ Return ONLY valid JSON:
 }
 
 /**
- * Call GPT-4o-mini to score chatter conversations.
- * Same pattern as qa-score/route.ts.
+ * Call Kimi K2.5 (Moonshot) to score chatter conversations.
+ * 256K context window, cheap for bulk scoring.
  */
 export async function runAIScoring(
     formattedConversations: string,
@@ -155,35 +155,35 @@ export async function runAIScoring(
         totalMessages: number;
     },
 ): Promise<AIScoringResult | null> {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.MOONSHOT_API_KEY;
     if (!apiKey) {
-        console.error("[ChatterScoring] OPENAI_API_KEY not configured");
+        console.error("[ChatterScoring] MOONSHOT_API_KEY not configured");
         return null;
     }
 
     const prompt = buildScoringPrompt(formattedConversations, metadata);
 
     try {
-        const response = await fetch(OPENAI_BASE, {
+        const response = await fetch(KIMI_BASE, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "gpt-4o-mini",
+                model: "kimi-k2.5",
                 messages: [
                     { role: "system", content: SYSTEM_PROMPT },
                     { role: "user", content: prompt },
                 ],
-                temperature: 0.2,
+                thinking: { type: "disabled" },
                 max_tokens: 800,
                 response_format: { type: "json_object" },
             }),
         });
 
         if (!response.ok) {
-            console.error("[ChatterScoring] GPT call failed:", response.status);
+            console.error("[ChatterScoring] Kimi call failed:", response.status);
             return null;
         }
 
