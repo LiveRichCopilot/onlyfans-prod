@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, MessageCircle, AlertTriangle, Trophy } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertTriangle, Trophy, CheckCircle, XCircle } from "lucide-react";
 import { ExportButtons } from "./ExportButtons";
 import { scoreColor } from "./chart-colors";
+import { ChatBubbleViewer } from "./ChatBubbleViewer";
 
 type ConversationSample = {
   chatterName: string;
@@ -19,6 +20,7 @@ type ConversationSample = {
   archetype: string | null;
   aiNotes: string | null;
   notableQuotes: any;
+  conversationData: any;
   mistakeTags: string[];
   strengthTags: string[];
   penalties: { copyPaste: number; missedTrigger: number; spam: number };
@@ -43,8 +45,8 @@ function ScoreBar({ label, score, max }: { label: string; score: number; max: nu
 
 function ConversationCard({ sample }: { sample: ConversationSample }) {
   const [open, setOpen] = useState(false);
-  const quotes = Array.isArray(sample.notableQuotes) ? sample.notableQuotes : [];
   const hasPenalties = sample.penalties.copyPaste < 0 || sample.penalties.missedTrigger < 0 || sample.penalties.spam < 0;
+  const conversations = Array.isArray(sample.conversationData) ? sample.conversationData : [];
 
   return (
     <div className="glass-inset rounded-2xl overflow-hidden">
@@ -61,6 +63,7 @@ function ConversationCard({ sample }: { sample: ConversationSample }) {
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-white/30 text-[10px]">{new Date(sample.date).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
             {sample.archetype && <span className="text-purple-400/60 text-[10px] bg-purple-500/10 px-1.5 py-0.5 rounded">{formatTag(sample.archetype)}</span>}
+            {conversations.length > 0 && <span className="text-teal-400/40 text-[10px]">{conversations.length} chats</span>}
             {hasPenalties && <AlertTriangle size={11} className="text-red-400/60" />}
           </div>
         </div>
@@ -68,7 +71,29 @@ function ConversationCard({ sample }: { sample: ConversationSample }) {
       </button>
 
       {open && (
-        <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
+        <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-3">
+          {/* Chat Bubbles — the actual back-and-forth */}
+          {conversations.length > 0 && <ChatBubbleViewer conversations={conversations} />}
+
+          {/* What Worked Here / What Didn't */}
+          {(sample.strengthTags.length > 0 || sample.mistakeTags.length > 0) && (
+            <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5 space-y-2">
+              <p className="text-white/50 text-[10px] font-semibold uppercase tracking-wider mb-1.5">What Worked / What Didn&apos;t</p>
+              {sample.strengthTags.map(t => (
+                <div key={t} className="flex items-center gap-2">
+                  <CheckCircle size={12} className="text-teal-400 shrink-0" />
+                  <span className="text-teal-300/70 text-[11px]">{formatTag(t)}</span>
+                </div>
+              ))}
+              {sample.mistakeTags.map(t => (
+                <div key={t} className="flex items-center gap-2">
+                  <XCircle size={12} className="text-red-400 shrink-0" />
+                  <span className="text-red-300/70 text-[11px]">{formatTag(t)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Score Bars */}
           <div className="space-y-1.5">
             <ScoreBar label="SLA" score={sample.slaScore} max={25} />
@@ -87,31 +112,11 @@ function ConversationCard({ sample }: { sample: ConversationSample }) {
             </div>
           )}
 
-          {/* Tags */}
-          {(sample.strengthTags.length > 0 || sample.mistakeTags.length > 0) && (
-            <div className="flex gap-1.5 flex-wrap">
-              {sample.strengthTags.map(t => <span key={t} className="text-[9px] bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded-full">{formatTag(t)}</span>)}
-              {sample.mistakeTags.map(t => <span key={t} className="text-[9px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full">{formatTag(t)}</span>)}
-            </div>
-          )}
-
           {/* AI Notes */}
           {sample.aiNotes && (
             <div className="bg-white/[0.02] rounded-xl p-3 border border-white/5">
+              <p className="text-white/30 text-[10px] font-semibold uppercase tracking-wider mb-1">AI Analysis</p>
               <p className="text-white/50 text-[11px] leading-relaxed">{sample.aiNotes}</p>
-            </div>
-          )}
-
-          {/* Notable Quotes */}
-          {quotes.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-white/30 text-[10px] font-semibold uppercase tracking-wider">Notable Lines</p>
-              {quotes.map((q: any, i: number) => (
-                <div key={i} className="flex items-start gap-2">
-                  <MessageCircle size={11} className={q.quality === "great" || q.quality === "good" ? "text-teal-400/50" : "text-red-400/50"} />
-                  <p className="text-white/40 text-[11px] italic leading-relaxed">&ldquo;{q.text || q}&rdquo;</p>
-                </div>
-              ))}
             </div>
           )}
         </div>
@@ -144,14 +149,14 @@ export function ConversationScoringSection({ data }: { data: ConversationSample[
           <h3 className="text-white font-semibold text-sm flex items-center gap-2">
             <Trophy size={16} className="text-amber-400" /> Conversation Scoring
           </h3>
-          <p className="text-white/40 text-xs mt-0.5">Recent scored conversations with AI analysis</p>
+          <p className="text-white/40 text-xs mt-0.5">Scored conversations with actual chat back-and-forth</p>
         </div>
         <ExportButtons data={exportData} filename="conversation-scoring" />
       </div>
       {data.length === 0 ? (
         <div className="h-[150px] flex items-center justify-center text-white/30 text-sm">No scored conversations yet</div>
       ) : (
-        <div className="space-y-2 max-h-[600px] overflow-y-auto custom-scrollbar">
+        <div className="space-y-2 max-h-[800px] overflow-y-auto custom-scrollbar">
           {data.map((sample, i) => <ConversationCard key={i} sample={sample} />)}
         </div>
       )}

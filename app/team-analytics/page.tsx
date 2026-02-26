@@ -15,6 +15,7 @@ import { ActivityByHourBar } from "@/components/team-analytics/ActivityByHourBar
 import { TagCloudPanel } from "@/components/team-analytics/TagCloudPanel";
 import { TeamGaugePanel } from "@/components/team-analytics/TeamGaugePanel";
 import { ConversationScoringSection } from "@/components/team-analytics/ConversationScoringSection";
+import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting";
 
 const RANGES = [
   { label: "7d", days: 7 },
@@ -105,7 +106,10 @@ export default function TeamAnalytics() {
         <TagCloudPanel data={d.tagCloud || { strengths: [], weaknesses: [] }} />
       </div>
 
-      {/* Row 6: Conversation Scoring (full width, dedicated section) */}
+      {/* Row 6: Copy-Paste Blasting (full width) */}
+      <CopyPasteBlasting data={d.copyPasteBlasters || []} />
+
+      {/* Row 7: Conversation Scoring with Chat Bubbles (full width) */}
       <ConversationScoringSection data={d.conversationSamples || []} />
     </div>
   );

@@ -260,6 +260,38 @@ export async function scoreChatter(
             strengthTags: aiResult?.strengthTags || [],
         };
 
+        // Build conversation snippets grouped by chat (limit to 10 chats, 20 msgs each)
+        const chatGroups = new Map<string, typeof allMessages>();
+        for (const m of allMessages) {
+            const group = chatGroups.get(m.chatId) || [];
+            if (group.length < 20) group.push(m);
+            chatGroups.set(m.chatId, group);
+        }
+        const conversationData = [...chatGroups.entries()].slice(0, 10).map(([chatId, msgs]) => ({
+            chatId,
+            fanName: msgs.find(m => !m.isChatter)?.fanName || `Fan ${chatId.slice(-4)}`,
+            messages: msgs.map(m => ({
+                text: m.text.slice(0, 500),
+                isChatter: m.isChatter,
+                time: m.createdAt.toISOString(),
+            })),
+        }));
+
+        // Detect copy-paste blasting (same message sent to 2+ fans)
+        const blastMap = new Map<string, Set<string>>();
+        for (const m of allMessages) {
+            if (!m.isChatter || m.text.length < 20) continue;
+            const key = m.text.toLowerCase().trim();
+            const fans = blastMap.get(key) || new Set();
+            fans.add(m.chatId);
+            blastMap.set(key, fans);
+        }
+        const copyPasteBlasts = [...blastMap.entries()]
+            .filter(([, fans]) => fans.size >= 2)
+            .sort((a, b) => b[1].size - a[1].size)
+            .slice(0, 10)
+            .map(([message, fans]) => ({ message: message.slice(0, 300), fanCount: fans.size }));
+
         // Save to DB
         await prisma.chatterHourlyScore.create({
             data: {
@@ -277,6 +309,8 @@ export async function scoreChatter(
                 creativePhraseCount: result.creativePhraseCount,
                 aiNotes: result.aiNotes,
                 notableQuotes: aiResult?.notableQuotes || [],
+                conversationData: conversationData.length > 0 ? conversationData : undefined,
+                copyPasteBlasts: copyPasteBlasts.length > 0 ? copyPasteBlasts : undefined,
                 mistakeTags: result.mistakeTags,
                 strengthTags: result.strengthTags,
             },

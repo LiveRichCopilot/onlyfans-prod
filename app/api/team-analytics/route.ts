@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -189,6 +190,7 @@ export async function GET(req: NextRequest) {
       archetype: h.detectedArchetype,
       aiNotes: h.aiNotes,
       notableQuotes: h.notableQuotes,
+      conversationData: h.conversationData,
       mistakeTags: h.mistakeTags,
       strengthTags: h.strengthTags,
       penalties: {
@@ -197,6 +199,32 @@ export async function GET(req: NextRequest) {
         spam: h.spamPenalty,
       },
     }));
+
+    // --- Copy-Paste Blasting (aggregated across all scored hours) ---
+    const blastScores = await prisma.chatterHourlyScore.findMany({
+      where: { NOT: { copyPasteBlasts: { equals: Prisma.DbNull } }, createdAt: { gte: since } },
+      include: { creator: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    const blasterMap = new Map<string, { chatterName: string; chatterEmail: string; creator: string; blasts: Map<string, number> }>();
+    for (const s of blastScores) {
+      const key = `${s.chatterEmail}|${s.creatorId}`;
+      if (!blasterMap.has(key)) blasterMap.set(key, { chatterName: s.chatterEmail.split("@")[0], chatterEmail: s.chatterEmail, creator: (s as any).creator?.name || "Unknown", blasts: new Map() });
+      const entry = blasterMap.get(key)!;
+      const blasts = Array.isArray(s.copyPasteBlasts) ? s.copyPasteBlasts : [];
+      for (const b of blasts as any[]) {
+        const existing = entry.blasts.get(b.message) || 0;
+        entry.blasts.set(b.message, existing + (b.fanCount || 0));
+      }
+    }
+    const copyPasteBlasters = [...blasterMap.values()].map(e => ({
+      chatterName: e.chatterName,
+      chatterEmail: e.chatterEmail,
+      creator: e.creator,
+      uniqueBlasts: e.blasts.size,
+      totalBlastSends: [...e.blasts.values()].reduce((a, b) => a + b, 0),
+      blasts: [...e.blasts.entries()].sort((a, b) => b[1] - a[1]).map(([message, fanCount]) => ({ message, fanCount })),
+    })).filter(e => e.totalBlastSends > 0);
 
     return NextResponse.json({
       kpis,
@@ -210,6 +238,7 @@ export async function GET(req: NextRequest) {
       tagCloud,
       creatorWorkload,
       conversationSamples,
+      copyPasteBlasters,
     });
   } catch (err: any) {
     console.error("Team analytics error:", err.message);
