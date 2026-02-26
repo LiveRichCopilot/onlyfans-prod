@@ -78,10 +78,25 @@ function ExpandedConversation({
   onClose: () => void;
 }) {
   const conversations = extractConversations(sample.conversationData);
-  const storyAnalysis = extractStoryAnalysis(sample.conversationData);
+  const fullStoryAnalysis = extractStoryAnalysis(sample.conversationData);
   const convo = conversations[convoIndex];
 
   if (!convo) return null;
+
+  // Filter story arcs to match the CURRENT chat being viewed
+  const fanName = convo.fanName?.toLowerCase() || "";
+  const filteredArcs = (fullStoryAnalysis?.storyArcs || []).filter((arc: any) => {
+    const titleLower = (arc.title || "").toLowerCase();
+    // Match if arc title contains the fan name (e.g. "Matt's Bold Escalation" matches "Matt")
+    return fanName && titleLower.includes(fanName.split(" ")[0]);
+  });
+
+  // Build a filtered story analysis for this specific chat
+  const storyAnalysis = fullStoryAnalysis && filteredArcs.length > 0
+    ? { ...fullStoryAnalysis, storyArcs: filteredArcs }
+    : filteredArcs.length > 0 ? { storyArcs: filteredArcs, overallSellingScore: 0, fanInvestmentMoment: null } : null;
+
+  const isTooShort = convo.messages.length < 5;
 
   return (
     <div className="glass-inset rounded-3xl p-5 space-y-4">
@@ -139,21 +154,33 @@ function ExpandedConversation({
 
       {/* Conversation nav */}
       {conversations.length > 1 && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => onConvoChange(Math.max(0, convoIndex - 1))}
             disabled={convoIndex === 0}
-            className="glass-button rounded-lg p-1 text-white/30 hover:text-white disabled:opacity-20"
+            className="glass-button rounded-lg p-1.5 text-white/50 hover:text-white disabled:opacity-20"
           >
             <ChevronLeft size={14} />
           </button>
-          <span className="text-white/60 text-xs tabular-nums">
-            Chat {convoIndex + 1} of {conversations.length}: {convo.fanName}
-          </span>
+          {conversations.map((c: Conversation, ci: number) => (
+            <button
+              key={ci}
+              onClick={() => onConvoChange(ci)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition ${
+                ci === convoIndex
+                  ? "glass-prominent text-white"
+                  : c.messages.length < 5
+                    ? "glass-button text-white/30"
+                    : "glass-button text-white/60 hover:text-white"
+              }`}
+            >
+              {c.fanName} ({c.messages.length})
+            </button>
+          ))}
           <button
             onClick={() => onConvoChange(Math.min(conversations.length - 1, convoIndex + 1))}
             disabled={convoIndex === conversations.length - 1}
-            className="glass-button rounded-lg p-1 text-white/30 hover:text-white disabled:opacity-20"
+            className="glass-button rounded-lg p-1.5 text-white/50 hover:text-white disabled:opacity-20"
           >
             <ChevronRight size={14} />
           </button>
@@ -165,25 +192,35 @@ function ExpandedConversation({
         <PhoneFrame
           header={
             <div className="flex items-center justify-between">
-              <span className="text-white/70 text-xs font-medium">{convo.fanName}</span>
-              <span className="text-white/25 text-[10px]">{convo.messages.length} msgs</span>
+              <span className="text-white text-xs font-medium">{convo.fanName}</span>
+              <span className="text-white/50 text-[10px]">{convo.messages.length} msgs</span>
             </div>
           }
         >
           <StoryChatBubbles
             messages={convo.messages}
-            storyArcs={storyAnalysis?.storyArcs}
+            storyArcs={filteredArcs}
             autoScrollToFirstSell
           />
         </PhoneFrame>
 
-        <StoryBreakdownPanel
-          storyAnalysis={storyAnalysis}
-          totalScore={sample.totalScore}
-          aiNotes={sample.aiNotes}
-          strengthTags={sample.strengthTags}
-          mistakeTags={sample.mistakeTags}
-        />
+        {isTooShort ? (
+          <div className="flex-1 min-w-[280px] max-w-[420px] glass-inset rounded-2xl p-6 flex flex-col items-center justify-center gap-3">
+            <p className="text-white/50 text-sm font-medium">Too short to analyze</p>
+            <p className="text-white/40 text-xs text-center leading-relaxed">
+              This conversation only has {convo.messages.length} message{convo.messages.length !== 1 ? "s" : ""}.
+              Story analysis requires at least 5 messages of back-and-forth.
+            </p>
+          </div>
+        ) : (
+          <StoryBreakdownPanel
+            storyAnalysis={storyAnalysis}
+            totalScore={sample.totalScore}
+            aiNotes={sample.aiNotes}
+            strengthTags={sample.strengthTags}
+            mistakeTags={sample.mistakeTags}
+          />
+        )}
       </div>
     </div>
   );
