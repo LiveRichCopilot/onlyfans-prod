@@ -25,6 +25,7 @@ model Creator {
   active                Boolean @default(true)
   onlineFanCache        Json?
   purchaseAlertsEnabled Boolean @default(true)
+  organizationId        String?
 
   fans                Fan[]
   mediaAssets         MediaAsset[]
@@ -35,6 +36,7 @@ model Creator {
   chatterProfiles      ChatterProfile[]
   hubstaffMappings     HubstaffUserMapping[]
   massMessageReplies   MassMessageReply[]
+  organization         Organization?       @relation(fields: [organizationId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -45,6 +47,16 @@ enum Role {
   AGENCY
   CFO
   EMPLOYEE
+  CREATOR
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  ACCOUNT_EXEC
+  MANAGER
+  AGENT
+  VIEWER
 }
 
 model CreatorAssignment {
@@ -86,15 +98,19 @@ model Session {
 }
 
 model User {
-  id            String              @id @default(cuid())
-  name          String?
-  email         String?             @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role                @default(UNASSIGNED)
-  accounts      Account[]
-  sessions      Session[]
-  assignments   CreatorAssignment[]
+  id               String              @id @default(cuid())
+  name             String?
+  email            String?             @unique
+  emailVerified    DateTime?
+  image            String?
+  role             Role                @default(UNASSIGNED)
+  organizationId   String?
+  creatorProfileId String?             @unique
+  accounts         Account[]
+  sessions         Session[]
+  assignments      CreatorAssignment[]
+  organization     Organization?       @relation(fields: [organizationId], references: [id])
+  orgMemberships   OrgMember[]
 }
 
 model VerificationToken {
@@ -535,4 +551,113 @@ model MassMessageReply {
   @@unique([creatorId, massMessageId])
   @@index([creatorId])
   @@index([sentAt])
+}
+
+// ─── Agency + Creator Auth System ───────────────────────────────────
+
+model Organization {
+  id                    String                        @id @default(cuid())
+  name                  String
+  slug                  String                        @unique
+  users                 User[]
+  members               OrgMember[]
+  creators              Creator[]
+  modules               OrgModule[]
+  permissions           MemberPermission[]
+  accountAccess         MemberAccountAccess[]
+  managerResponsibility ManagerAccountResponsibility[]
+  auditLogs             AuditLog[]
+  invites               Invite[]
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+}
+
+model OrgMember {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           OrgRole      @default(AGENT)
+  roleTemplate   String?
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+model OrgModule {
+  id             String       @id @default(cuid())
+  organizationId String
+  moduleKey      String
+  enabled        Boolean      @default(true)
+  plan           String?
+  limits         Json?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, moduleKey])
+}
+
+model MemberPermission {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  permissionKey  String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, permissionKey])
+  @@index([userId, organizationId])
+}
+
+model MemberAccountAccess {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  creatorId      String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, creatorId])
+  @@index([userId, organizationId])
+}
+
+model ManagerAccountResponsibility {
+  id             String       @id @default(cuid())
+  organizationId String
+  managerId      String
+  creatorId      String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, managerId, creatorId])
+  @@index([managerId, organizationId])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  resource       String?
+  metadata       Json?
+  ipAddress      String?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model Invite {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           OrgRole      @default(AGENT)
+  roleTemplate   String?
+  token          String       @unique @default(cuid())
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([token])
+  @@index([email])
 }
