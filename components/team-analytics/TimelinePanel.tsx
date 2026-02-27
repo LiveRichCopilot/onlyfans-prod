@@ -282,30 +282,35 @@ export function TimelinePanel() {
             )}
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-white/5">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(45, 212, 191, 0.85)" }} />
-              <span className="text-white/30 text-[9px]">Active (60%+)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(45, 212, 191, 0.45)" }} />
-              <span className="text-white/30 text-[9px]">Moderate (30-59%)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(251, 191, 36, 0.45)" }} />
-              <span className="text-white/30 text-[9px]">Low (&lt;30%)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(107, 114, 128, 0.25)" }} />
-              <span className="text-white/30 text-[9px]">Idle</span>
-            </div>
-            {isToday && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                <div className="w-px h-3 border-l border-dashed border-red-400/60" />
-                <span className="text-white/30 text-[9px]">Now</span>
+          {/* Legend with explanations */}
+          <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(45, 212, 191, 0.85)" }} />
+                <span className="text-white/40 text-[9px]"><span className="text-white/60 font-medium">60%+</span> Active — working normally</span>
               </div>
-            )}
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(45, 212, 191, 0.45)" }} />
+                <span className="text-white/40 text-[9px]"><span className="text-white/60 font-medium">30-59%</span> Moderate — some activity</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(251, 191, 36, 0.45)" }} />
+                <span className="text-white/40 text-[9px]"><span className="text-white/60 font-medium">&lt;30%</span> Low — barely active</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-2 rounded-sm" style={{ background: "rgba(107, 114, 128, 0.25)" }} />
+                <span className="text-white/40 text-[9px]">No blocks = not tracked</span>
+              </div>
+              {isToday && (
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <div className="w-px h-3 border-l border-dashed border-red-400/60" />
+                  <span className="text-white/30 text-[9px]">Current time</span>
+                </div>
+              )}
+            </div>
+            <p className="text-white/20 text-[9px]">
+              Each block = 10 minutes. Color shows what % of that time had keyboard or mouse input. Gaps = Hubstaff tracker was paused or offline.
+            </p>
           </div>
         </div>
       )}
