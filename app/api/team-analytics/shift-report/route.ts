@@ -161,14 +161,16 @@ export async function GET(req: NextRequest) {
 
         if (userActivities.length > 0) {
           const totalTracked = userActivities.reduce((s, a) => s + a.tracked, 0);
-          const weightedKeyboard = userActivities.reduce((s, a) => s + a.keyboard * a.tracked, 0);
-          const weightedMouse = userActivities.reduce((s, a) => s + a.mouse * a.tracked, 0);
-          const weightedOverall = userActivities.reduce((s, a) => s + a.overall * a.tracked, 0);
+          // Hubstaff returns keyboard/mouse/overall as SECONDS of activity, not percentages.
+          // Convert to percentage: (total_activity_seconds / total_tracked_seconds) * 100
+          const totalKeyboard = userActivities.reduce((s, a) => s + a.keyboard, 0);
+          const totalMouse = userActivities.reduce((s, a) => s + a.mouse, 0);
+          const totalOverall = userActivities.reduce((s, a) => s + a.overall, 0);
 
           hubstaffActivity = {
-            keyboard: totalTracked > 0 ? Math.round(weightedKeyboard / totalTracked) : 0,
-            mouse: totalTracked > 0 ? Math.round(weightedMouse / totalTracked) : 0,
-            overall: totalTracked > 0 ? Math.round(weightedOverall / totalTracked) : 0,
+            keyboard: totalTracked > 0 ? Math.round((totalKeyboard / totalTracked) * 100) : 0,
+            mouse: totalTracked > 0 ? Math.round((totalMouse / totalTracked) * 100) : 0,
+            overall: totalTracked > 0 ? Math.round((totalOverall / totalTracked) * 100) : 0,
             totalTrackedSeconds: totalTracked,
             totalTrackedHrs: parseFloat((totalTracked / 3600).toFixed(2)),
           };

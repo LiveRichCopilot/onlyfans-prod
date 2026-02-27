@@ -44,16 +44,19 @@ export async function POST() {
       console.warn("[Hubstaff Sync Now] Activity fetch failed:", e.message);
     }
 
-    // Aggregate per user
-    const userActivity = new Map<number, { keyboard: number[]; mouse: number[]; overall: number[] }>();
+    // Aggregate per user: sum seconds, then convert to percentage
+    // Hubstaff returns keyboard/mouse/overall as SECONDS, not percentages.
+    const userActivity = new Map<number, { keyboard: number; mouse: number; overall: number; tracked: number }>();
     for (const block of activityBlocks) {
+      if (!block.tracked || block.tracked <= 0) continue;
       if (!userActivity.has(block.user_id)) {
-        userActivity.set(block.user_id, { keyboard: [], mouse: [], overall: [] });
+        userActivity.set(block.user_id, { keyboard: 0, mouse: 0, overall: 0, tracked: 0 });
       }
       const ua = userActivity.get(block.user_id)!;
-      ua.keyboard.push(block.keyboard);
-      ua.mouse.push(block.mouse);
-      ua.overall.push(block.overall);
+      ua.keyboard += block.keyboard;
+      ua.mouse += block.mouse;
+      ua.overall += block.overall;
+      ua.tracked += block.tracked;
     }
 
     // Get live sessions
@@ -91,10 +94,11 @@ export async function POST() {
           creatorIds.push(...[...new Set(schedules.map(s => s.creatorId))]);
         }
 
+        // Convert summed seconds → percentage: (seconds / tracked) * 100
         const ua = userActivity.get(userId);
-        const avgKeyboard = ua ? Math.round(ua.keyboard.reduce((a, b) => a + b, 0) / ua.keyboard.length) : null;
-        const avgMouse = ua ? Math.round(ua.mouse.reduce((a, b) => a + b, 0) / ua.mouse.length) : null;
-        const avgOverall = ua ? Math.round(ua.overall.reduce((a, b) => a + b, 0) / ua.overall.length) : null;
+        const avgKeyboard = ua && ua.tracked > 0 ? Math.round((ua.keyboard / ua.tracked) * 100) : null;
+        const avgMouse = ua && ua.tracked > 0 ? Math.round((ua.mouse / ua.tracked) * 100) : null;
+        const avgOverall = ua && ua.tracked > 0 ? Math.round((ua.overall / ua.tracked) * 100) : null;
 
         for (const creatorId of creatorIds) {
           const key = `${mapping.chatterEmail}|${creatorId}`;
