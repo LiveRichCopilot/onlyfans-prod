@@ -6,6 +6,7 @@ import { Camera, Eye, AlertTriangle, Monitor, Scan, X, ChevronLeft, ChevronRight
 type Screenshot = {
   id: number;
   url: string;
+  thumb_url?: string;
   recorded_at: string;
   user_id: number;
 };
@@ -33,8 +34,9 @@ type Props = {
   date?: string;
 };
 
-function proxyUrl(url: string): string {
-  return `/api/proxy-media?url=${encodeURIComponent(url)}`;
+/** Hubstaff screenshots are pre-signed S3 URLs — load directly, no proxy needed. */
+function screenshotUrl(url: string): string {
+  return url;
 }
 
 function formatTimestamp(iso: string): string {
@@ -251,7 +253,7 @@ export function ScreenshotTimeline({ email, date }: Props) {
                 style={{ width: 120, height: 75 }}
               >
                 <img
-                  src={proxyUrl(ss.url)}
+                  src={screenshotUrl(ss.thumb_url || ss.url)}
                   alt={`Screenshot ${formatTimestamp(ss.recorded_at)}`}
                   className="w-full h-full object-cover"
                   loading="lazy"
@@ -345,7 +347,7 @@ function ExpandedScreenshot({
         {/* Full screenshot */}
         <div className="p-2">
           <img
-            src={proxyUrl(screenshot.url)}
+            src={screenshotUrl(screenshot.url)}
             alt="Full screenshot"
             className="w-full rounded-xl"
           />

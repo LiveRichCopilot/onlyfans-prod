@@ -399,12 +399,11 @@ export async function getProjects(): Promise<any[]> {
 export type HubstaffScreenshot = {
   id: number;
   url: string;
+  thumb_url: string;
   time_slot: string;
   recorded_at: string;
   user_id: number;
   project_id: number;
-  task_id: number | null;
-  activity_id: number;
   offset_x: number;
   offset_y: number;
   width: number;
@@ -414,14 +413,24 @@ export type HubstaffScreenshot = {
   updated_at: string;
 };
 
+type RawHubstaffScreenshot = Omit<HubstaffScreenshot, "url" | "thumb_url"> & {
+  full_url: string;
+  thumb_url: string;
+};
+
 /** Get screenshots for a time range. Max 7-day range. */
 export async function getScreenshots(startTime: string, stopTime: string): Promise<HubstaffScreenshot[]> {
   const orgId = await getOrgId();
-  const data = await hubstaffGet<{ screenshots: HubstaffScreenshot[] }>(
+  const data = await hubstaffGet<{ screenshots: RawHubstaffScreenshot[] }>(
     `/organizations/${orgId}/screenshots`,
     { "time_slot[start]": startTime, "time_slot[stop]": stopTime, page_limit: "500" },
   );
-  return data.screenshots || [];
+  // Hubstaff V2 API uses "full_url" not "url" — normalize to "url"
+  return (data.screenshots || []).map((s) => ({
+    ...s,
+    url: s.full_url,
+    thumb_url: s.thumb_url,
+  }));
 }
 
 // --- App / Tool Usage ---
