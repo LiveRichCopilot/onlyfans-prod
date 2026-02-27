@@ -106,7 +106,7 @@ Return ONLY valid JSON:
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "gpt-5-mini",
+                model: "gpt-4o-mini",
                 messages: [
                     { role: "system", content: "You are an expert QA reviewer for an OnlyFans chatting agency. Be honest and specific." },
                     { role: "user", content: qaPrompt },

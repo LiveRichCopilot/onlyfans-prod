@@ -89,7 +89,7 @@ Be flirty, natural, not desperate. Return ONLY the message text, no JSON.`;
                             "Content-Type": "application/json",
                         },
                         body: JSON.stringify({
-                            model: "gpt-5-mini",
+                            model: "gpt-4o-mini",
                             messages: [
                                 { role: "system", content: "You are a flirty, charismatic OnlyFans creator writing follow-up messages. Keep it natural and conversational." },
                                 { role: "user", content: prompt },
