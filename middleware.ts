@@ -64,6 +64,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Allow onboarding page through for authenticated users
+  if (pathname === "/onboarding" || pathname.startsWith("/api/onboarding")) {
+    return supabaseResponse;
+  }
+
   return supabaseResponse;
 }
 
