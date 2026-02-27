@@ -220,7 +220,7 @@ export async function GET() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           messages: [{ role: "user", content: "Reply with just the word: OK" }],
           max_completion_tokens: 10,
         }),
