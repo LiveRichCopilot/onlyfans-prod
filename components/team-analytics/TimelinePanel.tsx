@@ -79,7 +79,11 @@ function currentUKHour(): number {
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const BLOCK_WIDTH_PCT = (10 / 1440) * 100; // 10 min = 0.694% of 24h
 
-export function TimelinePanel() {
+type Props = {
+  creatorId?: string;
+};
+
+export function TimelinePanel({ creatorId }: Props) {
   const [date, setDate] = useState(todayUK());
   const [data, setData] = useState<MemberRow[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,14 +97,16 @@ export function TimelinePanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/team-analytics/timeline?date=${date}`);
+      const params = new URLSearchParams({ date });
+      if (creatorId && creatorId !== "all") params.set("creatorId", creatorId);
+      const res = await fetch(`/api/team-analytics/timeline?${params}`);
       if (res.ok) {
         const json = await res.json();
         setData(json.members || []);
       }
     } catch { /* silent */ }
     setLoading(false);
-  }, [date]);
+  }, [date, creatorId]);
 
   useEffect(() => { load(); }, [load]);
 

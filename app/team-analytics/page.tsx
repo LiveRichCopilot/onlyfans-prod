@@ -160,7 +160,7 @@ export default function TeamAnalytics() {
       <LiveActivityPanel data={d.liveActivity || []} avgActivity={d.avgActivity || null} />
 
       {/* Timeline — 24h activity blocks per member */}
-      <TimelinePanel />
+      <TimelinePanel creatorId={creatorFilter} />
 
       {/* Row 1: Performance Trend (full width) */}
       <PerformanceTrendChart data={d.performanceTrend || []} />
