@@ -115,8 +115,8 @@ export function LiveActivityPanel({ data, avgActivity: _dbAvg }: { data: LiveEnt
 
   return (
     <div className="glass-card rounded-3xl p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Header — always visible */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
             <h3 className="text-white font-semibold text-sm flex items-center gap-2">
@@ -124,9 +124,11 @@ export function LiveActivityPanel({ data, avgActivity: _dbAvg }: { data: LiveEnt
               Live Activity
               {data.length > 0 && <span className="text-teal-400/60 text-[10px] font-normal">{data.length} online</span>}
             </h3>
-            <p className="text-white/40 text-xs mt-0.5">
-              How much of their tracked time each chatter is actually using keyboard and mouse
-            </p>
+            {expanded && (
+              <p className="text-white/40 text-xs mt-0.5">
+                How much of their tracked time each chatter is actually using keyboard and mouse
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -141,135 +143,142 @@ export function LiveActivityPanel({ data, avgActivity: _dbAvg }: { data: LiveEnt
           <Link href="/team/hubstaff" className="glass-button rounded-lg px-2.5 py-1 text-[10px] text-white/30 hover:text-white flex items-center gap-1">
             <Settings size={10} /> Setup
           </Link>
-          <button onClick={() => setShowGuide(!showGuide)} className="text-white/20 hover:text-white/40" title="What do these numbers mean?">
-            <Info size={14} />
-          </button>
+          {expanded && (
+            <button onClick={() => setShowGuide(!showGuide)} className="text-white/20 hover:text-white/40" title="What do these numbers mean?">
+              <Info size={14} />
+            </button>
+          )}
           <button onClick={() => setExpanded(!expanded)} className="text-white/20 hover:text-white/40">
             <ChevronDown size={14} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
           </button>
         </div>
       </div>
 
-      {/* Color Legend — always visible */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-3 px-1">
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#6b7280" }} />
-          <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">60%+</span> Active</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#fbbf24" }} />
-          <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">30-59%</span> Low</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#f87171" }} />
-          <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">&lt;30%</span> Idle</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full border border-red-400/50" style={{ background: "#f87171" }} />
-          <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">&gt;100%</span> Suspicious</span>
-        </div>
-      </div>
-
-      {/* Expandable Guide — detailed explanation */}
-      {showGuide && (
-        <div className="glass-inset rounded-xl px-4 py-3 mb-3 text-[11px] leading-relaxed text-white/50 space-y-2">
-          <p className="text-white/70 font-medium">What does Activity % mean?</p>
-          <p>
-            Activity % shows how much of the tracked time Hubstaff detected keyboard or mouse input.
-            If a chatter has been clocked in for 30 minutes and used their keyboard/mouse for 15 of those minutes,
-            their overall activity is <span className="text-white/70 font-medium">50%</span>.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 pt-1">
-            <div>
-              <span className="font-medium" style={{ color: "#6b7280" }}>Gray (60%+) = Active</span>
-              <span className="text-white/40"> — Working normally. Typing and clicking at a healthy pace. This is what you want to see.</span>
+      {/* Everything below collapses */}
+      {expanded && (
+        <>
+          {/* Color Legend */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-3 mb-3 px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#6b7280" }} />
+              <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">60%+</span> Active — working normally</span>
             </div>
-            <div>
-              <span className="font-medium" style={{ color: "#fbbf24" }}>Amber (30-59%) = Low</span>
-              <span className="text-white/40"> — Below average activity. Could be reading, thinking, or distracted. Worth checking in on.</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#fbbf24" }} />
+              <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">30-59%</span> Low — some activity but below average</span>
             </div>
-            <div>
-              <span className="font-medium" style={{ color: "#f87171" }}>Red (&lt;30%) = Idle</span>
-              <span className="text-white/40"> — Barely touching their keyboard or mouse. Either AFK, on their phone, or doing non-work tasks.</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#f87171" }} />
+              <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">&lt;30%</span> Idle — barely touching keyboard/mouse</span>
             </div>
-            <div>
-              <span className="font-medium" style={{ color: "#f87171" }}>Red (&gt;100%) = Suspicious</span>
-              <span className="text-white/40"> — More input than humanly possible. Likely using a mouse jiggler or auto-clicker to fake activity.</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full border border-red-400/50" style={{ background: "#f87171" }} />
+              <span className="text-white/40 text-[10px]"><span className="text-white/60 font-medium">&gt;100%</span> Suspicious — possible mouse jiggler</span>
             </div>
           </div>
-          <div className="pt-1.5 border-t border-white/5 text-white/30">
-            <p><span className="text-white/50 font-medium">Keys</span> = keyboard input only. <span className="text-white/50 font-medium">Mouse</span> = mouse/trackpad only. <span className="text-white/50 font-medium">Overall</span> = any input (keyboard or mouse combined, without double-counting overlap).</p>
-            <p className="mt-1">Industry average for active chatters is typically <span className="text-white/50">40-70%</span>. Nobody types 100% of the time — reading messages, thinking about replies, and scrolling are all normal parts of work.</p>
-          </div>
-        </div>
-      )}
 
-      {isEmpty ? (
-        <div className="flex items-center justify-center text-white/20 text-xs py-4 gap-2">
-          <WifiOff size={14} />
-          <span>No chatters online. <Link href="/team/hubstaff" className="text-teal-400/50 hover:text-teal-400 underline">Connect Hubstaff</Link> to see live activity.</span>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {/* Column Header */}
-          <div className="grid grid-cols-[1fr_80px_60px_60px_60px_50px] gap-2 text-[10px] text-white/30 px-1">
-            <span>Chatter</span>
-            <span>Creator</span>
-            <span className="flex items-center gap-1"><Keyboard size={9} /> Keys</span>
-            <span className="flex items-center gap-1"><Mouse size={9} /> Mouse</span>
-            <span className="flex items-center gap-1"><Activity size={9} /> Overall</span>
-            <span>Time</span>
-          </div>
-
-          {data.map(s => (
-            <div key={`${s.email}-${s.clockIn}`} className="grid grid-cols-[1fr_80px_60px_60px_60px_50px] gap-2 items-center glass-inset rounded-xl px-3 py-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Wifi size={10} className="text-teal-400 shrink-0" />
-                <span className="text-white text-xs font-medium truncate">{s.name}</span>
+          {/* Expandable Guide — detailed explanation */}
+          {showGuide && (
+            <div className="glass-inset rounded-xl px-4 py-3 mb-3 text-[11px] leading-relaxed text-white/50 space-y-2">
+              <p className="text-white/70 font-medium">What does Activity % mean?</p>
+              <p>
+                Activity % shows how much of the tracked time Hubstaff detected keyboard or mouse input.
+                If a chatter has been clocked in for 30 minutes and used their keyboard/mouse for 15 of those minutes,
+                their overall activity is <span className="text-white/70 font-medium">50%</span>.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 pt-1">
+                <div>
+                  <span className="font-medium" style={{ color: "#6b7280" }}>Gray (60%+) = Active</span>
+                  <span className="text-white/40"> — Working normally. Typing and clicking at a healthy pace.</span>
+                </div>
+                <div>
+                  <span className="font-medium" style={{ color: "#fbbf24" }}>Amber (30-59%) = Low</span>
+                  <span className="text-white/40"> — Below average. Could be reading, thinking, or distracted.</span>
+                </div>
+                <div>
+                  <span className="font-medium" style={{ color: "#f87171" }}>Red (&lt;30%) = Idle</span>
+                  <span className="text-white/40"> — Barely using keyboard or mouse. AFK, on phone, or off-task.</span>
+                </div>
+                <div>
+                  <span className="font-medium" style={{ color: "#f87171" }}>Red (&gt;100%) = Suspicious</span>
+                  <span className="text-white/40"> — More input than humanly possible. Mouse jiggler or auto-clicker.</span>
+                </div>
               </div>
-              <span className="text-white/40 text-[10px] truncate">{s.creator}</span>
-
-              {/* Keyboard */}
-              <div className="flex items-center gap-1.5">
-                {s.keyboardPct !== null ? (
-                  <>
-                    <ActivityBar value={s.keyboardPct} color={activityColor(s.keyboardPct)} />
-                    <span className="text-[10px] tabular-nums" style={{ color: activityColor(s.keyboardPct) }}>{s.keyboardPct}%</span>
-                  </>
-                ) : (
-                  <span className="text-white/15 text-[10px]">--</span>
-                )}
+              <div className="pt-1.5 border-t border-white/5 text-white/30">
+                <p><span className="text-white/50 font-medium">Keys</span> = keyboard input only. <span className="text-white/50 font-medium">Mouse</span> = mouse/trackpad only. <span className="text-white/50 font-medium">Overall</span> = any input combined.</p>
+                <p className="mt-1">Industry average for active chatters: <span className="text-white/50">40-70%</span>. Nobody types 100% of the time — reading and thinking are normal.</p>
               </div>
-
-              {/* Mouse */}
-              <div className="flex items-center gap-1.5">
-                {s.mousePct !== null ? (
-                  <>
-                    <ActivityBar value={s.mousePct} color={activityColor(s.mousePct)} />
-                    <span className="text-[10px] tabular-nums" style={{ color: activityColor(s.mousePct) }}>{s.mousePct}%</span>
-                  </>
-                ) : (
-                  <span className="text-white/15 text-[10px]">--</span>
-                )}
-              </div>
-
-              {/* Overall */}
-              <div className="flex items-center gap-1.5">
-                {s.overallActivity !== null ? (
-                  <>
-                    <ActivityBar value={s.overallActivity} color={activityColor(s.overallActivity)} />
-                    <span className="text-[10px] font-bold tabular-nums" style={{ color: activityColor(s.overallActivity) }}>{s.overallActivity}%</span>
-                  </>
-                ) : (
-                  <span className="text-white/15 text-[10px]">--</span>
-                )}
-              </div>
-
-              {/* Duration */}
-              <span className="text-white/30 text-[10px] tabular-nums">{duration(s.clockIn)}</span>
             </div>
-          ))}
-        </div>
+          )}
+
+          {isEmpty ? (
+            <div className="flex items-center justify-center text-white/20 text-xs py-4 gap-2">
+              <WifiOff size={14} />
+              <span>No chatters online. <Link href="/team/hubstaff" className="text-teal-400/50 hover:text-teal-400 underline">Connect Hubstaff</Link> to see live activity.</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Column Header */}
+              <div className="grid grid-cols-[1fr_80px_60px_60px_60px_50px] gap-2 text-[10px] text-white/30 px-1">
+                <span>Chatter</span>
+                <span>Creator</span>
+                <span className="flex items-center gap-1"><Keyboard size={9} /> Keys</span>
+                <span className="flex items-center gap-1"><Mouse size={9} /> Mouse</span>
+                <span className="flex items-center gap-1"><Activity size={9} /> Overall</span>
+                <span>Time</span>
+              </div>
+
+              {data.map(s => (
+                <div key={`${s.email}-${s.clockIn}`} className="grid grid-cols-[1fr_80px_60px_60px_60px_50px] gap-2 items-center glass-inset rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Wifi size={10} className="text-teal-400 shrink-0" />
+                    <span className="text-white text-xs font-medium truncate">{s.name}</span>
+                  </div>
+                  <span className="text-white/40 text-[10px] truncate">{s.creator}</span>
+
+                  {/* Keyboard */}
+                  <div className="flex items-center gap-1.5">
+                    {s.keyboardPct !== null ? (
+                      <>
+                        <ActivityBar value={s.keyboardPct} color={activityColor(s.keyboardPct)} />
+                        <span className="text-[10px] tabular-nums" style={{ color: activityColor(s.keyboardPct) }}>{s.keyboardPct}%</span>
+                      </>
+                    ) : (
+                      <span className="text-white/15 text-[10px]">--</span>
+                    )}
+                  </div>
+
+                  {/* Mouse */}
+                  <div className="flex items-center gap-1.5">
+                    {s.mousePct !== null ? (
+                      <>
+                        <ActivityBar value={s.mousePct} color={activityColor(s.mousePct)} />
+                        <span className="text-[10px] tabular-nums" style={{ color: activityColor(s.mousePct) }}>{s.mousePct}%</span>
+                      </>
+                    ) : (
+                      <span className="text-white/15 text-[10px]">--</span>
+                    )}
+                  </div>
+
+                  {/* Overall */}
+                  <div className="flex items-center gap-1.5">
+                    {s.overallActivity !== null ? (
+                      <>
+                        <ActivityBar value={s.overallActivity} color={activityColor(s.overallActivity)} />
+                        <span className="text-[10px] font-bold tabular-nums" style={{ color: activityColor(s.overallActivity) }}>{s.overallActivity}%</span>
+                      </>
+                    ) : (
+                      <span className="text-white/15 text-[10px]">--</span>
+                    )}
+                  </div>
+
+                  {/* Duration */}
+                  <span className="text-white/30 text-[10px] tabular-nums">{duration(s.clockIn)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
