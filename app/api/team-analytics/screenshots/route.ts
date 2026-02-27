@@ -90,10 +90,12 @@ export async function GET(req: NextRequest) {
 
       analysis = await analyzeScreenshots(toAnalyze);
 
-      // Compute summary
-      const analyzedCount = analysis.length;
-      const onOfCount = analysis.filter((a) => a.onOnlyFans).length;
-      const flaggedCount = analysis.filter((a) => a.flagged).length;
+      // Compute summary — exclude failed analyses from counts
+      const successfulAnalyses = analysis.filter((a) => !a.analysisFailed);
+      const analyzedCount = successfulAnalyses.length;
+      const onOfCount = successfulAnalyses.filter((a) => a.onOnlyFans).length;
+      const flaggedCount = successfulAnalyses.filter((a) => a.flagged).length;
+      const failedCount = analysis.filter((a) => a.analysisFailed).length;
       const onOfPct = analyzedCount > 0 ? Math.round((onOfCount / analyzedCount) * 100) : 0;
 
       // Same-screen streak: longest run of near-identical descriptions

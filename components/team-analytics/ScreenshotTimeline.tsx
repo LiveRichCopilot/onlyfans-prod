@@ -18,7 +18,9 @@ type Analysis = {
   activity: "chatting" | "browsing" | "idle" | "social_media" | "video" | "other";
   onOnlyFans: boolean;
   description: string;
+  reason: string;
   flagged: boolean;
+  analysisFailed: boolean;
 };
 
 type Summary = {
@@ -49,6 +51,7 @@ function formatTimestamp(iso: string): string {
 
 function borderColor(analysis: Analysis | undefined): string {
   if (!analysis) return "border-white/10";
+  if (analysis.analysisFailed) return "border-white/20";
   if (analysis.flagged) return "border-red-500/70";
   if (analysis.onOnlyFans && analysis.activity === "chatting") return "border-emerald-500/70";
   if (analysis.onOnlyFans) return "border-amber-500/70";
@@ -68,6 +71,7 @@ function activityLabel(analysis: Analysis): string {
 }
 
 function activityLabelColor(analysis: Analysis): string {
+  if (analysis.analysisFailed) return "text-white/25";
   if (analysis.onOnlyFans && analysis.activity === "chatting") return "text-emerald-400";
   if (analysis.onOnlyFans) return "text-amber-400";
   if (analysis.flagged) return "text-red-400";
@@ -355,12 +359,25 @@ function ExpandedScreenshot({
 
         {/* Analysis details */}
         {analysis && (
-          <div className="px-4 py-3 border-t border-white/5">
+          <div className="px-4 py-3 border-t border-white/5 space-y-2">
             <p className="text-white/60 text-xs">{analysis.description}</p>
-            {analysis.flagged && (
-              <div className="mt-2 flex items-center gap-1.5 text-red-400 text-[11px]">
+            {/* AI reasoning — always show when available */}
+            {analysis.reason && (
+              <div className="glass-inset rounded-lg px-3 py-2">
+                <p className="text-[10px] text-white/30 mb-0.5 font-medium">AI Reasoning</p>
+                <p className="text-white/50 text-[11px] leading-relaxed">{analysis.reason}</p>
+              </div>
+            )}
+            {analysis.analysisFailed && (
+              <div className="mt-1 flex items-center gap-1.5 text-white/30 text-[11px]">
+                <Monitor size={11} />
+                Analysis could not be completed — screenshot may have expired
+              </div>
+            )}
+            {analysis.flagged && !analysis.analysisFailed && (
+              <div className="mt-1 flex items-center gap-1.5 text-red-400 text-[11px]">
                 <AlertTriangle size={11} />
-                Flagged: Employee not on OnlyFans or idle
+                Flagged: {analysis.reason || "Employee not on OnlyFans or idle"}
               </div>
             )}
           </div>

@@ -301,6 +301,22 @@ export async function getTeams(): Promise<HubstaffTeam[]> {
   return data.teams || [];
 }
 
+export type HubstaffTeamMember = {
+  id: number;
+  user_id: number;
+  role: string;
+  status: string;
+};
+
+/** Get members of a specific team with sideloaded user objects. */
+export async function getTeamMembers(teamId: number): Promise<{ members: HubstaffTeamMember[]; users: any[] }> {
+  const data = await hubstaffGet<{ members: HubstaffTeamMember[]; users: any[] }>(
+    `/teams/${teamId}/members`,
+    { page_limit: "100", include: "users" },
+  );
+  return { members: data.members || [], users: data.users || [] };
+}
+
 // --- Time Edit Logs (audit trail) ---
 
 /** Get manual time modifications (for detecting gaming). */

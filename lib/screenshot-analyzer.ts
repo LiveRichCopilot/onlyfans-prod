@@ -10,7 +10,9 @@ export type ScreenshotAnalysis = {
   activity: "chatting" | "browsing" | "idle" | "social_media" | "video" | "other";
   onOnlyFans: boolean;
   description: string;
+  reason: string;
   flagged: boolean;
+  analysisFailed: boolean;
 };
 
 const SYSTEM_PROMPT = `You are analyzing a work screenshot from an OnlyFans chatting agency. The employee should be actively chatting with fans on the OnlyFans platform. Classify what you see.
@@ -20,7 +22,8 @@ Respond with valid JSON only:
   "app": "application or website name visible (e.g. OnlyFans, YouTube, Instagram, Chrome, Slack, Desktop)",
   "activity": "chatting" | "browsing" | "idle" | "social_media" | "video" | "other",
   "onOnlyFans": true/false,
-  "description": "Brief 1-sentence description of what is on screen"
+  "description": "Brief 1-sentence description of what is on screen",
+  "reason": "1-2 sentence explanation of WHY you came to this conclusion. What specific visual evidence led you here? Be concrete."
 }
 
 Rules:
@@ -29,14 +32,25 @@ Rules:
 - "idle" = desktop, lock screen, screensaver, or blank/unchanged screen
 - "social_media" = Instagram, Twitter/X, TikTok, Facebook, Reddit feed
 - "video" = YouTube, Netflix, Twitch, or any video playing
-- "other" = anything that does not fit the above categories`;
+- "other" = anything that does not fit the above categories
 
-async function analyzeOne(screenshotUrl: string): Promise<{
+For the "reason" field, explain what you actually see on screen that led to your classification. Examples:
+- "OnlyFans chat window is open with an active conversation. Message input field is visible with text being composed."
+- "Screen shows YouTube video playing in full screen. No OnlyFans tabs visible."
+- "Desktop wallpaper visible with no applications open. Taskbar shows no active windows."
+- "Instagram feed is open in Chrome. OnlyFans tab is visible but not active."
+Be specific about what apps, tabs, or content you can identify.`;
+
+type AnalysisResult = {
   app: string;
   activity: ScreenshotAnalysis["activity"];
   onOnlyFans: boolean;
   description: string;
-}> {
+  reason: string;
+  failed: boolean;
+};
+
+async function analyzeOne(screenshotUrl: string): Promise<AnalysisResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
@@ -59,14 +73,21 @@ async function analyzeOne(screenshotUrl: string): Promise<{
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 200,
+      max_tokens: 300,
     }),
   });
 
   if (!res.ok) {
     const text = await res.text();
     console.error("[screenshot-analyzer] OpenAI error:", res.status, text);
-    return { app: "Unknown", activity: "other", onOnlyFans: false, description: "Analysis failed" };
+    return {
+      app: "Unknown",
+      activity: "other",
+      onOnlyFans: false,
+      description: "Analysis failed — could not process screenshot",
+      reason: "Screenshot could not be analyzed (image may have expired or API error).",
+      failed: true,
+    };
   }
 
   const data = await res.json();
@@ -79,9 +100,18 @@ async function analyzeOne(screenshotUrl: string): Promise<{
       activity: parsed.activity || "other",
       onOnlyFans: !!parsed.onOnlyFans,
       description: parsed.description || "",
+      reason: parsed.reason || "No reasoning provided.",
+      failed: false,
     };
   } catch {
-    return { app: "Unknown", activity: "other", onOnlyFans: false, description: "Parse error" };
+    return {
+      app: "Unknown",
+      activity: "other",
+      onOnlyFans: false,
+      description: "Parse error",
+      reason: "AI response could not be parsed.",
+      failed: true,
+    };
   }
 }
 
@@ -120,7 +150,9 @@ export async function analyzeScreenshots(
     const batchResults = await Promise.all(
       batch.map(async (ss) => {
         const analysis = await analyzeOne(ss.url);
-        const flagged = !analysis.onOnlyFans || analysis.activity === "idle";
+        // Only flag if analysis succeeded AND determined not on OF or idle
+        // Failed analyses get a separate state — don't count as flags
+        const flagged = !analysis.failed && (!analysis.onOnlyFans || analysis.activity === "idle");
         return {
           screenshotId: ss.id,
           timestamp: ss.recorded_at,
@@ -128,7 +160,9 @@ export async function analyzeScreenshots(
           activity: analysis.activity,
           onOnlyFans: analysis.onOnlyFans,
           description: analysis.description,
+          reason: analysis.reason,
           flagged,
+          analysisFailed: analysis.failed,
         };
       })
     );

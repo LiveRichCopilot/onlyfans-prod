@@ -20,6 +20,7 @@ import { ContentPerformancePanel } from "@/components/team-analytics/ContentPerf
 import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
 import { TimelinePanel } from "@/components/team-analytics/TimelinePanel";
 import { ShiftReportPanel } from "@/components/team-analytics/ShiftReportPanel";
+import { TeamReportsPanel } from "@/components/team-analytics/TeamReportsPanel";
 import { DateRangePicker, type DateRange } from "@/components/team-analytics/DateRangePicker";
 
 const RANGES = [
@@ -181,7 +182,10 @@ export default function TeamAnalytics() {
         <ActivityByHourBar data={d.activityByHour || []} />
       </div>
 
-      {/* Row 4: Chatter Rankings (full width) — click name for shift report */}
+      {/* Row 4: Chatter Reports by Hubstaff Team — who has reports, who doesn't */}
+      <TeamReportsPanel days={days} onChatterClick={(email) => setShiftReportEmail(email)} />
+
+      {/* Row 5: Chatter Rankings bar chart (full width) — click name for shift report */}
       <ChatterComparisonBar data={d.chatterComparison || []} onChatterClick={(email) => setShiftReportEmail(email)} />
 
       {/* Row 5: Hours + Tags */}
