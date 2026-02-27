@@ -18,6 +18,7 @@ import { ConversationPhoneGallery } from "@/components/team-analytics/Conversati
 import { CopyPasteBlasting } from "@/components/team-analytics/CopyPasteBlasting";
 import { ContentPerformancePanel } from "@/components/team-analytics/ContentPerformancePanel";
 import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
+import { TimelinePanel } from "@/components/team-analytics/TimelinePanel";
 import { ShiftReportPanel } from "@/components/team-analytics/ShiftReportPanel";
 import { DateRangePicker, type DateRange } from "@/components/team-analytics/DateRangePicker";
 
@@ -156,6 +157,9 @@ export default function TeamAnalytics() {
 
       {/* Live Activity — who's online and are they actually working */}
       <LiveActivityPanel data={d.liveActivity || []} avgActivity={d.avgActivity || null} />
+
+      {/* Timeline — 24h activity blocks per member */}
+      <TimelinePanel />
 
       {/* Row 1: Performance Trend (full width) */}
       <PerformanceTrendChart data={d.performanceTrend || []} />
