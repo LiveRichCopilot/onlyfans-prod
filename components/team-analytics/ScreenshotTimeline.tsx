@@ -87,6 +87,7 @@ export function ScreenshotTimeline({ email, date }: Props) {
   const [expanded, setExpanded] = useState<Screenshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const labelsRef = useRef<HTMLDivElement>(null);
 
   const fetchScreenshots = useCallback(
     async (withAnalysis: boolean) => {
@@ -136,6 +137,13 @@ export function ScreenshotTimeline({ email, date }: Props) {
     const amount = dir === "left" ? -360 : 360;
     scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
   };
+
+  // Sync label scroll with thumbnail scroll
+  const handleThumbScroll = useCallback(() => {
+    if (scrollRef.current && labelsRef.current) {
+      labelsRef.current.scrollLeft = scrollRef.current.scrollLeft;
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -244,6 +252,7 @@ export function ScreenshotTimeline({ email, date }: Props) {
         </button>
         <div
           ref={scrollRef}
+          onScroll={handleThumbScroll}
           className="flex gap-2.5 overflow-x-auto scrollbar-hide py-1 px-1"
           style={{ scrollbarWidth: "none" }}
         >
@@ -274,8 +283,8 @@ export function ScreenshotTimeline({ email, date }: Props) {
         </button>
       </div>
 
-      {/* Timestamp labels row */}
-      <div className="flex gap-2.5 overflow-hidden px-1">
+      {/* Timestamp labels row — synced with thumbnail scroll */}
+      <div ref={labelsRef} className="flex gap-2.5 overflow-x-auto scrollbar-hide px-1" style={{ scrollbarWidth: "none" }}>
         {screenshots.map((ss) => {
           const analysis = analysisMap.get(ss.id);
           return (
