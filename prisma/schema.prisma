@@ -477,6 +477,29 @@ model HubstaffUserMapping {
   @@index([hubstaffUserId])
 }
 
+model CachedScreenshot {
+  id                   String    @id @default(cuid())
+  hubstaffScreenshotId Int       @unique
+  hubstaffUserId       Int
+  chatterEmail         String?
+  recordedAt           DateTime
+  supabaseUrl          String?
+  thumbUrl             String?
+  // AI analysis fields (cached)
+  analysisApp          String?
+  analysisActivity     String?
+  analysisOnOf         Boolean?
+  analysisDescription  String?
+  analysisReason       String?
+  analysisFlagged      Boolean?
+  analysisFailed       Boolean?
+  analyzedAt           DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([hubstaffUserId, recordedAt])
+  @@index([chatterEmail, recordedAt])
+}
+
 model HubstaffConfig {
   id             String    @id @default(cuid())
   organizationId String    @unique
