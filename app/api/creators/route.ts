@@ -138,39 +138,53 @@ export async function GET(request: Request) {
             autoSyncUnsynced(needsSync.slice(0, 5)).catch(() => {});
         }
 
-        // Compute today's revenue from DB — OnlyFans uses UK time (GMT/BST) as daily cutoff
-        // Midnight UK = start of the OF "day" for statements
+        // Compute revenue range from DB — OnlyFans uses UK time (GMT/BST) as daily cutoff
         const now = new Date();
         const ukNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/London" }));
-        const todayStart = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), 0, 0, 0, 0);
-        // Convert UK midnight back to UTC for DB query
         const ukOffset = ukNow.getTime() - now.getTime();
-        const todayStartUtc = new Date(todayStart.getTime() - ukOffset);
-        const hoursSinceStart = Math.max(1, (now.getTime() - todayStartUtc.getTime()) / 3600000);
 
-        // Single query: today's transactions grouped by creator (UK day)
+        // Default: today's UK day. If start/end params provided, use those instead.
+        let rangeStartUtc: Date;
+        let rangeEndUtc: Date;
+        let hoursInRange: number;
+
+        if (startParam && endParam) {
+            rangeStartUtc = new Date(startParam);
+            rangeEndUtc = new Date(endParam);
+            // Calculate hours in the selected range for hourlyRev
+            const rangeMs = rangeEndUtc.getTime() - rangeStartUtc.getTime();
+            hoursInRange = Math.max(1, rangeMs / 3600000);
+        } else {
+            // Default: today UK midnight to now
+            const todayStart = new Date(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate(), 0, 0, 0, 0);
+            rangeStartUtc = new Date(todayStart.getTime() - ukOffset);
+            rangeEndUtc = now;
+            hoursInRange = Math.max(1, (now.getTime() - rangeStartUtc.getTime()) / 3600000);
+        }
+
+        // Transactions in the selected range grouped by creator
         const todayTx = await prisma.transaction.groupBy({
             by: ["creatorId"],
-            where: { date: { gte: todayStartUtc } },
+            where: { date: { gte: rangeStartUtc, lte: rangeEndUtc } },
             _sum: { amount: true },
             _count: true,
         });
         const txMap = new Map(todayTx.map((t) => [t.creatorId, { sum: t._sum.amount || 0, count: t._count }]));
 
-        // Yesterday's revenue (UK day: yesterday midnight to today midnight)
-        const yesterdayStartUtc = new Date(todayStartUtc.getTime() - 24 * 60 * 60 * 1000);
+        // "Yesterday" revenue = the 24h period before the selected range start
+        const prevDayStartUtc = new Date(rangeStartUtc.getTime() - 24 * 60 * 60 * 1000);
         const yesterdayTx = await prisma.transaction.groupBy({
             by: ["creatorId"],
-            where: { date: { gte: yesterdayStartUtc, lt: todayStartUtc } },
+            where: { date: { gte: prevDayStartUtc, lt: rangeStartUtc } },
             _sum: { amount: true },
             _count: true,
         });
         const yesterdayMap = new Map(yesterdayTx.map((t) => [t.creatorId, { sum: t._sum.amount || 0, count: t._count }]));
 
-        // Top fan per creator (highest spend today)
+        // Top fan per creator (highest spend in selected range)
         const topFanRows = await prisma.transaction.groupBy({
             by: ["creatorId", "fanId"],
-            where: { date: { gte: todayStartUtc } },
+            where: { date: { gte: rangeStartUtc, lte: rangeEndUtc } },
             _sum: { amount: true },
             orderBy: { _sum: { amount: "desc" } },
         });
@@ -192,7 +206,7 @@ export async function GET(request: Request) {
             const tx = txMap.get(c.id);
             const todayRev = tx?.sum || 0;
             const txCount = tx?.count || 0;
-            const hourlyRev = todayRev / hoursSinceStart;
+            const hourlyRev = todayRev / hoursInRange;
             const topFan = topFanMap.get(c.id);
             const yesterdayRev = yesterdayMap.get(c.id)?.sum ?? 0;
 
