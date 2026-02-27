@@ -107,7 +107,7 @@ export async function GET(request: Request) {
             const shouldRunStory = storyCount < MAX_STORY_PAIRS;
 
             try {
-                const result = await scoreChatter(window, true, shouldRunStory);
+                const result = await scoreChatter(window, true, shouldRunStory, /* skipStory */ true);
                 if (result && shouldRunStory) storyCount++;
 
                 results.push({

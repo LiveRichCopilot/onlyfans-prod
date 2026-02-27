@@ -161,7 +161,16 @@ export async function sendScoreNotification(score: ScoreNotification): Promise<b
         msg += `\n\nMsgs: ${score.messagesAnalyzed} | Chats: ${score.conversationsScanned}`;
         msg += ` | Robot: ${score.robotPhraseCount} | Creative: ${score.creativePhraseCount}`;
 
-        await bot.api.sendMessage(chatId, msg);
+        try {
+            await bot.api.sendMessage(chatId, msg);
+        } catch (sendErr: any) {
+            const errMsg = (sendErr.message || "").toLowerCase();
+            if (errMsg.includes("chat not found") || errMsg.includes("bots can't send messages to bots")) {
+                console.warn(`[Notify] Telegram undeliverable (${chatId}): ${sendErr.message}`);
+                return false;
+            }
+            throw sendErr; // Re-throw unexpected errors to outer catch
+        }
 
         console.log(`[Notify] Sent score notification for ${displayName} to ${chatId}`);
         return true;
