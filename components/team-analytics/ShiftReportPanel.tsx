@@ -50,6 +50,22 @@ function activityColor(pct: number): string {
   return "#f87171";
 }
 
+/** Hubstaff activity % = how much of tracked time had keyboard/mouse input.
+ *  Over 100% is suspicious (possible mouse jiggler or auto-clicker). */
+function activityVerdict(pct: number): { label: string; color: string } {
+  if (pct > 100) return { label: "Suspicious — possible auto-clicker", color: "#f87171" };
+  if (pct >= 60) return { label: "Normal", color: "#9ca3af" };
+  if (pct >= 30) return { label: "Low activity", color: "#fbbf24" };
+  return { label: "Very low", color: "#f87171" };
+}
+
+function hubstaffActivityColor(pct: number): string {
+  if (pct > 100) return "#f87171"; // Suspicious — over 100% is not normal
+  if (pct >= 60) return "#6b7280"; // muted gray — normal, no need to highlight
+  if (pct >= 30) return "#fbbf24"; // amber — low
+  return "#f87171"; // red — very low
+}
+
 function verdictConfig(v: string): { label: string; color: string; icon: typeof CheckCircle } {
   switch (v) {
     case "excellent": return { label: "Excellent", color: "#34d399", icon: CheckCircle };
@@ -68,14 +84,18 @@ function formatTime(iso: string): string {
 }
 
 function ActivityBar({ value, label, icon: Icon }: { value: number; label: string; icon: typeof Keyboard }) {
-  const color = activityColor(value);
+  const color = hubstaffActivityColor(value);
+  const verdict = activityVerdict(value);
   return (
     <div className="flex items-center gap-3">
       <Icon size={14} className="text-white/40 shrink-0" />
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
           <span className="text-[11px] text-white/70">{label}</span>
-          <span className="text-[11px] font-bold tabular-nums" style={{ color }}>{value}%</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px]" style={{ color: verdict.color }}>{verdict.label}</span>
+            <span className="text-[11px] font-bold tabular-nums" style={{ color }}>{value}%</span>
+          </div>
         </div>
         <div className="h-2 glass-inset rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, value)}%`, background: color }} />
@@ -235,6 +255,7 @@ function HubstaffSection({ data }: { data: ShiftReportData }) {
   }
 
   const hs = data.hubstaff;
+  const isSuspicious = hs.keyboard > 100 || hs.mouse > 100 || hs.overall > 100;
   return (
     <div className="glass-inset rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -243,11 +264,26 @@ function HubstaffSection({ data }: { data: ShiftReportData }) {
         </h4>
         <span className="text-[10px] text-white/60">Tracked: {hs.totalTrackedHrs}h of {data.totalShiftDurationHrs}h shift</span>
       </div>
+      {/* Explanation */}
+      <div className="text-[10px] text-white/40 leading-relaxed">
+        % of tracked time with keyboard/mouse input. 60%+ = active, 30-60% = low, under 30% = very low.
+        {isSuspicious && (
+          <span className="text-red-400 font-medium ml-1">
+            Over 100% = possible mouse jiggler or auto-clicker software.
+          </span>
+        )}
+      </div>
       <div className="space-y-2.5">
         <ActivityBar value={hs.keyboard} label="Keyboard" icon={Keyboard} />
         <ActivityBar value={hs.mouse} label="Mouse" icon={Mouse} />
         <ActivityBar value={hs.overall} label="Overall" icon={Activity} />
       </div>
+      {isSuspicious && (
+        <div className="flex items-center gap-2 text-red-400 text-[11px] bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+          <AlertTriangle size={12} />
+          Activity over 100% is not possible with normal use. This chatter may be using software to fake activity.
+        </div>
+      )}
     </div>
   );
 }

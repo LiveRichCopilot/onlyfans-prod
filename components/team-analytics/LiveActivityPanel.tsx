@@ -35,7 +35,8 @@ function ActivityBar({ value, color }: { value: number; color: string }) {
 }
 
 function activityColor(pct: number): string {
-  if (pct >= 60) return "#34d399"; // green — active
+  if (pct > 100) return "#f87171"; // red — suspicious (auto-clicker)
+  if (pct >= 60) return "#6b7280"; // muted gray — normal/active
   if (pct >= 30) return "#fbbf24"; // amber — low
   return "#f87171"; // red — idle
 }
