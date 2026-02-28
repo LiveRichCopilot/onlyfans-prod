@@ -3,14 +3,6 @@
 import { useState } from "react";
 import { X, Mail, CheckCircle, AlertCircle } from "lucide-react";
 
-const ASSIGNABLE_ROLES = [
-    { value: "ADMIN", label: "Admin" },
-    { value: "ACCOUNT_EXEC", label: "Team Manager" },
-    { value: "MANAGER", label: "Account Manager" },
-    { value: "AGENT", label: "Chatter" },
-    { value: "VIEWER", label: "Analyst" },
-];
-
 type Props = {
     onClose: () => void;
     onInvite: (email: string, role: string) => Promise<void>;
@@ -20,7 +12,6 @@ type InviteResult = { email: string; ok: boolean; msg: string };
 
 export function InviteMemberModal({ onClose, onInvite }: Props) {
     const [emails, setEmails] = useState("");
-    const [role, setRole] = useState("AGENT");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [results, setResults] = useState<InviteResult[]>([]);
@@ -47,7 +38,8 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
 
         for (const email of parsed) {
             try {
-                await onInvite(email, role);
+                // Default to AGENT (Chatter) — no access until role + accounts assigned
+                await onInvite(email, "AGENT");
                 inviteResults.push({ email, ok: true, msg: "Invited" });
             } catch (err: any) {
                 inviteResults.push({ email, ok: false, msg: err.message || "Failed" });
@@ -57,7 +49,6 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
         setResults(inviteResults);
         setLoading(false);
 
-        // If all succeeded, close after a brief delay
         const allOk = inviteResults.every((r) => r.ok);
         if (allOk) {
             setTimeout(() => onClose(), 1200);
@@ -75,43 +66,26 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
                     <Mail size={20} className="text-teal-400" /> Invite Team Members
                 </h2>
                 <p className="text-sm text-white/50 mb-6">
-                    Add multiple emails separated by commas or new lines.
+                    Paste emails below. They&apos;ll be able to log in but won&apos;t see
+                    anything until you assign their role and accounts.
                 </p>
 
-                <div className="space-y-4 mb-6">
-                    <div>
-                        <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5 block">
-                            Email Addresses
-                        </label>
-                        <textarea
-                            value={emails}
-                            onChange={(e) => { setEmails(e.target.value); setResults([]); }}
-                            placeholder={"stacey@liverich.travel\nsora@liverich.travel\neirene@liverich.travel"}
-                            rows={4}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:border-teal-500 focus:outline-none transition resize-none"
-                        />
-                        {parsed.length > 0 && results.length === 0 && (
-                            <div className="text-xs text-teal-400 mt-1">
-                                {parsed.length} email{parsed.length !== 1 ? "s" : ""} detected
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5 block">
-                            Role (applied to all)
-                        </label>
-                        <select
-                            value={role}
-                            onChange={(e) => setRole(e.target.value)}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 focus:outline-none transition appearance-none"
-                        >
-                            {ASSIGNABLE_ROLES.map((r) => (
-                                <option key={r.value} value={r.value} className="bg-gray-900">
-                                    {r.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                <div className="mb-6">
+                    <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5 block">
+                        Email Addresses
+                    </label>
+                    <textarea
+                        value={emails}
+                        onChange={(e) => { setEmails(e.target.value); setResults([]); }}
+                        placeholder={"stacey@liverich.travel\nsora@liverich.travel\neirene@liverich.travel"}
+                        rows={5}
+                        className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-white/30 focus:border-teal-500 focus:outline-none transition resize-none"
+                    />
+                    {parsed.length > 0 && results.length === 0 && (
+                        <div className="text-xs text-teal-400 mt-1">
+                            {parsed.length} email{parsed.length !== 1 ? "s" : ""} detected
+                        </div>
+                    )}
                 </div>
 
                 {/* Results */}
