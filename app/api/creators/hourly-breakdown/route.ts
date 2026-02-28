@@ -75,12 +75,17 @@ export async function GET(req: Request) {
         // --- Hourly revenue query ---
         const creatorIds = creators.map((c) => c.id);
 
+        // Convert Date objects to ISO strings — Prisma $queryRaw Date objects
+        // can cause timezone mismatches on Vercel's serverless runtime
+        const dayStartIso = dayStartUtc.toISOString();
+        const dayEndIso = dayEndUtc.toISOString();
+
         const rows: { creatorId: string; bucket: Date; total: number }[] = await prisma.$queryRaw`
             SELECT "creatorId",
                    date_trunc('hour', "date") AS bucket,
                    COALESCE(SUM("amount"), 0)::float AS total
             FROM "Transaction"
-            WHERE "date" >= ${dayStartUtc} AND "date" < ${dayEndUtc}
+            WHERE "date" >= ${dayStartIso}::timestamptz AND "date" < ${dayEndIso}::timestamptz
               AND "creatorId" IN (${Prisma.join(creatorIds)})
             GROUP BY "creatorId", bucket
             ORDER BY bucket
