@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
-    getEarningsOverview,
+    getEarningsByType,
     getMe,
     getTopPercentage,
     getStatisticsOverview,
-    getTransactionsSummary,
 } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
@@ -117,53 +116,77 @@ export async function GET(req: Request) {
                     const dayEnd = new Date(reportDate.getTime() + 24 * 60 * 60 * 1000).toISOString();
                     const fmt = (d: string) => d.replace("T", " ").replace(/\.\d+Z$/, "");
 
-                    // 5 calls in parallel
-                    const [earningsRes, txSummaryRes, meRes, topPctRes, overviewRes] = await Promise.all([
-                        getEarningsOverview(key, {
-                            account_ids: [acct],
-                            start_date: dayStart,
-                            end_date: dayEnd,
-                        }, acct).catch(() => null),
-                        getTransactionsSummary(key, {
-                            account_ids: [acct],
-                            start_date: dayStart,
-                            end_date: dayEnd,
-                        }, acct).catch(() => null),
+                    // ---- 6 earnings calls (per type) + /me + top% + overview (best-effort) ----
+                    const [
+                        totalRes, subsRes, tipsRes, postsRes, msgsRes, streamsRes,
+                        meRes, topPctRes, overviewRes,
+                    ] = await Promise.all([
+                        getEarningsByType(acct, key, "total", dayStart, dayEnd).catch(() => null),
+                        getEarningsByType(acct, key, "subscribes", dayStart, dayEnd).catch(() => null),
+                        getEarningsByType(acct, key, "tips", dayStart, dayEnd).catch(() => null),
+                        getEarningsByType(acct, key, "post", dayStart, dayEnd).catch(() => null),
+                        getEarningsByType(acct, key, "messages", dayStart, dayEnd).catch(() => null),
+                        getEarningsByType(acct, key, "stream", dayStart, dayEnd).catch(() => null),
                         getMe(acct, key).catch(() => null),
                         getTopPercentage(acct, key).catch(() => null),
+                        // Best-effort: may return data or null depending on OFAPI plan
                         getStatisticsOverview(acct, key, fmt(dayStart), fmt(dayEnd)).catch(() => null),
                     ]);
 
-                    // ---- Parse earnings (from getEarningsOverview) ----
-                    const ed = earningsRes?.data || earningsRes || {};
+                    // ---- Parse earnings (OFAPI confirmed: individual per-type GET calls) ----
+                    const parseGross = (res: any): number => {
+                        if (!res) return 0;
+                        const d = res?.data || res;
+                        // Response may be { gross: X }, { total: X }, { amount: X }, or a number
+                        if (typeof d === "number") return d;
+                        return parseNum(d?.gross ?? d?.total ?? d?.amount ?? d?.earnings ?? d?.sum ?? 0);
+                    };
 
-                    const totalGross = parseNum(ed.total_earnings || ed.total_gross || ed.total);
-                    const subsGross = parseNum(ed.subscriptions || ed.subscribes || ed.subs);
-                    const messagesGross = parseNum(ed.messages || ed.chat_messages);
-                    const postsGross = parseNum(ed.posts || ed.post);
-                    const streamsGross = parseNum(ed.streams || ed.stream);
-                    const tipsGross =
-                        parseNum(ed.tips) +
-                        parseNum(ed.tips_posts) +
-                        parseNum(ed.tips_messages);
+                    const totalGross = parseGross(totalRes);
+                    const subsGross = parseGross(subsRes);
+                    const tipsGross = parseGross(tipsRes);
+                    const postsGross = parseGross(postsRes);
+                    const messagesGross = parseGross(msgsRes);
+                    const streamsGross = parseGross(streamsRes);
 
-                    // ---- Parse transaction summary (refunds, net) ----
-                    const txd = txSummaryRes?.data || txSummaryRes || {};
-                    const refundGross = parseNum(txd.total_refunds || txd.refunds || txd.chargebacks);
-                    const totalNet = txd.total_net != null ? parseNum(txd.total_net) : null;
+                    // ---- Calculate from our own Transaction table ----
+                    const localTxStats: { refunds: number; avgPerSpender: number; avgPerTx: number; txCount: number }[] =
+                        await prisma.$queryRaw`
+                            SELECT
+                                COALESCE(ABS(SUM(CASE WHEN "amount" < 0 THEN "amount" ELSE 0 END)), 0) as "refunds",
+                                CASE WHEN COUNT(DISTINCT CASE WHEN "amount" > 0 THEN "fanId" END) > 0
+                                    THEN SUM(CASE WHEN "amount" > 0 THEN "amount" ELSE 0 END)::float
+                                         / COUNT(DISTINCT CASE WHEN "amount" > 0 THEN "fanId" END)
+                                    ELSE 0 END as "avgPerSpender",
+                                CASE WHEN COUNT(CASE WHEN "amount" > 0 THEN 1 END) > 0
+                                    THEN SUM(CASE WHEN "amount" > 0 THEN "amount" ELSE 0 END)::float
+                                         / COUNT(CASE WHEN "amount" > 0 THEN 1 END)
+                                    ELSE 0 END as "avgPerTx",
+                                COUNT(*)::int as "txCount"
+                            FROM "Transaction"
+                            WHERE "creatorId" = ${creator.id}
+                              AND "date" >= ${reportDate}
+                              AND "date" < ${new Date(reportDate.getTime() + 24 * 60 * 60 * 1000)}
+                        `;
+                    const localTx = localTxStats[0] || { refunds: 0, avgPerSpender: 0, avgPerTx: 0, txCount: 0 };
 
-                    // ---- Parse audience from /me ----
+                    const refundGross = Number(localTx.refunds) || 0;
+                    const totalNet = totalGross > 0 ? totalGross - refundGross : null;
+                    const avgSpendPerSpender = Math.round((Number(localTx.avgPerSpender) || 0) * 100) / 100;
+                    const avgSpendPerTransaction = Math.round((Number(localTx.avgPerTx) || 0) * 100) / 100;
+
+                    // ---- Parse audience from /me (works if it works) ----
                     const me = meRes?.data || meRes || {};
                     const subscribersCount = parseNum(me.subscribersCount || me.subscribers_count);
                     const followingCount = parseNum(me.followingCount || me.following_count);
 
-                    // ---- Parse top percentage ----
+                    // ---- Parse top percentage (works if it works) ----
                     const topPct = topPctRes?.data?.top_percentage ?? topPctRes?.percentage ?? null;
                     const topPercentage = topPct !== null && topPct !== undefined
                         ? (Number.isFinite(parseFloat(String(topPct))) ? parseFloat(String(topPct)) : null)
                         : null;
 
-                    // ---- Parse statistics overview (fans, subs, visitors) ----
+                    // ---- Parse statistics overview (best-effort — may return 0) ----
                     const ov = overviewRes?.data || {};
                     const newSubs = parseNum(
                         ov.visitors?.subscriptions?.new?.total ||
@@ -173,40 +196,35 @@ export async function GET(req: Request) {
                     const activeFans = parseNum(
                         ov.visitors?.subscriptions?.active?.total ||
                         ov.subscribers?.active?.total ||
-                        ov.activeSubscribers ||
-                        me.subscribersCount || me.subscribers_count
-                    );
+                        ov.activeSubscribers
+                    ) || Math.round(subscribersCount); // fallback to subscriber count
                     const fansRenewOn = parseNum(
                         ov.visitors?.subscriptions?.renew_on?.total ||
                         ov.subscribers?.renew_on?.total ||
                         ov.renewOn
                     );
 
-                    // New vs recurring sub revenue
+                    // New vs recurring sub revenue (best-effort from overview, may be 0)
                     const newSubsGross = parseNum(
-                        ed.new_subscriptions || ed.subscriptions_new || ov.earnings?.subscriptions?.new?.gross
+                        ov.earnings?.subscriptions?.new?.gross
                     );
                     const recurringSubsGross = newSubsGross > 0
                         ? Math.max(0, subsGross - newSubsGross)
                         : 0;
 
-                    // Averages from transaction summary or overview
-                    const avgSpendPerSpender = parseNum(
-                        txd.avg_spend_per_spender || txd.average_per_spender
-                    );
-                    const avgSpendPerTransaction = parseNum(
-                        txd.avg_spend_per_transaction || txd.average_per_transaction
-                    );
+                    // Avg earnings per fan (calculated)
                     const avgEarningsPerFan = activeFans > 0
                         ? Math.round((totalGross / activeFans) * 100) / 100
                         : 0;
+
+                    // Avg sub length (best-effort from OFAPI, may be 0)
                     const avgSubLength = parseNum(
                         ov.visitors?.subscriptions?.avg_length?.total ||
                         ov.subscribers?.avg_length ||
                         ov.averageSubscriptionLength
                     );
 
-                    // Day-over-day expired fan change (look up previous day)
+                    // Day-over-day expired fan change
                     let expiredFanChange = 0;
                     try {
                         const prevDate = new Date(reportDate.getTime() - 24 * 60 * 60 * 1000);
@@ -215,7 +233,6 @@ export async function GET(req: Request) {
                             select: { subscribersCount: true },
                         });
                         if (prevReport) {
-                            // If subs went down but we got new subs, the difference + newSubs = expired
                             const subsDelta = Math.round(subscribersCount) - prevReport.subscribersCount;
                             expiredFanChange = subsDelta < 0 ? subsDelta : -(Math.round(newSubs) - subsDelta);
                             if (!Number.isFinite(expiredFanChange)) expiredFanChange = 0;
@@ -245,7 +262,7 @@ export async function GET(req: Request) {
                         avgSpendPerTransaction,
                         avgEarningsPerFan,
                         avgSubLength,
-                        earningsJson: earningsRes ?? Prisma.DbNull,
+                        earningsJson: { total: totalRes, subscribes: subsRes, tips: tipsRes, post: postsRes, messages: msgsRes, stream: streamsRes },
                         overviewJson: overviewRes ?? Prisma.DbNull,
                     };
 

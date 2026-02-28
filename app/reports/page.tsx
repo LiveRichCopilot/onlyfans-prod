@@ -194,7 +194,7 @@ export default function ReportsPage() {
                                         "New Fans", "Active Fans", "Expired \u0394",
                                         "Posts $", "Msgs $", "Streams $", "Refund $",
                                         "Group", "$/Spender", "$/Tx", "$/Fan",
-                                        "Avg Sub Len", "Day", "Wk", "Month", "Year",
+                                        "Avg Sub Len", "Date", "Day", "Wk", "Month", "Year",
                                     ].map((h) => (
                                         <th key={h} className="pb-4 pt-5 px-3 text-[10px] font-semibold text-white/40 uppercase tracking-widest text-right first:text-left [&:nth-child(2)]:text-left [&:nth-child(20)]:text-left [&:nth-child(25)]:text-left [&:nth-child(27)]:text-left">
                                             {h}
@@ -233,6 +233,7 @@ export default function ReportsPage() {
                                         <td className="py-2.5 px-3 text-xs text-right text-white/50">{fmt(r.avgSpendPerTransaction)}</td>
                                         <td className="py-2.5 px-3 text-xs text-right text-white/50">{fmt(r.avgEarningsPerFan)}</td>
                                         <td className="py-2.5 px-3 text-xs text-right text-white/50">{r.avgSubLength.toFixed(1)}</td>
+                                        <td className="py-2.5 px-3 text-xs text-white/40">{r.date}</td>
                                         <td className="py-2.5 px-3 text-xs text-white/40">{r.day?.slice(0, 3)}</td>
                                         <td className="py-2.5 px-3 text-xs text-right text-white/40">{r.week}</td>
                                         <td className="py-2.5 px-3 text-xs text-white/40">{r.month?.slice(0, 3)}</td>
@@ -241,7 +242,7 @@ export default function ReportsPage() {
                                 ))}
                                 {filteredReports.length === 0 && (
                                     <tr>
-                                        <td colSpan={28} className="py-12 text-center text-sm text-white/40 italic">
+                                        <td colSpan={29} className="py-12 text-center text-sm text-white/40 italic">
                                             No report data yet. The cron runs daily at 06:00 UTC.
                                         </td>
                                     </tr>

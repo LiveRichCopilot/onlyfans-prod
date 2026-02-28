@@ -164,12 +164,12 @@ export async function GET(req: NextRequest) {
                         ofapiTxId: tx.id.toString(),
                         fanId: fanMap.get(tx.user.id.toString())!,
                         creatorId: creator.id,
-                        // Use price/gross (fan-paid amount) when available, fall back to amount
-                        amount: Math.abs(Number(tx.price || tx.gross || tx.amount) || 0),
+                        // Preserve original sign: negative = chargeback/refund
+                        amount: Number(tx.price || tx.gross || tx.amount) || 0,
                         type: ((tx.type || tx.description || "unknown").replace(/<[^>]*>/g, "").replace(/&(?:#[0-9]+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]+);/g, "").replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim().slice(0, 50).replace(/[\uD800-\uDFFF]/g, "").trim()) || "unknown",
                         date: new Date(tx.createdAt || tx.date || new Date()),
                     }))
-                    .filter((tx: any) => tx.amount > 0);
+                    .filter((tx: any) => tx.amount !== 0);
 
                 if (txRecords.length > 0) {
                     // Chunk into batches of 500 to avoid query size limits
@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
         // --- 4. Update computed fields (bulk SQL) ---
         t0 = Date.now();
 
-        // 4a. Average Order Value
+        // 4a. Average Order Value (positive transactions only — exclude chargebacks)
         try {
             await prisma.$executeRaw`
                 UPDATE "Fan" f SET
@@ -235,7 +235,7 @@ export async function GET(req: NextRequest) {
                 FROM (
                     SELECT "fanId", AVG("amount") as "avg"
                     FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id}
+                    WHERE "creatorId" = ${creator.id} AND "amount" > 0
                     GROUP BY "fanId"
                 ) sub
                 WHERE f."id" = sub."fanId"
@@ -244,7 +244,7 @@ export async function GET(req: NextRequest) {
             result.errors.push(`avgOrderValue update: ${e.message}`);
         }
 
-        // 4b. Biggest Purchase
+        // 4b. Biggest Purchase (positive transactions only — exclude chargebacks)
         try {
             await prisma.$executeRaw`
                 UPDATE "Fan" f SET
@@ -252,7 +252,7 @@ export async function GET(req: NextRequest) {
                 FROM (
                     SELECT "fanId", MAX("amount") as "max"
                     FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id}
+                    WHERE "creatorId" = ${creator.id} AND "amount" > 0
                     GROUP BY "fanId"
                 ) sub
                 WHERE f."id" = sub."fanId"
