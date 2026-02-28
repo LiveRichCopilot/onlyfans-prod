@@ -74,7 +74,11 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                             </li>
                         </Link>
                         <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Activity size={16} /> Real-time Feed</li>
-                        <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Users size={16} /> Team & Chatters</li>
+                        <Link href="/team">
+                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
+                                <Users size={16} /> Team Management
+                            </li>
+                        </Link>
                         <Link href="/team-analytics">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
                                 <BarChart2 size={16} /> Team Analytics
