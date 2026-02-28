@@ -26,6 +26,7 @@ model Creator {
   onlineFanCache        Json?
   purchaseAlertsEnabled Boolean @default(true)
   organizationId        String?
+  group                 String? // Creator group/category for reporting
 
   fans                Fan[]
   mediaAssets         MediaAsset[]
@@ -347,20 +348,32 @@ model CreatorDailyReport {
   creatorId String
   date      DateTime @db.Date
 
-  // Earnings breakdown (gross $)
-  totalGross    Float  @default(0)
-  totalNet      Float? // Nullable until we have a real net source
-  subsGross     Float  @default(0)
-  tipsGross     Float  @default(0)
-  messagesGross Float  @default(0)
-  postsGross    Float  @default(0)
-  streamsGross  Float  @default(0)
+  // Earnings breakdown (gross $) — matches HistoricalSalesUTC0 spreadsheet
+  totalGross         Float  @default(0)
+  totalNet           Float?
+  subsGross          Float  @default(0)   // Subscription Gross (total)
+  newSubsGross       Float  @default(0)   // New subscriptions Gross
+  recurringSubsGross Float  @default(0)   // Recurring subscriptions Gross
+  tipsGross          Float  @default(0)
+  messagesGross      Float  @default(0)   // Message Gross
+  postsGross         Float  @default(0)   // Posts Gross
+  streamsGross       Float  @default(0)   // Streams Gross
+  refundGross        Float  @default(0)   // Refund Gross
 
   // Audience metrics
-  subscribersCount Int    @default(0)
-  followingCount   Int    @default(0)
-  topPercentage    Float?
-  newSubs          Int    @default(0)
+  subscribersCount Int    @default(0)     // Total fans/subscribers
+  followingCount   Int    @default(0)     // Following count
+  topPercentage    Float?                 // OF ranking (top X%)
+  newSubs          Int    @default(0)     // New fans count
+  activeFans       Int    @default(0)     // Active fans count
+  fansRenewOn      Int    @default(0)     // Fans with renew on
+  expiredFanChange Int    @default(0)     // Change in expired fan count (day-over-day)
+
+  // Averages
+  avgSpendPerSpender     Float @default(0) // Avg spend per spender Gross
+  avgSpendPerTransaction Float @default(0) // Avg spend per transaction Gross
+  avgEarningsPerFan      Float @default(0) // Avg earnings per fan Gross
+  avgSubLength           Float @default(0) // Avg subscription length (days)
 
   // Raw OFAPI responses for future normalization
   earningsJson Json?
