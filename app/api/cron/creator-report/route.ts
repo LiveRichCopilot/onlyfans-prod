@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getEarningsOverview, getMe, getTopPercentage } from "@/lib/ofapi";
 
@@ -165,8 +166,8 @@ export async function GET(req: Request) {
                             followingCount: Math.round(followingCount),
                             topPercentage,
                             newSubs: 0,
-                            earningsJson: earningsRes || null,
-                            overviewJson: null,
+                            earningsJson: earningsRes ?? Prisma.DbNull,
+                            overviewJson: Prisma.DbNull,
                         },
                         update: {
                             totalGross,
@@ -179,8 +180,8 @@ export async function GET(req: Request) {
                             subscribersCount: Math.round(subscribersCount),
                             followingCount: Math.round(followingCount),
                             topPercentage,
-                            earningsJson: earningsRes || null,
-                            overviewJson: null,
+                            earningsJson: earningsRes ?? Prisma.DbNull,
+                            overviewJson: Prisma.DbNull,
                         },
                     });
 
