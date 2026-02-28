@@ -40,8 +40,8 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden text-white">
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-600/30 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/30 rounded-full blur-[120px]" />
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/30 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="glass-panel p-10 rounded-3xl z-10 w-full max-w-2xl border-white/10 mx-4">
         <h1 className="text-4xl font-bold mb-2 tracking-tight text-center">
