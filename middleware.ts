@@ -8,6 +8,8 @@ const PUBLIC_PATHS = [
   "/api/telegram",
   "/api/webhooks",
   "/api/cron",
+  "/api/reports/creator-map",
+  "/api/reports/import-csv",
 ];
 
 function isPublicPath(pathname: string): boolean {
