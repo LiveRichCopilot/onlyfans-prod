@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -72,26 +71,22 @@ export async function GET(req: Request) {
             return NextResponse.json({ currentHour, creators: [], isToday });
         }
 
-        // --- Hourly revenue query ---
+        // --- Hourly revenue via Prisma findMany (not $queryRaw) ---
         const creatorIds = creators.map((c) => c.id);
 
-        // Convert Date objects to ISO strings — Prisma $queryRaw Date objects
-        // can cause timezone mismatches on Vercel's serverless runtime
-        const dayStartIso = dayStartUtc.toISOString();
-        const dayEndIso = dayEndUtc.toISOString();
+        const transactions = await prisma.transaction.findMany({
+            where: {
+                date: { gte: dayStartUtc, lt: dayEndUtc },
+                creatorId: { in: creatorIds },
+            },
+            select: { creatorId: true, amount: true, date: true },
+        });
 
-        const rows: { creatorId: string; bucket: Date; total: number }[] = await prisma.$queryRaw`
-            SELECT "creatorId",
-                   date_trunc('hour', "date") AS bucket,
-                   COALESCE(SUM("amount"), 0)::float AS total
-            FROM "Transaction"
-            WHERE "date" >= ${dayStartIso}::timestamptz AND "date" < ${dayEndIso}::timestamptz
-              AND "creatorId" IN (${Prisma.join(creatorIds)})
-            GROUP BY "creatorId", bucket
-            ORDER BY bucket
-        `;
+        console.log("[hourly] creatorIds:", creatorIds.length, "tx count:", transactions.length,
+            "dayStartUtc:", dayStartUtc.toISOString(), "dayEndUtc:", dayEndUtc.toISOString(),
+            "ukOffset:", ukOffset, "currentHour:", currentHour);
 
-        // --- Build per-creator hourly arrays ---
+        // Group by creator + UK hour in JavaScript
         const hoursCount = currentHour + 1;
         const creatorMap = new Map<string, number[]>();
 
@@ -99,13 +94,14 @@ export async function GET(req: Request) {
             creatorMap.set(creator.id, new Array(hoursCount).fill(0));
         }
 
-        for (const row of rows) {
-            const hourly = creatorMap.get(row.creatorId);
+        for (const tx of transactions) {
+            if (!tx.creatorId) continue;
+            const hourly = creatorMap.get(tx.creatorId);
             if (!hourly) continue;
-            const bucketUk = new Date(row.bucket.getTime() + ukOffset);
-            const hourIndex = bucketUk.getHours();
+            const txUk = new Date(tx.date.getTime() + ukOffset);
+            const hourIndex = txUk.getHours();
             if (hourIndex >= 0 && hourIndex < hoursCount) {
-                hourly[hourIndex] = Math.round(row.total * 100) / 100;
+                hourly[hourIndex] += Number(tx.amount);
             }
         }
 
