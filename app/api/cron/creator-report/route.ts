@@ -112,9 +112,13 @@ export async function GET(req: Request) {
                 };
 
                 try {
-                    const dayStart = reportDate.toISOString();
-                    const dayEnd = new Date(reportDate.getTime() + 24 * 60 * 60 * 1000).toISOString();
-                    const fmt = (d: string) => d.replace("T", " ").replace(/\.\d+Z$/, "");
+                    // OFAPI date format: "2026-02-27 00:00:00" (NOT ISO with T/Z)
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    const y = reportDate.getUTCFullYear();
+                    const m = pad(reportDate.getUTCMonth() + 1);
+                    const d = pad(reportDate.getUTCDate());
+                    const dayStart = `${y}-${m}-${d} 00:00:00`;
+                    const dayEnd = `${y}-${m}-${d} 23:59:59`;
 
                     // ---- 6 earnings calls (per type) + /me + top% + overview (best-effort) ----
                     const [
@@ -130,7 +134,7 @@ export async function GET(req: Request) {
                         getMe(acct, key).catch(() => null),
                         getTopPercentage(acct, key).catch(() => null),
                         // Best-effort: may return data or null depending on OFAPI plan
-                        getStatisticsOverview(acct, key, fmt(dayStart), fmt(dayEnd)).catch(() => null),
+                        getStatisticsOverview(acct, key, dayStart, dayEnd).catch(() => null),
                     ]);
 
                     // ---- Parse earnings (OFAPI confirmed: individual per-type GET calls) ----

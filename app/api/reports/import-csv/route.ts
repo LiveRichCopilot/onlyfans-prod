@@ -122,12 +122,71 @@ export async function POST(req: NextRequest) {
             select: { id: true, name: true, ofUsername: true, group: true },
         });
 
-        // Build lookup maps (lowercase name/username -> creator)
-        const creatorByName = new Map<string, typeof allCreators[0]>();
+        // Strip emojis, special chars, extra spaces for fuzzy matching
+        const clean = (s: string) => s
+            .replace(/[\u{1F000}-\u{1FFFF}]/gu, "") // emojis
+            .replace(/[\u{2600}-\u{27BF}]/gu, "")   // misc symbols
+            .replace(/[\u{FE00}-\u{FE0F}]/gu, "")   // variation selectors
+            .replace(/[\u{200D}]/gu, "")             // zero-width joiner
+            .replace(/[^\w\s]/g, "")                 // non-word chars
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase();
+
+        // Build multiple lookup maps for fuzzy matching
+        const creatorByExact = new Map<string, typeof allCreators[0]>();
+        const creatorByClean = new Map<string, typeof allCreators[0]>();
+        const creatorByFirstWord = new Map<string, typeof allCreators[0]>();
+        const creatorByUsername = new Map<string, typeof allCreators[0]>();
+        const allCreatorClean: { creator: typeof allCreators[0]; cleaned: string }[] = [];
+
         for (const c of allCreators) {
-            if (c.name) creatorByName.set(c.name.toLowerCase().trim(), c);
-            if (c.ofUsername) creatorByName.set(c.ofUsername.toLowerCase().trim(), c);
+            if (c.name) {
+                creatorByExact.set(c.name.toLowerCase().trim(), c);
+                const cleaned = clean(c.name);
+                creatorByClean.set(cleaned, c);
+                allCreatorClean.push({ creator: c, cleaned });
+                // First word of cleaned name (e.g. "katelyn" from "KATELYN 😜 #1 FITNESS...")
+                const firstWord = cleaned.split(" ")[0];
+                if (firstWord && firstWord.length >= 3) {
+                    creatorByFirstWord.set(firstWord, c);
+                }
+            }
+            if (c.ofUsername) {
+                creatorByUsername.set(c.ofUsername.toLowerCase().trim(), c);
+                creatorByClean.set(clean(c.ofUsername), c);
+            }
         }
+
+        // Fuzzy match: tries exact → cleaned → username → first-word → substring
+        const matchCreator = (csvName: string) => {
+            const lower = csvName.toLowerCase().trim();
+            const cleaned = clean(csvName);
+            // Remove common suffixes like "Free", "VIP", "OFTV", "Paid" for base matching
+            const baseName = cleaned.replace(/\b(free|vip|oftv|paid)\b/gi, "").trim();
+
+            // 1. Exact match on name or username
+            if (creatorByExact.has(lower)) return creatorByExact.get(lower)!;
+            if (creatorByUsername.has(lower)) return creatorByUsername.get(lower)!;
+
+            // 2. Cleaned match
+            if (creatorByClean.has(cleaned)) return creatorByClean.get(cleaned)!;
+            if (creatorByClean.has(baseName)) return creatorByClean.get(baseName)!;
+
+            // 3. CSV name contained in DB name or vice versa
+            for (const { creator, cleaned: dbCleaned } of allCreatorClean) {
+                if (baseName && dbCleaned.includes(baseName)) return creator;
+                if (baseName && baseName.includes(dbCleaned) && dbCleaned.length >= 3) return creator;
+            }
+
+            // 4. First word match (for single-name creators like "Rebecca", "Dolly", "Katelyn")
+            const firstWord = baseName.split(" ")[0];
+            if (firstWord && firstWord.length >= 4 && creatorByFirstWord.has(firstWord)) {
+                return creatorByFirstWord.get(firstWord)!;
+            }
+
+            return null;
+        };
 
         let imported = 0;
         let skipped = 0;
@@ -147,8 +206,8 @@ export async function POST(req: NextRequest) {
                 continue;
             }
 
-            // Match creator
-            const creator = creatorByName.get(creatorName.toLowerCase().trim());
+            // Match creator (fuzzy)
+            const creator = matchCreator(creatorName);
             if (!creator) {
                 unmatchedCreators.add(creatorName);
                 skipped++;
