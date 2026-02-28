@@ -53,6 +53,7 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/";
       return NextResponse.redirect(url);
     }
+    supabaseResponse.headers.set("x-next-pathname", pathname);
     return supabaseResponse;
   }
 
@@ -66,8 +67,12 @@ export async function middleware(request: NextRequest) {
 
   // Allow onboarding page through for authenticated users
   if (pathname === "/onboarding" || pathname.startsWith("/api/onboarding")) {
+    supabaseResponse.headers.set("x-next-pathname", pathname);
     return supabaseResponse;
   }
+
+  // Pass pathname to server components via header
+  supabaseResponse.headers.set("x-next-pathname", pathname);
 
   return supabaseResponse;
 }
