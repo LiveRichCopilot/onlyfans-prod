@@ -217,7 +217,7 @@ export default function TeamManagement() {
                                         </td>
                                         <td className="py-4 px-4">
                                             {m.role === "OWNER" ? (
-                                                <span className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wider w-max">
+                                                <span className="flex items-center gap-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wider w-max">
                                                     <Shield size={12} /> Owner
                                                 </span>
                                             ) : (
@@ -308,7 +308,7 @@ export default function TeamManagement() {
                                             </span>
                                         </td>
                                         <td className="py-4 px-4">
-                                            <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded">
+                                            <span className="text-xs text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-1 rounded">
                                                 Pending
                                             </span>
                                         </td>

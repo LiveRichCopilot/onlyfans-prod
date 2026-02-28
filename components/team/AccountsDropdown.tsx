@@ -60,7 +60,7 @@ export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
                 onClick={() => setOpen(!open)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition ${
                     count === 0
-                        ? "border-amber-500/30 text-amber-400 bg-amber-500/5"
+                        ? "border-white/20 text-white/50 bg-white/5"
                         : "border-teal-500/30 text-teal-400 bg-teal-500/5"
                 }`}
             >
@@ -70,7 +70,9 @@ export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
             </button>
 
             {open && (
-                <div className="absolute top-full left-0 mt-2 w-64 glass-panel rounded-2xl border border-white/10 bg-gray-900/95 shadow-2xl z-50 overflow-hidden">
+                <>
+                <div className="fixed inset-0 z-40" />
+                <div className="absolute top-full left-0 mt-2 w-64 rounded-2xl border border-white/15 bg-gray-950/90 backdrop-blur-3xl shadow-[0_8px_32px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] z-50 overflow-hidden">
                     <div className="max-h-[280px] overflow-y-auto p-2">
                         <button
                             onClick={toggleAll}
@@ -124,6 +126,7 @@ export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
                         })}
                     </div>
                 </div>
+                </>
             )}
         </div>
     );
