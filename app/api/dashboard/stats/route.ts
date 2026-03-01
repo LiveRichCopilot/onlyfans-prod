@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
     try {
         const creators = await prisma.creator.findMany({
-            where: { ofapiToken: { not: null } },
+            where: { active: true, ofapiToken: { not: null } },
             orderBy: { createdAt: "desc" },
         });
 

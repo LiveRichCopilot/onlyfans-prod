@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
     const creators = await prisma.creator.findMany({
+        where: { active: true },
         select: {
             id: true,
             name: true,
