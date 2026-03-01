@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     const allStrengths = hourlyScores.flatMap(h => h.strengthTags);
     const allMistakes = hourlyScores.flatMap(h => h.mistakeTags);
 
-    // Hourly score timeline
+    // Hourly score timeline — include conversation evidence
     const hourlyTimeline = hourlyScores.map(h => ({
       windowStart: h.windowStart.toISOString(),
       windowEnd: h.windowEnd.toISOString(),
@@ -121,6 +121,11 @@ export async function GET(req: NextRequest) {
       conversationsScanned: h.conversationsScanned,
       archetype: h.detectedArchetype,
       aiNotes: h.aiNotes,
+      notableQuotes: h.notableQuotes || null,
+      conversationData: h.conversationData || null,
+      scores: { sla: h.slaScore, followup: h.followupScore, trigger: h.triggerScore, quality: h.qualityScore, revenue: h.revenueScore },
+      strengthTags: h.strengthTags,
+      mistakeTags: h.mistakeTags,
     }));
 
     // Computed: messages per hour
