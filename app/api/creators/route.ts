@@ -127,6 +127,7 @@ export async function GET(request: Request) {
         const endParam = searchParams.get("end");
 
         const creators = await prisma.creator.findMany({
+            where: { active: true },
             orderBy: { createdAt: "desc" },
         });
 

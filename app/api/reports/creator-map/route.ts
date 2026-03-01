@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
             id: true,
             name: true,
             ofUsername: true,
-            ofAccountId: true,
             group: true,
         },
         orderBy: { name: "asc" },
@@ -29,7 +28,6 @@ export async function GET(req: NextRequest) {
             id: c.id,
             name: c.name,
             ofUsername: c.ofUsername,
-            ofAccountId: c.ofAccountId,
             group: c.group,
         })),
     });
