@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       if (hsName === chatterName) return true;
       const hsParts = hsName.split(/\s+/);
       const chParts = chatterName.split(/\s+/);
-      return (hsParts.every(p => chatterName.includes(p)) || chParts.every(p => hsName.includes(p))) && hsParts.length >= 2;
+      return (hsParts.every((p: string) => chatterName.includes(p)) || chParts.every((p: string) => hsName.includes(p))) && hsParts.length >= 2;
     });
 
     return NextResponse.json({
