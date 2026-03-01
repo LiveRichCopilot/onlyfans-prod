@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import {
   X, RefreshCw, MessageSquare, Users, Clock, Zap,
   Keyboard, Mouse, Activity, AlertTriangle, CheckCircle,
-  TrendingUp, TrendingDown, Copy, Shield, AppWindow,
+  TrendingUp, TrendingDown, Copy, Shield,
 } from "lucide-react";
 import { ScreenshotTimeline } from "./ScreenshotTimeline";
+import { HourlyTimeline, TagsSection, TopAppsSection } from "./ShiftReportSections";
 
 type ShiftReportData = {
   email: string;
@@ -105,15 +106,20 @@ function ActivityBar({ value, label, icon: Icon }: { value: number; label: strin
   );
 }
 
-function ScoreBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+function ScoreBar({ label, value, max, color, tooltip }: { label: string; value: number; max: number; color: string; tooltip?: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 group relative">
       <span className="text-[10px] text-white/70 w-16 shrink-0">{label}</span>
       <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <span className="text-[10px] tabular-nums font-medium w-8 text-right" style={{ color }}>{value}</span>
+      <span className="text-[10px] tabular-nums font-medium w-12 text-right" style={{ color }}>{value}/{max}</span>
+      {tooltip && (
+        <div className="absolute left-0 -top-8 hidden group-hover:block bg-[#12141a]/95 backdrop-blur-xl border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white/60 whitespace-nowrap z-10 shadow-lg">
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
@@ -218,6 +224,40 @@ function ShiftSummaryRow({ data }: { data: ShiftReportData }) {
         </div>
       </div>
 
+      {/* Diagnostic — explain WHY data is missing */}
+      {(data.activityVerdict === "no_data" || data.effortVerdict === "idle" || (data.scoringWindows === 0 && data.totalMessages === 0)) && (
+        <div className="glass-inset rounded-xl px-4 py-3 space-y-1.5 border border-amber-500/15">
+          <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-semibold">
+            <AlertTriangle size={12} /> Why is this report empty?
+          </div>
+          {!data.hubstaff && data.sessionCount === 0 && (
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              Chatter not linked to Hubstaff and no clock-in sessions recorded for this date. They may not have worked this shift.
+            </p>
+          )}
+          {!data.hubstaff && data.sessionCount > 0 && (
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              No Hubstaff tracking. Chatter has {data.sessionCount} session{data.sessionCount !== 1 ? "s" : ""} but no activity data was recorded — check Hubstaff mapping.
+            </p>
+          )}
+          {data.hubstaff && data.scoringWindows === 0 && (
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              Tracked by Hubstaff ({data.hubstaff.totalTrackedHrs}h) but no conversations were scored — chatter may not be assigned to a creator, or no messages were sent.
+            </p>
+          )}
+          {data.totalMessages === 0 && data.scoringWindows > 0 && (
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              No messages sent during this shift. Scoring windows exist but message count is zero — possible data sync delay.
+            </p>
+          )}
+          {data.hubstaff && data.hubstaff.overall < 10 && data.hubstaff.totalTrackedHrs > 0 && (
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              Hubstaff shows {data.hubstaff.totalTrackedHrs}h tracked but only {data.hubstaff.overall}% activity — chatter may have left tracking running while away.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Quick stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatPill icon={MessageSquare} label="Messages" value={String(data.totalMessages)} sub={`${data.messagesPerHour}/hr`} />
@@ -297,11 +337,11 @@ function ScoringSection({ data }: { data: ShiftReportData }) {
         <TrendingUp size={12} className="text-teal-400" /> Score Breakdown
       </h4>
       <div className="space-y-2">
-        <ScoreBar label="SLA" value={s.sla} max={25} color="#60a5fa" />
-        <ScoreBar label="Follow-up" value={s.followup} max={20} color="#2dd4bf" />
-        <ScoreBar label="Triggers" value={s.trigger} max={20} color="#a78bfa" />
-        <ScoreBar label="Quality" value={s.quality} max={20} color="#fbbf24" />
-        <ScoreBar label="Revenue" value={s.revenue} max={15} color="#34d399" />
+        <ScoreBar label="SLA" value={s.sla} max={25} color="#60a5fa" tooltip="Response speed. 25 = under 5 min replies" />
+        <ScoreBar label="Follow-up" value={s.followup} max={20} color="#2dd4bf" tooltip="Re-engaging quiet fans. 20 = always follows up" />
+        <ScoreBar label="Triggers" value={s.trigger} max={20} color="#a78bfa" tooltip="Acting on buying signals. 20 = never misses" />
+        <ScoreBar label="Quality" value={s.quality} max={20} color="#fbbf24" tooltip="Creative, personal messages. 20 = excellent" />
+        <ScoreBar label="Revenue" value={s.revenue} max={15} color="#34d399" tooltip="Closed sales (PPV, tips). 15 = strong closer" />
       </div>
       {(p.copyPaste !== 0 || p.missedTrigger !== 0 || p.spam !== 0 || totalBlasts > 0) && (
         <div className="border-t border-white/5 pt-2 space-y-1">
@@ -331,96 +371,4 @@ function ScoringSection({ data }: { data: ShiftReportData }) {
   );
 }
 
-/** Top apps used during shift */
-function TopAppsSection({ apps }: { apps: ShiftReportData["topApps"] }) {
-  if (apps.length === 0) return null;
 
-  return (
-    <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
-        <AppWindow size={12} className="text-teal-400" /> Top Apps During Shift
-      </h4>
-      <div className="space-y-1.5">
-        {apps.map((app, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-[11px] text-white/80 w-28 truncate">{app.name}</span>
-            <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
-              <div className="h-full rounded-full bg-teal-400/60" style={{ width: `${app.pct}%` }} />
-            </div>
-            <span className="text-[10px] tabular-nums text-white/70 w-10 text-right">{app.pct}%</span>
-            <span className="text-[10px] tabular-nums text-white/50 w-12 text-right">{formatSeconds(app.seconds)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function formatSeconds(sec: number): string {
-  if (sec < 60) return `${sec}s`;
-  const m = Math.floor(sec / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
-}
-
-/** Hourly performance timeline */
-function HourlyTimeline({ timeline }: { timeline: ShiftReportData["hourlyTimeline"] }) {
-  if (timeline.length === 0) return null;
-
-  return (
-    <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
-        <Clock size={12} className="text-teal-400" /> Hourly Performance
-      </h4>
-      <div className="space-y-1.5">
-        {timeline.map((h, i) => (
-          <div key={i} className="flex items-center gap-2 group">
-            <span className="text-[10px] text-white/60 w-14 shrink-0 tabular-nums">
-              {formatTime(h.windowStart)}
-            </span>
-            <div className="flex-1 h-5 glass-inset rounded-lg overflow-hidden relative">
-              <div
-                className="h-full rounded-lg transition-all"
-                style={{ width: `${h.totalScore}%`, background: activityColor(h.totalScore) }}
-              />
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/80">
-                {h.totalScore}
-              </span>
-            </div>
-            <span className="text-[9px] text-white/50 w-12 shrink-0 text-right">{h.messagesAnalyzed} msgs</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Strength and mistake tags */
-function TagsSection({ strengths, mistakes }: { strengths: string[]; mistakes: string[] }) {
-  if (strengths.length === 0 && mistakes.length === 0) return null;
-
-  return (
-    <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold">Tags</h4>
-      {strengths.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {strengths.map((t, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-teal-500/15 text-teal-400 border border-teal-500/20">
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-      {mistakes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {mistakes.map((t, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-red-500/15 text-red-400 border border-red-500/20">
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

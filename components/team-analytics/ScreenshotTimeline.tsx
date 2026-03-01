@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Camera, Eye, AlertTriangle, Monitor, Scan, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Camera, Eye, AlertTriangle, Scan, ChevronLeft, ChevronRight } from "lucide-react";
+import { ExpandedScreenshot } from "./ExpandedScreenshot";
 
 type Screenshot = {
   id: number;
@@ -159,7 +160,7 @@ export function ScreenshotTimeline({ email, date }: Props) {
   if (error && screenshots.length === 0) {
     return (
       <div className="glass-inset rounded-2xl p-4 text-center">
-        <Monitor size={18} className="text-white/20 mx-auto mb-2" />
+        <Camera size={18} className="text-white/20 mx-auto mb-2" />
         <p className="text-white/30 text-xs">{error}</p>
       </div>
     );
@@ -217,30 +218,80 @@ export function ScreenshotTimeline({ email, date }: Props) {
       </div>
 
       {/* Summary bar */}
-      {analyzed && summary && (
-        <div className="flex items-center gap-3 text-[11px] flex-wrap">
-          <span className="text-white/60">
-            <span className="font-bold text-white tabular-nums">{summary.onOfPct}%</span> on OnlyFans
-          </span>
-          <span className="text-white/10">|</span>
-          {summary.flaggedCount > 0 ? (
-            <span className="text-red-400 flex items-center gap-1">
-              <AlertTriangle size={10} />
-              {summary.flaggedCount} flagged
-            </span>
-          ) : (
-            <span className="text-emerald-400">0 flagged</span>
-          )}
-          <span className="text-white/10">|</span>
-          {summary.sameScreenStreak > 0 ? (
-            <span className="text-amber-400">
-              Stale screen: ~{summary.sameScreenStreak * 10} min
-            </span>
-          ) : (
-            <span className="text-white/30">No idle streaks</span>
-          )}
-        </div>
-      )}
+      {analyzed && summary && (() => {
+        // Compute activity breakdown from analysisMap
+        const counts: Record<string, number> = {};
+        let failedCount = 0;
+        for (const a of analysisMap.values()) {
+          if (a.analysisFailed) { failedCount++; continue; }
+          counts[a.activity] = (counts[a.activity] || 0) + 1;
+        }
+        const total = analysisMap.size;
+        const activityPills: { label: string; count: number; color: string }[] = [
+          { label: "Chatting", count: counts.chatting || 0, color: "#34d399" },
+          { label: "Browsing", count: counts.browsing || 0, color: "#fbbf24" },
+          { label: "Idle", count: counts.idle || 0, color: "#f87171" },
+          { label: "Social Media", count: counts.social_media || 0, color: "#a78bfa" },
+          { label: "Video", count: counts.video || 0, color: "#60a5fa" },
+          { label: "Other", count: counts.other || 0, color: "rgba(255,255,255,0.3)" },
+        ].filter(p => p.count > 0);
+
+        return (
+          <div className="space-y-2">
+            {/* Stats row */}
+            <div className="flex items-center gap-3 text-[11px] flex-wrap">
+              <span className="text-white/60">
+                <span className="font-bold text-white tabular-nums">{summary.analyzedCount}</span> of {summary.totalScreenshots} analyzed
+              </span>
+              <span className="text-white/10">|</span>
+              <span className="text-white/60">
+                <span className="font-bold text-white tabular-nums">{summary.onOfPct}%</span> on OnlyFans
+              </span>
+              <span className="text-white/10">|</span>
+              {summary.flaggedCount > 0 ? (
+                <span className="text-red-400 flex items-center gap-1">
+                  <AlertTriangle size={10} />
+                  {summary.flaggedCount} flagged
+                </span>
+              ) : (
+                <span className="text-emerald-400">0 flagged</span>
+              )}
+              {summary.sameScreenStreak > 0 && (
+                <>
+                  <span className="text-white/10">|</span>
+                  <span className="text-amber-400">
+                    Stale screen: ~{summary.sameScreenStreak * 10} min
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Activity breakdown pills */}
+            {activityPills.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {activityPills.map(p => (
+                  <span key={p.label} className="text-[10px] font-medium px-2 py-0.5 rounded-lg border"
+                    style={{ color: p.color, borderColor: p.color, background: `${typeof p.color === "string" && p.color.startsWith("#") ? p.color : "rgba(255,255,255,0.1)"}15` }}>
+                    {p.label}: {p.count}
+                  </span>
+                ))}
+                {failedCount > 0 && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-lg border border-white/10 text-white/30 bg-white/5">
+                    Failed: {failedCount}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Color legend explanation */}
+            <div className="text-[10px] text-white/35 leading-relaxed">
+              <span className="text-emerald-400/60">Green border</span> = chatting on OF.{" "}
+              <span className="text-amber-400/60">Amber</span> = on OF but not chatting.{" "}
+              <span className="text-red-400/60">Red / Flagged</span> = off-platform or idle.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Scrollable thumbnail strip */}
       <div className="relative group">
@@ -314,84 +365,3 @@ export function ScreenshotTimeline({ email, date }: Props) {
   );
 }
 
-/** Full-size screenshot modal overlay */
-function ExpandedScreenshot({
-  screenshot,
-  analysis,
-  onClose,
-}: {
-  screenshot: Screenshot;
-  analysis?: Analysis;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div
-        className="relative glass-card rounded-2xl max-w-3xl w-full overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <Monitor size={14} className="text-teal-400" />
-            <span className="text-white/70 text-xs tabular-nums">
-              {formatTimestamp(screenshot.recorded_at)}
-            </span>
-            {analysis && (
-              <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-lg ${
-                  analysis.flagged
-                    ? "bg-red-500/15 text-red-400 border border-red-500/20"
-                    : analysis.onOnlyFans
-                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                      : "bg-white/5 text-white/40 border border-white/10"
-                }`}
-              >
-                {analysis.app} - {activityLabel(analysis)}
-              </span>
-            )}
-          </div>
-          <button onClick={onClose} className="glass-button rounded-xl p-2 text-white/40 hover:text-white">
-            <X size={14} />
-          </button>
-        </div>
-
-        {/* Full screenshot */}
-        <div className="p-2">
-          <img
-            src={screenshotUrl(screenshot.url)}
-            alt="Full screenshot"
-            className="w-full rounded-xl"
-          />
-        </div>
-
-        {/* Analysis details */}
-        {analysis && (
-          <div className="px-4 py-3 border-t border-white/5 space-y-2">
-            <p className="text-white/60 text-xs">{analysis.description}</p>
-            {/* AI reasoning — always show when available */}
-            {analysis.reason && (
-              <div className="glass-inset rounded-lg px-3 py-2">
-                <p className="text-[10px] text-white/30 mb-0.5 font-medium">AI Reasoning</p>
-                <p className="text-white/50 text-[11px] leading-relaxed">{analysis.reason}</p>
-              </div>
-            )}
-            {analysis.analysisFailed && (
-              <div className="mt-1 flex items-center gap-1.5 text-white/30 text-[11px]">
-                <Monitor size={11} />
-                Analysis could not be completed — screenshot may have expired
-              </div>
-            )}
-            {analysis.flagged && !analysis.analysisFailed && (
-              <div className="mt-1 flex items-center gap-1.5 text-red-400 text-[11px]">
-                <AlertTriangle size={11} />
-                Flagged: {analysis.reason || "Employee not on OnlyFans or idle"}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}

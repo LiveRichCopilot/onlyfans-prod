@@ -30,6 +30,8 @@ export type MessageCardData = {
   creatorName: string;
   thumbnails: MediaThumb[];
   source: "direct" | "mass";
+  likelySender?: string;
+  likelySenderEmail?: string;
 };
 
 const HOOK_COLORS: Record<string, string> = {
@@ -43,6 +45,13 @@ function MediaTypeIcon({ type }: { type: string }) {
   if (type === "audio") return <Mic size={10} className="text-amber-400" />;
   if (type === "photo") return <Image size={10} className="text-blue-400" />;
   return <Type size={10} className="text-white/30" />;
+}
+
+function formatUKDateTime(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Europe/London" });
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+  return `${date}, ${time}`;
 }
 
 function Pill({ label, color }: { label: string; color?: string }) {
@@ -120,8 +129,16 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
                 <span className="text-[10px] font-bold text-white/40 tabular-nums">#{rank}</span>
               )}
               <span className="text-white/60 text-[10px]">{msg.creatorName}</span>
+              {msg.likelySender && (
+                <span className="text-white/40 text-[10px] group/sender relative cursor-default">
+                  by <span className="text-teal-400/70">{msg.likelySender}</span>
+                  <span className="absolute left-0 -top-6 hidden group-hover/sender:block bg-[#12141a]/95 backdrop-blur-xl border border-white/10 rounded-lg px-2 py-1 text-[9px] text-white/50 whitespace-nowrap z-10">
+                    Approximate — was on shift when sent
+                  </span>
+                </span>
+              )}
             </div>
-            <span className="text-white/50 text-[10px] shrink-0">{msg.date ? new Date(msg.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""}</span>
+            <span className="text-white/50 text-[10px] shrink-0">{msg.date ? formatUKDateTime(msg.date) : ""}</span>
           </div>
 
           {/* Full message text */}

@@ -30,6 +30,8 @@ type ClassifiedMessage = {
   creatorName: string;
   source: "direct" | "mass";
   thumbnails: MediaThumb[];
+  likelySender?: string;
+  likelySenderEmail?: string;
 };
 
 type AggregatedEntry = {
@@ -239,6 +241,32 @@ export async function GET(req: NextRequest) {
     const directClassified = allDirectMessages.map(msg => classifyMessage(msg as Record<string, any>, "direct"));
     const massClassified = allMassMessages.map(msg => classifyMessage(msg as Record<string, any>, "mass"));
     const allClassified = [...directClassified, ...massClassified];
+
+    // --- Approximate sender attribution ---
+    // Query chatter sessions overlapping the date range
+    const shiftSessions = await prisma.chatterSession.findMany({
+      where: {
+        clockIn: { lte: endDate },
+        OR: [{ clockOut: { gte: startDate } }, { clockOut: null, isLive: true }],
+        ...(creatorId ? { creatorId } : {}),
+      },
+      select: { email: true, creatorId: true, clockIn: true, clockOut: true },
+    });
+
+    // For each message, find who was on shift when it was sent
+    for (const msg of allClassified) {
+      if (!msg.date) continue;
+      const msgTime = new Date(msg.date).getTime();
+      const match = shiftSessions.find(s =>
+        s.creatorId === msg.creatorId &&
+        new Date(s.clockIn).getTime() <= msgTime &&
+        (s.clockOut ? new Date(s.clockOut).getTime() >= msgTime : true)
+      );
+      if (match) {
+        (msg as any).likelySender = match.email.split("@")[0];
+        (msg as any).likelySenderEmail = match.email;
+      }
+    }
 
     // Aggregations
     const hookPerformance = aggregateByField(allClassified, "hookCategory");

@@ -94,6 +94,15 @@ export async function GET(req: NextRequest) {
     }
     const archetypeDistribution = [...archCounts.entries()].map(([archetype, count]) => ({ archetype, count }));
 
+    // --- Chatter Hours Map (for comparison table — closed sessions only) ---
+    const chatterHoursMap = new Map<string, number>();
+    for (const s of sessions) {
+      if (!s.clockIn || !s.clockOut) continue;
+      const key = `${s.email}|${s.creatorId}`;
+      const hrs = (new Date(s.clockOut).getTime() - new Date(s.clockIn).getTime()) / 3600000;
+      if (hrs > 0 && hrs < 24) chatterHoursMap.set(key, (chatterHoursMap.get(key) || 0) + hrs);
+    }
+
     // --- Chatter Comparison ---
     const chatterComparison = profiles.map(p => ({
       name: p.chatterName || p.chatterEmail.split("@")[0],
@@ -102,6 +111,7 @@ export async function GET(req: NextRequest) {
       avgScore: Math.round(p.avgTotalScore),
       totalSessions: p.totalScoringSessions,
       improvementIndex: Math.round(p.improvementIndex * 100) / 100,
+      totalHours: parseFloat((chatterHoursMap.get(`${p.chatterEmail}|${p.creatorId}`) || 0).toFixed(1)),
     })).sort((a, b) => b.avgScore - a.avgScore);
 
     // --- Category Averages ---
