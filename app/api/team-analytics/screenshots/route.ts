@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getScreenshots, HubstaffScreenshot } from "@/lib/hubstaff";
 import { analyzeScreenshots, ScreenshotAnalysis } from "@/lib/screenshot-analyzer";
 import { uploadScreenshotBatch, isStorageConfigured } from "@/lib/supabase-storage";
+import { resolveHubstaffUser } from "@/lib/hubstaff-resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -30,21 +31,19 @@ export async function GET(req: NextRequest) {
   const isoEnd = `${targetDate}T23:59:59Z`;
 
   try {
-    // Step 1: Find Hubstaff user mapping
-    const mapping = await prisma.hubstaffUserMapping.findFirst({
-      where: { chatterEmail: email },
-    });
+    // Step 1: Resolve Hubstaff user (auto-matches by email/name if not manually mapped)
+    const resolved = await resolveHubstaffUser(email);
 
-    if (!mapping) {
+    if (!resolved) {
       return NextResponse.json({
         screenshots: [],
         analysis: null,
         summary: null,
-        error: "No Hubstaff mapping found for this email",
+        error: "Could not match this chatter to a Hubstaff account",
       });
     }
 
-    const hsUserId = parseInt(mapping.hubstaffUserId);
+    const hsUserId = resolved.hubstaffUserId;
 
     // Step 2: Check cache first
     const dayStart = new Date(isoStart);

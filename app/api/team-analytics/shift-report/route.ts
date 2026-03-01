@@ -4,6 +4,7 @@ import {
   getActivities,
   getToolUsages,
 } from "@/lib/hubstaff";
+import { resolveHubstaffUser } from "@/lib/hubstaff-resolve";
 
 export const dynamic = "force-dynamic";
 
@@ -144,13 +145,11 @@ export async function GET(req: NextRequest) {
     let topApps: { name: string; seconds: number; pct: number }[] = [];
 
     try {
-      // Find Hubstaff user ID for this email
-      const mapping = await prisma.hubstaffUserMapping.findFirst({
-        where: { chatterEmail: email },
-      });
+      // Resolve Hubstaff user (auto-matches by email/name if not manually mapped)
+      const resolved = await resolveHubstaffUser(email, creatorId);
 
-      if (mapping) {
-        const hsUserId = parseInt(mapping.hubstaffUserId);
+      if (resolved) {
+        const hsUserId = resolved.hubstaffUserId;
         const isoStart = `${targetDate}T00:00:00Z`;
         const isoEnd = `${targetDate}T23:59:59Z`;
 
