@@ -50,9 +50,39 @@ type AnalysisResult = {
   failed: boolean;
 };
 
+/** Download image and convert to base64 data URI for reliable vision API access. */
+async function toBase64DataUri(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) {
+      console.error(`[screenshot-analyzer] Image fetch failed: ${res.status} for ${url.slice(0, 80)}...`);
+      return null;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type") || "image/png";
+    return `data:${contentType};base64,${buf.toString("base64")}`;
+  } catch (e: any) {
+    console.error(`[screenshot-analyzer] Image download error: ${e.message}`);
+    return null;
+  }
+}
+
 async function analyzeOne(screenshotUrl: string): Promise<AnalysisResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+
+  // Download image first — Hubstaff CDN URLs may not be accessible to OpenAI servers
+  const dataUri = await toBase64DataUri(screenshotUrl);
+  if (!dataUri) {
+    return {
+      app: "Unknown",
+      activity: "other",
+      onOnlyFans: false,
+      description: "Analysis failed — could not download screenshot",
+      reason: "Screenshot image could not be downloaded (URL may have expired).",
+      failed: true,
+    };
+  }
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -68,7 +98,7 @@ async function analyzeOne(screenshotUrl: string): Promise<AnalysisResult> {
           role: "user",
           content: [
             { type: "text", text: "Classify this work screenshot:" },
-            { type: "image_url", image_url: { url: screenshotUrl, detail: "low" } },
+            { type: "image_url", image_url: { url: dataUri, detail: "low" } },
           ],
         },
       ],
@@ -79,13 +109,13 @@ async function analyzeOne(screenshotUrl: string): Promise<AnalysisResult> {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("[screenshot-analyzer] OpenAI error:", res.status, text);
+    console.error("[screenshot-analyzer] OpenAI error:", res.status, text.slice(0, 300));
     return {
       app: "Unknown",
       activity: "other",
       onOnlyFans: false,
       description: "Analysis failed — could not process screenshot",
-      reason: "Screenshot could not be analyzed (image may have expired or API error).",
+      reason: `OpenAI API error: ${res.status}. ${text.slice(0, 100)}`,
       failed: true,
     };
   }
