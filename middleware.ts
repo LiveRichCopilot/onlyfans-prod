@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/api/cron",
   "/api/reports/creator-map",
   "/api/reports/import-csv",
+  "/api/debug",
 ];
 
 function isPublicPath(pathname: string): boolean {
