@@ -60,10 +60,13 @@ export async function GET(req: Request) {
         const dayStartUtc = new Date(dayStart.getTime() - ukOffset);
         const dayEndUtc = isToday ? now : new Date(dayEnd.getTime() - ukOffset);
 
-        // --- Fetch creators ---
+        // --- Fetch creators (active only — hist-* entries are historical data only) ---
         const creators = await prisma.creator.findMany({
-            where: allowedCreatorIds ? { id: { in: allowedCreatorIds } } : undefined,
-            select: { id: true, name: true, avatarUrl: true, hourlyTarget: true, active: true },
+            where: {
+                active: true,
+                ...(allowedCreatorIds ? { id: { in: allowedCreatorIds } } : {}),
+            },
+            select: { id: true, name: true, avatarUrl: true, hourlyTarget: true },
             orderBy: { name: "asc" },
         });
 

@@ -52,7 +52,8 @@ export async function GET() {
         // Fetch all creators — matches every other query in the codebase.
         // TODO: filter by organizationId once creators are assigned to orgs.
         const allCreators = await prisma.creator.findMany({
-            select: { id: true, name: true, avatarUrl: true, active: true },
+            where: { active: true },
+            select: { id: true, name: true, avatarUrl: true },
             orderBy: { name: "asc" },
         });
 

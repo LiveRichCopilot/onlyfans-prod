@@ -24,9 +24,10 @@ export async function GET() {
         const accounts = await accountsRes.json();
         const updated: any[] = [];
 
-        // Get all creators from our DB
-        // Sync ALL creators, including unlinked ones (they still need profile data)
-        const creators = await prisma.creator.findMany();
+        // Get active creators from our DB (hist-* entries are historical only)
+        const creators = await prisma.creator.findMany({
+            where: { active: true },
+        });
 
         for (const creator of creators) {
             // Match by ofapiCreatorId (the acct_xxx ID)
