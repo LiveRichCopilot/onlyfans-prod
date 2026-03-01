@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { Shield } from "lucide-react";
+import { Shield, ChevronDown, ChevronUp } from "lucide-react";
 import { GlassTooltip } from "./ChartTooltip";
 import { ExportButtons } from "./ExportButtons";
 import { scoreColor } from "./chart-colors";
@@ -20,7 +21,13 @@ type Props = {
   onChatterClick?: (email: string) => void;
 };
 
+const COLLAPSED_COUNT = 8;
+
 export function ChatterComparisonBar({ data, onChatterClick }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const showToggle = data.length > COLLAPSED_COUNT;
+  const visible = expanded ? data : data.slice(0, COLLAPSED_COUNT);
+
   return (
     <div className="glass-card rounded-3xl p-6">
       <div className="flex items-center justify-between mb-4">
@@ -35,24 +42,32 @@ export function ChatterComparisonBar({ data, onChatterClick }: Props) {
       </div>
 
       {data.length === 0 ? (
-        <div className="h-[250px] flex items-center justify-center text-white/30 text-sm">No chatter profiles yet</div>
+        <div className="h-[200px] flex items-center justify-center text-white/30 text-sm">No chatter profiles yet</div>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={Math.max(250, data.length * 35)}>
-            <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
+          <ResponsiveContainer width="100%" height={visible.length * 32}>
+            <BarChart data={visible} layout="vertical" margin={{ left: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
               <XAxis type="number" domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} />
               <YAxis type="category" dataKey="name" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} width={100} />
               <Tooltip content={<GlassTooltip />} />
-              <Bar dataKey="avgScore" name="Score" radius={[0, 6, 6, 0]} barSize={18}>
-                {data.map((entry, i) => <Cell key={i} fill={scoreColor(entry.avgScore)} />)}
+              <Bar dataKey="avgScore" name="Score" radius={[0, 6, 6, 0]} barSize={16}>
+                {visible.map((entry, i) => <Cell key={i} fill={scoreColor(entry.avgScore)} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
 
-          {/* Clickable chatter list for shift reports */}
+          {showToggle && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="mt-2 w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-white/40 hover:text-white/70 transition"
+            >
+              {expanded ? <><ChevronUp size={14} /> Show top {COLLAPSED_COUNT}</> : <><ChevronDown size={14} /> Show all {data.length} chatters</>}
+            </button>
+          )}
+
           {onChatterClick && (
-            <div className="mt-4 border-t border-white/5 pt-4">
+            <div className="mt-3 border-t border-white/5 pt-3">
               <p className="text-[10px] text-white/30 mb-2 flex items-center gap-1">
                 <Shield size={10} className="text-teal-400" /> Click to open shift accountability report
               </p>
