@@ -1,29 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { listMembers } from "@/lib/hubstaff";
+import { listMembers, getActivities, getScreenshots, getToolUsages } from "@/lib/hubstaff";
+import { resolveHubstaffUser } from "@/lib/hubstaff-resolve";
 
 export const dynamic = "force-dynamic";
 
-/** Debug: check why a chatter isn't matching to Hubstaff */
+/** Debug: full pipeline test — resolve user → fetch activities → fetch screenshots */
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email") || "";
+  const dateParam = req.nextUrl.searchParams.get("date");
+  const targetDate = dateParam || new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
 
   try {
-    // 1. What email do we have in DB?
+    // 1. DB profiles for this email
     const profiles = await prisma.chatterProfile.findMany({
-      where: { chatterName: { contains: "Elly", mode: "insensitive" } },
+      where: { chatterEmail: { contains: email, mode: "insensitive" } },
       select: { chatterEmail: true, chatterName: true, creatorId: true },
       take: 5,
     });
 
-    // 2. What mappings exist?
+    // 2. Existing mappings
     const mappings = await prisma.hubstaffUserMapping.findMany({
-      select: { hubstaffUserId: true, hubstaffName: true, chatterEmail: true },
+      where: { chatterEmail: { contains: email, mode: "insensitive" } },
+      select: { hubstaffUserId: true, hubstaffName: true, chatterEmail: true, creatorId: true },
     });
 
-    // 3. What does Hubstaff API return?
+    // 3. All Hubstaff members
     const { members, users } = await listMembers();
-    const hubstaffMembers = members.map(m => {
+    const hubstaffMembers = members.map((m: any) => {
       const u = users.find((u: any) => u.id === m.user_id);
       return {
         memberId: m.id,
@@ -34,33 +38,80 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // 4. Try matching the requested email
-    const emailNorm = email.toLowerCase().trim();
-    const emailMatch = hubstaffMembers.find(m => m.email.toLowerCase().trim() === emailNorm);
+    // 4. Run resolveHubstaffUser
+    const resolved = await resolveHubstaffUser(email);
 
-    // 5. Try name match
-    const profile = profiles.find(p => p.chatterEmail.toLowerCase() === emailNorm) || profiles[0];
-    const chatterName = (profile?.chatterName || email.split("@")[0]).toLowerCase().trim();
-    const nameMatch = hubstaffMembers.find(m => {
-      const hsName = m.name.toLowerCase().trim();
-      if (hsName === chatterName) return true;
-      const hsParts = hsName.split(/\s+/);
-      const chParts = chatterName.split(/\s+/);
-      return (hsParts.every((p: string) => chatterName.includes(p)) || chParts.every((p: string) => hsName.includes(p))) && hsParts.length >= 2;
+    // 5. If resolved, fetch activities + screenshots for the date
+    let activityData: any = null;
+    let screenshotData: any = null;
+
+    if (resolved) {
+      const isoStart = `${targetDate}T00:00:00Z`;
+      const isoEnd = `${targetDate}T23:59:59Z`;
+
+      try {
+        const allActivities = await getActivities(isoStart, isoEnd);
+        const userActivities = allActivities.filter(a => a.user_id === resolved.hubstaffUserId);
+        const totalTracked = userActivities.reduce((s, a) => s + a.tracked, 0);
+        const totalOverall = userActivities.reduce((s, a) => s + a.overall, 0);
+
+        activityData = {
+          totalActivitiesInOrg: allActivities.length,
+          userActivities: userActivities.length,
+          totalTrackedSeconds: totalTracked,
+          totalTrackedHrs: parseFloat((totalTracked / 3600).toFixed(2)),
+          overallPct: totalTracked > 0 ? Math.round((totalOverall / totalTracked) * 100) : 0,
+          sampleActivity: userActivities[0] || null,
+          uniqueUserIds: [...new Set(allActivities.map(a => a.user_id))],
+        };
+      } catch (e: any) {
+        activityData = { error: e.message };
+      }
+
+      try {
+        const allScreenshots = await getScreenshots(isoStart, isoEnd);
+        const userScreenshots = allScreenshots.filter(s => s.user_id === resolved.hubstaffUserId);
+
+        screenshotData = {
+          totalScreenshotsInOrg: allScreenshots.length,
+          userScreenshots: userScreenshots.length,
+          sampleScreenshot: userScreenshots[0] ? {
+            id: userScreenshots[0].id,
+            recorded_at: userScreenshots[0].recorded_at,
+            user_id: userScreenshots[0].user_id,
+          } : null,
+          uniqueUserIds: [...new Set(allScreenshots.map(s => s.user_id))],
+        };
+      } catch (e: any) {
+        screenshotData = { error: e.message };
+      }
+    }
+
+    // 6. Check sessions for this date
+    const dayStart = new Date(`${targetDate}T00:00:00Z`);
+    const dayEnd = new Date(`${targetDate}T23:59:59Z`);
+    const sessions = await prisma.chatterSession.findMany({
+      where: {
+        email: { contains: email, mode: "insensitive" },
+        clockIn: { gte: dayStart, lte: dayEnd },
+      },
+      select: { email: true, clockIn: true, clockOut: true, creatorId: true },
+      take: 10,
     });
 
     return NextResponse.json({
       searchEmail: email,
+      targetDate,
       dbProfiles: profiles,
       existingMappings: mappings,
+      resolved,
+      hubstaffMemberCount: hubstaffMembers.length,
       hubstaffMembers,
-      matching: {
-        emailMatch: emailMatch || null,
-        nameMatch: nameMatch || null,
-        chatterNameUsed: chatterName,
-      },
+      activityData,
+      screenshotData,
+      sessions,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message, stack: err.stack?.split("\n").slice(0, 5) }, { status: 500 });
   }
 }
