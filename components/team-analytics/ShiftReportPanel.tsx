@@ -12,6 +12,7 @@ import { HourlyTimeline, TagsSection, TopAppsSection } from "./ShiftReportSectio
 type ShiftReportData = {
   email: string;
   name: string;
+  creatorName: string | null;
   date: string;
   shift: string | null;
   sessionCount: number;
@@ -96,16 +97,16 @@ function ActivityBar({ value, label, icon: Icon }: { value: number; label: strin
   const verdict = activityVerdict(value);
   return (
     <div className="flex items-center gap-3">
-      <Icon size={14} className="text-white/40 shrink-0" />
+      <Icon size={16} className="text-white/50 shrink-0" />
       <div className="flex-1">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] text-white/70">{label}</span>
+          <span className="text-sm text-white/90 font-medium">{label}</span>
           <div className="flex items-center gap-2">
-            <span className="text-[9px]" style={{ color: verdict.color }}>{verdict.label}</span>
-            <span className="text-[11px] font-bold tabular-nums" style={{ color }}>{value}%</span>
+            <span className="text-xs" style={{ color: verdict.color }}>{verdict.label}</span>
+            <span className="text-sm font-bold tabular-nums" style={{ color }}>{value}%</span>
           </div>
         </div>
-        <div className="h-2 glass-inset rounded-full overflow-hidden">
+        <div className="h-3 glass-inset rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, value)}%`, background: color }} />
         </div>
       </div>
@@ -116,14 +117,14 @@ function ActivityBar({ value, label, icon: Icon }: { value: number; label: strin
 function ScoreBar({ label, value, max, color, tooltip }: { label: string; value: number; max: number; color: string; tooltip?: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex items-center gap-2 group relative">
-      <span className="text-[10px] text-white/70 w-16 shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
+    <div className="flex items-center gap-3 group relative">
+      <span className="text-sm text-white/90 w-20 shrink-0 font-medium">{label}</span>
+      <div className="flex-1 h-2.5 glass-inset rounded-full overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
-      <span className="text-[10px] tabular-nums font-medium w-12 text-right" style={{ color }}>{value}/{max}</span>
+      <span className="text-sm tabular-nums font-bold w-14 text-right" style={{ color }}>{value}/{max}</span>
       {tooltip && (
-        <div className="absolute left-0 -top-8 hidden group-hover:block bg-[#12141a]/95 backdrop-blur-xl border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white/60 whitespace-nowrap z-10 shadow-lg">
+        <div className="absolute left-0 -top-8 hidden group-hover:block bg-[#12141a]/95 backdrop-blur-xl border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white/80 whitespace-nowrap z-10 shadow-lg">
           {tooltip}
         </div>
       )}
@@ -165,12 +166,18 @@ export function ShiftReportPanel({ email, creatorId, date, onClose }: Props) {
         {/* Header */}
         <div className="sticky top-0 z-10 glass-prominent rounded-t-3xl px-6 py-4 flex items-center justify-between border-b border-white/5">
           <div>
-            <h2 className="text-white font-bold text-base flex items-center gap-2">
-              <Shield size={16} className="text-teal-400" />
+            <h2 className="text-white font-bold text-lg flex items-center gap-2">
+              <Shield size={18} className="text-teal-400" />
               Shift Report
             </h2>
-            <p className="text-white/40 text-xs mt-0.5">
-              {loading ? "Loading..." : data ? `${data.name} - ${data.date}` : "Error"}
+            <p className="text-white/70 text-sm mt-0.5">
+              {loading ? "Loading..." : data ? (
+                <>
+                  <span className="font-semibold text-white">{data.name}</span>
+                  {data.creatorName && <span className="text-teal-400/80"> on {data.creatorName}</span>}
+                  <span className="text-white/50"> — {data.date}</span>
+                </>
+              ) : "Error"}
             </p>
           </div>
           <button onClick={onClose} className="glass-button rounded-xl p-2 text-white/40 hover:text-white">
@@ -208,24 +215,24 @@ function ShiftSummaryRow({ data }: { data: ShiftReportData }) {
   return (
     <div className="space-y-3">
       {/* Verdict banner */}
-      <div className="glass-inset rounded-2xl p-4 flex items-center gap-4">
+      <div className="glass-inset rounded-2xl p-5 flex items-center gap-4">
         <div className="flex-1 space-y-1">
-          <div className="text-[11px] text-white/60">Activity Verdict</div>
-          <div className="text-sm font-bold flex items-center gap-1.5" style={{ color: activity.color }}>
-            <activity.icon size={14} /> {activity.label}
+          <div className="text-xs text-white/70 font-medium">Activity Verdict</div>
+          <div className="text-base font-bold flex items-center gap-1.5" style={{ color: activity.color }}>
+            <activity.icon size={16} /> {activity.label}
           </div>
         </div>
-        <div className="w-px h-8 bg-white/10" />
+        <div className="w-px h-10 bg-white/10" />
         <div className="flex-1 space-y-1">
-          <div className="text-[11px] text-white/60">Effort Verdict</div>
-          <div className="text-sm font-bold flex items-center gap-1.5" style={{ color: effort.color }}>
-            <effort.icon size={14} /> {effort.label}
+          <div className="text-xs text-white/70 font-medium">Effort Verdict</div>
+          <div className="text-base font-bold flex items-center gap-1.5" style={{ color: effort.color }}>
+            <effort.icon size={16} /> {effort.label}
           </div>
         </div>
-        <div className="w-px h-8 bg-white/10" />
+        <div className="w-px h-10 bg-white/10" />
         <div className="flex-1 space-y-1">
-          <div className="text-[11px] text-white/60">Avg Score</div>
-          <div className="text-sm font-bold tabular-nums" style={{ color: activityColor(data.avgScore) }}>
+          <div className="text-xs text-white/70 font-medium">Avg Score</div>
+          <div className="text-base font-bold tabular-nums" style={{ color: activityColor(data.avgScore) }}>
             {data.avgScore}/100
           </div>
         </div>
@@ -234,31 +241,31 @@ function ShiftSummaryRow({ data }: { data: ShiftReportData }) {
       {/* Diagnostic — explain WHY data is missing */}
       {(data.activityVerdict === "no_data" || data.effortVerdict === "idle" || (data.scoringWindows === 0 && data.totalMessages === 0)) && (
         <div className="glass-inset rounded-xl px-4 py-3 space-y-1.5 border border-amber-500/15">
-          <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-semibold">
+          <div className="flex items-center gap-1.5 text-amber-400 text-sm font-semibold">
             <AlertTriangle size={12} /> Why is this report empty?
           </div>
           {!data.hubstaff && data.sessionCount === 0 && (
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-sm text-white/70 leading-relaxed">
               Chatter not linked to Hubstaff and no clock-in sessions recorded for this date. They may not have worked this shift.
             </p>
           )}
           {!data.hubstaff && data.sessionCount > 0 && (
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-sm text-white/70 leading-relaxed">
               No Hubstaff tracking. Chatter has {data.sessionCount} session{data.sessionCount !== 1 ? "s" : ""} but no activity data was recorded — check Hubstaff mapping.
             </p>
           )}
           {data.hubstaff && data.scoringWindows === 0 && (
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-sm text-white/70 leading-relaxed">
               Tracked by Hubstaff ({data.hubstaff.totalTrackedHrs}h) but no conversations were scored — chatter may not be assigned to a creator, or no messages were sent.
             </p>
           )}
           {data.totalMessages === 0 && data.scoringWindows > 0 && (
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-sm text-white/70 leading-relaxed">
               No messages sent during this shift. Scoring windows exist but message count is zero — possible data sync delay.
             </p>
           )}
           {data.hubstaff && data.hubstaff.overall < 10 && data.hubstaff.totalTrackedHrs > 0 && (
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-sm text-white/70 leading-relaxed">
               Hubstaff shows {data.hubstaff.totalTrackedHrs}h tracked but only {data.hubstaff.overall}% activity — chatter may have left tracking running while away.
             </p>
           )}
@@ -278,13 +285,13 @@ function ShiftSummaryRow({ data }: { data: ShiftReportData }) {
 
 function StatPill({ icon: Icon, label, value, sub, warn }: { icon: typeof Clock; label: string; value: string; sub?: string; warn?: boolean }) {
   return (
-    <div className="glass-inset rounded-xl px-3 py-2.5">
+    <div className="glass-inset rounded-xl px-4 py-3">
       <div className="flex items-center gap-1.5 mb-1">
-        <Icon size={11} className="text-white/50" />
-        <span className="text-[10px] text-white/60">{label}</span>
+        <Icon size={14} className="text-white/60" />
+        <span className="text-xs text-white/70 font-medium">{label}</span>
       </div>
-      <div className={`text-sm font-bold tabular-nums ${warn ? "text-red-400" : "text-white"}`}>{value}</div>
-      {sub && <div className="text-[10px] text-white/50 mt-0.5">{sub}</div>}
+      <div className={`text-lg font-bold tabular-nums ${warn ? "text-red-400" : "text-white"}`}>{value}</div>
+      {sub && <div className="text-xs text-white/60 mt-0.5">{sub}</div>}
     </div>
   );
 }
@@ -306,13 +313,13 @@ function HubstaffSection({ data }: { data: ShiftReportData }) {
   return (
     <div className="glass-inset rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
-          <Activity size={12} className="text-teal-400" /> Hubstaff Activity
+        <h4 className="text-white/90 text-sm font-bold flex items-center gap-1.5">
+          <Activity size={14} className="text-teal-400" /> Hubstaff Activity
         </h4>
-        <span className="text-[10px] text-white/60">Tracked: {hs.totalTrackedHrs}h of {data.totalShiftDurationHrs}h shift</span>
+        <span className="text-xs text-white/70">Tracked: {hs.totalTrackedHrs}h of {data.totalShiftDurationHrs}h shift</span>
       </div>
       {/* Explanation */}
-      <div className="text-[10px] text-white/40 leading-relaxed">
+      <div className="text-xs text-white/60 leading-relaxed">
         % of tracked time with keyboard/mouse input. 60%+ = active, 30-60% = low, under 30% = very low.
         {isSuspicious && (
           <span className="text-red-400 font-medium ml-1">
@@ -326,7 +333,7 @@ function HubstaffSection({ data }: { data: ShiftReportData }) {
         <ActivityBar value={hs.overall} label="Overall" icon={Activity} />
       </div>
       {isSuspicious && (
-        <div className="flex items-center gap-2 text-red-400 text-[11px] bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
           <AlertTriangle size={12} />
           Activity over 100% is not possible with normal use. This chatter may be using software to fake activity.
         </div>
@@ -340,8 +347,8 @@ function ScoringSection({ data }: { data: ShiftReportData }) {
   const { scoreBreakdown: s, penalties: p, totalBlasts } = data;
   return (
     <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
-        <TrendingUp size={12} className="text-teal-400" /> Score Breakdown
+      <h4 className="text-white/90 text-sm font-bold flex items-center gap-1.5">
+        <TrendingUp size={14} className="text-teal-400" /> Score Breakdown
       </h4>
       <div className="space-y-2">
         <ScoreBar label="SLA" value={s.sla} max={25} color="#60a5fa" tooltip="Response speed. 25 = under 5 min replies" />
@@ -353,22 +360,22 @@ function ScoringSection({ data }: { data: ShiftReportData }) {
       {(p.copyPaste !== 0 || p.missedTrigger !== 0 || p.spam !== 0 || totalBlasts > 0) && (
         <div className="border-t border-white/5 pt-2 space-y-1">
           {p.copyPaste !== 0 && (
-            <div className="flex items-center gap-2 text-red-400 text-[11px]">
+            <div className="flex items-center gap-2 text-red-400 text-sm">
               <Copy size={10} /> Copy-paste penalty: {p.copyPaste}pts
             </div>
           )}
           {p.missedTrigger !== 0 && (
-            <div className="flex items-center gap-2 text-red-400 text-[11px]">
+            <div className="flex items-center gap-2 text-red-400 text-sm">
               <AlertTriangle size={10} /> Missed trigger: {p.missedTrigger}pts
             </div>
           )}
           {p.spam !== 0 && (
-            <div className="flex items-center gap-2 text-red-400 text-[11px]">
+            <div className="flex items-center gap-2 text-red-400 text-sm">
               <AlertTriangle size={10} /> Spam penalty: {p.spam}pts
             </div>
           )}
           {totalBlasts > 0 && (
-            <div className="flex items-center gap-2 text-amber-400 text-[11px]">
+            <div className="flex items-center gap-2 text-amber-400 text-sm">
               <Copy size={10} /> Copy-paste blasts detected: {totalBlasts}
             </div>
           )}

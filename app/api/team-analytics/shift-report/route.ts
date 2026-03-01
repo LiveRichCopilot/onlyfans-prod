@@ -227,6 +227,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       email,
       name: schedule?.name || profile?.chatterName || email.split("@")[0],
+      creatorName: sessions[0]?.creator?.name || profile?.creatorId || null,
       date: targetDate,
       shift: schedule?.shift || null,
 

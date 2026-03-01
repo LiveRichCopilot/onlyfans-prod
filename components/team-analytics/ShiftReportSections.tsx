@@ -55,12 +55,12 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
   const showToggle = timeline.length > COLLAPSED_COUNT;
 
   return (
-    <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
-        <Clock size={12} className="text-teal-400" /> Hourly Performance
-        <span className="text-[10px] text-white/30 font-normal ml-1">Click a row to see evidence</span>
+    <div className="glass-inset rounded-2xl p-5 space-y-3">
+      <h4 className="text-white/90 text-sm font-bold flex items-center gap-1.5">
+        <Clock size={14} className="text-teal-400" /> Hourly Performance
+        <span className="text-xs text-white/50 font-normal ml-1">Click a row to see evidence</span>
       </h4>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {visible.map((h, i) => {
           const isOpen = openIndex === i;
           const convos = getConversations(h.conversationData);
@@ -70,39 +70,39 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
               {/* Score bar row — clickable */}
               <button
                 onClick={() => setOpenIndex(isOpen ? null : i)}
-                className={`w-full flex items-center gap-2 py-1 rounded-lg transition ${hasEvidence ? "hover:bg-white/5 cursor-pointer" : "cursor-default"}`}
+                className={`w-full flex items-center gap-3 py-1.5 rounded-lg transition ${hasEvidence ? "hover:bg-white/5 cursor-pointer" : "cursor-default"}`}
               >
-                <span className="text-[10px] text-white/60 w-14 shrink-0 tabular-nums text-left">
+                <span className="text-sm text-white/80 w-14 shrink-0 tabular-nums text-left font-medium">
                   {formatTime(h.windowStart)}
                 </span>
-                <div className="flex-1 h-5 glass-inset rounded-lg overflow-hidden relative">
+                <div className="flex-1 h-7 glass-inset rounded-lg overflow-hidden relative">
                   <div
                     className="h-full rounded-lg transition-all"
                     style={{ width: `${h.totalScore}%`, background: activityColor(h.totalScore) }}
                   />
-                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/80">
+                  <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
                     {h.totalScore}
                   </span>
                 </div>
-                <span className="text-[9px] text-white/50 w-12 shrink-0 text-right">{h.messagesAnalyzed} msgs</span>
+                <span className="text-xs text-white/70 w-16 shrink-0 text-right font-medium">{h.messagesAnalyzed} msgs</span>
                 {hasEvidence && (
-                  <span className="text-white/30 shrink-0">
-                    {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                  <span className="text-white/50 shrink-0">
+                    {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </span>
                 )}
               </button>
 
               {/* Expanded evidence panel */}
               {isOpen && hasEvidence && (
-                <div className="ml-14 mr-2 mb-2 mt-1 space-y-2 border-l-2 border-white/10 pl-3">
+                <div className="ml-4 mr-2 mb-3 mt-2 space-y-3 border-l-2 border-teal-400/30 pl-4 bg-white/[0.02] rounded-r-xl py-3">
                   {/* AI notes */}
                   {h.aiNotes && (
-                    <p className="text-[11px] text-white/60 leading-relaxed">{h.aiNotes}</p>
+                    <p className="text-sm text-white/80 leading-relaxed">{h.aiNotes}</p>
                   )}
 
                   {/* Per-hour score breakdown */}
                   {h.scores && (
-                    <div className="flex items-center gap-2 flex-wrap text-[9px]">
+                    <div className="flex items-center gap-3 flex-wrap text-xs font-semibold">
                       <span className="text-blue-400">SLA {h.scores.sla}/25</span>
                       <span className="text-teal-400">Follow {h.scores.followup}/20</span>
                       <span className="text-purple-400">Trigger {h.scores.trigger}/20</span>
@@ -113,31 +113,31 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
 
                   {/* Tags for this hour */}
                   {((h.strengthTags && h.strengthTags.length > 0) || (h.mistakeTags && h.mistakeTags.length > 0)) && (
-                    <div className="flex items-center gap-1 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {h.strengthTags?.map((t, j) => (
-                        <span key={`s${j}`} className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-400/80 border border-teal-500/15">{t}</span>
+                        <span key={`s${j}`} className="text-xs px-2 py-0.5 rounded-lg bg-teal-500/15 text-teal-400 border border-teal-500/20 font-medium">{t}</span>
                       ))}
                       {h.mistakeTags?.map((t, j) => (
-                        <span key={`m${j}`} className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400/80 border border-red-500/15">{t}</span>
+                        <span key={`m${j}`} className="text-xs px-2 py-0.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/20 font-medium">{t}</span>
                       ))}
                     </div>
                   )}
 
                   {/* Notable quotes */}
                   {h.notableQuotes && (h.notableQuotes as NotableQuote[]).length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-[9px] text-white/40 font-medium flex items-center gap-1">
-                        <Quote size={9} /> Notable Messages
+                    <div className="space-y-2">
+                      <div className="text-xs text-white/60 font-semibold flex items-center gap-1.5">
+                        <Quote size={12} /> Notable Messages
                       </div>
                       {(h.notableQuotes as NotableQuote[]).map((q, j) => (
-                        <div key={j} className="rounded-lg px-2.5 py-1.5 border" style={{
-                          borderColor: `${quoteColor[q.type] || "#666"}30`,
-                          background: `${quoteColor[q.type] || "#666"}08`,
+                        <div key={j} className="rounded-xl px-3 py-2 border" style={{
+                          borderColor: `${quoteColor[q.type] || "#666"}40`,
+                          background: `${quoteColor[q.type] || "#666"}10`,
                         }}>
-                          <p className="text-[10px] text-white/70 leading-relaxed italic">"{q.text}"</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[9px] font-bold uppercase" style={{ color: quoteColor[q.type] || "#666" }}>{q.type}</span>
-                            {q.context && <span className="text-[9px] text-white/30">{q.context}</span>}
+                          <p className="text-sm text-white/85 leading-relaxed italic">"{q.text}"</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-bold uppercase" style={{ color: quoteColor[q.type] || "#666" }}>{q.type}</span>
+                            {q.context && <span className="text-xs text-white/50">{q.context}</span>}
                           </div>
                         </div>
                       ))}
@@ -146,32 +146,37 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
 
                   {/* Conversation thread */}
                   {convos.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-[9px] text-white/40 font-medium flex items-center gap-1">
-                        <MessageSquare size={9} /> Conversations Scored
+                    <div className="space-y-3">
+                      <div className="text-xs text-white/60 font-semibold flex items-center gap-1.5">
+                        <MessageSquare size={12} /> Conversations Scored
                       </div>
                       {convos.slice(0, 3).map((chat, ci) => (
-                        <div key={ci} className="space-y-0.5">
-                          <div className="text-[9px] text-white/50 font-medium">Fan: {chat.fanName || "Unknown"}</div>
-                          <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
+                        <div key={ci} className="glass-inset rounded-xl p-3 space-y-1.5">
+                          <div className="text-xs font-bold text-white/90 flex items-center gap-2">
+                            <span className="text-teal-400">Fan:</span> {chat.fanName || "Unknown"}
+                          </div>
+                          <div className="space-y-1 max-h-[300px] overflow-y-auto">
                             {chat.messages.slice(0, 15).map((msg, mi) => (
-                              <div key={mi} className={`text-[10px] leading-relaxed px-2 py-0.5 rounded ${
+                              <div key={mi} className={`text-sm leading-relaxed px-3 py-1.5 rounded-lg ${
                                 msg.isChatter
-                                  ? "bg-teal-500/8 text-white/70 ml-4"
-                                  : "bg-white/5 text-white/50 mr-4"
+                                  ? "bg-teal-500/10 text-white/90 ml-6 border border-teal-500/15"
+                                  : "bg-white/5 text-white/70 mr-6 border border-white/5"
                               }`}>
-                                <span className="text-[8px] text-white/30 mr-1">{formatTime(msg.time)}</span>
+                                <span className="text-[10px] text-white/40 mr-1.5 font-medium">{formatTime(msg.time)}</span>
+                                <span className="text-[10px] font-semibold mr-1.5" style={{ color: msg.isChatter ? "#2dd4bf" : "#94a3b8" }}>
+                                  {msg.isChatter ? "Chatter" : "Fan"}:
+                                </span>
                                 {msg.text}
                               </div>
                             ))}
                             {chat.messages.length > 15 && (
-                              <div className="text-[9px] text-white/25 text-center py-0.5">+{chat.messages.length - 15} more messages</div>
+                              <div className="text-xs text-white/40 text-center py-1">+{chat.messages.length - 15} more messages</div>
                             )}
                           </div>
                         </div>
                       ))}
                       {convos.length > 3 && (
-                        <div className="text-[9px] text-white/25 text-center">+{convos.length - 3} more chats</div>
+                        <div className="text-xs text-white/40 text-center">+{convos.length - 3} more chats</div>
                       )}
                     </div>
                   )}
@@ -207,19 +212,19 @@ export function TopAppsSection({ apps }: { apps: { name: string; seconds: number
   if (apps.length === 0) return null;
 
   return (
-    <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold flex items-center gap-1.5">
-        <AppWindow size={12} className="text-teal-400" /> Top Apps During Shift
+    <div className="glass-inset rounded-2xl p-5 space-y-3">
+      <h4 className="text-white/90 text-sm font-bold flex items-center gap-1.5">
+        <AppWindow size={14} className="text-teal-400" /> Top Apps During Shift
       </h4>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {apps.map((app, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="text-[11px] text-white/80 w-28 truncate">{app.name}</span>
-            <div className="flex-1 h-1.5 glass-inset rounded-full overflow-hidden">
+          <div key={i} className="flex items-center gap-3">
+            <span className="text-sm text-white/90 w-32 truncate font-medium">{app.name}</span>
+            <div className="flex-1 h-2.5 glass-inset rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-teal-400/60" style={{ width: `${app.pct}%` }} />
             </div>
-            <span className="text-[10px] tabular-nums text-white/70 w-10 text-right">{app.pct}%</span>
-            <span className="text-[10px] tabular-nums text-white/50 w-12 text-right">{formatSeconds(app.seconds)}</span>
+            <span className="text-sm tabular-nums text-white/80 w-10 text-right font-medium">{app.pct}%</span>
+            <span className="text-xs tabular-nums text-white/60 w-12 text-right">{formatSeconds(app.seconds)}</span>
           </div>
         ))}
       </div>
@@ -232,21 +237,21 @@ export function TagsSection({ strengths, mistakes }: { strengths: string[]; mist
   if (strengths.length === 0 && mistakes.length === 0) return null;
 
   return (
-    <div className="glass-inset rounded-2xl p-4 space-y-3">
-      <h4 className="text-white/70 text-xs font-semibold">Tags</h4>
+    <div className="glass-inset rounded-2xl p-5 space-y-3">
+      <h4 className="text-white/90 text-sm font-bold">Tags</h4>
       {strengths.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {strengths.map((t, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-teal-500/15 text-teal-400 border border-teal-500/20">
+            <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-500/15 text-teal-400 border border-teal-500/20">
               {t}
             </span>
           ))}
         </div>
       )}
       {mistakes.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {mistakes.map((t, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-red-500/15 text-red-400 border border-red-500/20">
+            <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/20">
               {t}
             </span>
           ))}
