@@ -88,10 +88,13 @@ export async function GET(req: NextRequest) {
         }
       }
     } else {
-      // Fetch fresh from Hubstaff
-      let allScreenshots: HubstaffScreenshot[];
+      // Fetch from Hubstaff — filter by userId server-side to avoid pagination cutoff
+      let userScreenshots: HubstaffScreenshot[];
       try {
-        allScreenshots = await getScreenshots(isoStart, isoEnd);
+        const fetched = await getScreenshots(isoStart, isoEnd, hsUserId);
+        userScreenshots = fetched.sort(
+          (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+        );
       } catch (e: any) {
         console.error("[screenshots] Hubstaff fetch error:", e.message);
         return NextResponse.json({
@@ -101,10 +104,6 @@ export async function GET(req: NextRequest) {
           error: `Hubstaff API error: ${e.message}`,
         });
       }
-
-      const userScreenshots = allScreenshots
-        .filter((s) => s.user_id === hsUserId)
-        .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
 
       // Upload to Supabase Storage in background (non-blocking for user)
       if (isStorageConfigured() && userScreenshots.length > 0) {

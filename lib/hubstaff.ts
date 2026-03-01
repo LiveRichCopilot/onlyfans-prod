@@ -68,13 +68,16 @@ export async function getOrganizationMembers(orgId: string): Promise<HubstaffMem
 export async function getOrganizationActivities(
   orgId: string,
   startTime: string,
-  stopTime: string
+  stopTime: string,
+  userId?: number,
 ): Promise<HubstaffActivity[]> {
-  const data = await hubstaffGet<ActivitiesResponse>(`/organizations/${orgId}/activities`, {
+  const params: Record<string, string> = {
     "time_slot[start]": startTime,
     "time_slot[stop]": stopTime,
     page_limit: "500",
-  });
+  };
+  if (userId) params["user_ids"] = String(userId);
+  const data = await hubstaffGet<ActivitiesResponse>(`/organizations/${orgId}/activities`, params);
   return data.activities || [];
 }
 
@@ -139,10 +142,10 @@ export async function listMembers(): Promise<{ members: any[]; users: any[] }> {
   return { members: data.members || [], users: data.users || [] };
 }
 
-/** Get activity slots for a time range (10-min intervals). */
-export async function getActivities(startTime: string, stopTime: string): Promise<HubstaffActivity[]> {
+/** Get activity slots for a time range (10-min intervals). Pass userId to filter server-side. */
+export async function getActivities(startTime: string, stopTime: string, userId?: number): Promise<HubstaffActivity[]> {
   const orgId = await getOrgId();
-  return getOrganizationActivities(orgId, startTime, stopTime);
+  return getOrganizationActivities(orgId, startTime, stopTime, userId);
 }
 
 /** Get daily activity aggregates (one row per user per day). */
@@ -205,12 +208,18 @@ type RawHubstaffScreenshot = Omit<HubstaffScreenshot, "url" | "thumb_url"> & {
   thumb_url: string;
 };
 
-/** Get screenshots for a time range. Max 7-day range. */
-export async function getScreenshots(startTime: string, stopTime: string): Promise<HubstaffScreenshot[]> {
+/** Get screenshots for a time range. Max 7-day range. Pass userId to filter server-side. */
+export async function getScreenshots(startTime: string, stopTime: string, userId?: number): Promise<HubstaffScreenshot[]> {
   const orgId = await getOrgId();
+  const params: Record<string, string> = {
+    "time_slot[start]": startTime,
+    "time_slot[stop]": stopTime,
+    page_limit: "500",
+  };
+  if (userId) params["user_ids"] = String(userId);
   const data = await hubstaffGet<{ screenshots: RawHubstaffScreenshot[] }>(
     `/organizations/${orgId}/screenshots`,
-    { "time_slot[start]": startTime, "time_slot[stop]": stopTime, page_limit: "500" },
+    params,
   );
   // Hubstaff V2 API uses "full_url" not "url" — normalize to "url"
   return (data.screenshots || []).map((s) => ({
@@ -234,12 +243,18 @@ export type ToolUsage = {
   updated_at: string;
 };
 
-/** Get app/tool usage for a time range (which apps chatters are using). Max 7-day range. */
-export async function getToolUsages(startTime: string, stopTime: string): Promise<ToolUsage[]> {
+/** Get app/tool usage for a time range (which apps chatters are using). Max 7-day range. Pass userId to filter server-side. */
+export async function getToolUsages(startTime: string, stopTime: string, userId?: number): Promise<ToolUsage[]> {
   const orgId = await getOrgId();
+  const params: Record<string, string> = {
+    "time_slot[start]": startTime,
+    "time_slot[stop]": stopTime,
+    page_limit: "500",
+  };
+  if (userId) params["user_ids"] = String(userId);
   const data = await hubstaffGet<{ tool_usages: ToolUsage[] }>(
     `/organizations/${orgId}/tool_usages`,
-    { "time_slot[start]": startTime, "time_slot[stop]": stopTime, page_limit: "500" },
+    params,
   );
   return data.tool_usages || [];
 }

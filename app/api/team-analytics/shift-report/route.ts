@@ -153,15 +153,11 @@ export async function GET(req: NextRequest) {
         const isoStart = `${targetDate}T00:00:00Z`;
         const isoEnd = `${targetDate}T23:59:59Z`;
 
-        // Get activity slots for the day
-        const [activities, toolUsages] = await Promise.all([
-          getActivities(isoStart, isoEnd).catch(() => []),
-          getToolUsages(isoStart, isoEnd).catch(() => []),
+        // Get activity slots for the day — filter by userId server-side to avoid pagination cutoff
+        const [userActivities, userTools] = await Promise.all([
+          getActivities(isoStart, isoEnd, hsUserId).catch(() => []),
+          getToolUsages(isoStart, isoEnd, hsUserId).catch(() => []),
         ]);
-
-        // Filter to this user
-        const userActivities = activities.filter(a => a.user_id === hsUserId);
-        const userTools = toolUsages.filter(t => t.user_id === hsUserId);
 
         if (userActivities.length > 0) {
           const totalTracked = userActivities.reduce((s, a) => s + a.tracked, 0);

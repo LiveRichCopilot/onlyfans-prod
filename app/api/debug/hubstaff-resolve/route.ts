@@ -50,37 +50,35 @@ export async function GET(req: NextRequest) {
       const isoEnd = `${targetDate}T23:59:59Z`;
 
       try {
-        const allActivities = await getActivities(isoStart, isoEnd);
-        const userActivities = allActivities.filter(a => a.user_id === resolved.hubstaffUserId);
+        // Filter by user_id server-side to avoid pagination cutoff
+        const userActivities = await getActivities(isoStart, isoEnd, resolved.hubstaffUserId);
         const totalTracked = userActivities.reduce((s, a) => s + a.tracked, 0);
         const totalOverall = userActivities.reduce((s, a) => s + a.overall, 0);
 
         activityData = {
-          totalActivitiesInOrg: allActivities.length,
+          filteredByUserId: resolved.hubstaffUserId,
           userActivities: userActivities.length,
           totalTrackedSeconds: totalTracked,
           totalTrackedHrs: parseFloat((totalTracked / 3600).toFixed(2)),
           overallPct: totalTracked > 0 ? Math.round((totalOverall / totalTracked) * 100) : 0,
           sampleActivity: userActivities[0] || null,
-          uniqueUserIds: [...new Set(allActivities.map(a => a.user_id))],
         };
       } catch (e: any) {
         activityData = { error: e.message };
       }
 
       try {
-        const allScreenshots = await getScreenshots(isoStart, isoEnd);
-        const userScreenshots = allScreenshots.filter(s => s.user_id === resolved.hubstaffUserId);
+        // Filter by user_id server-side to avoid pagination cutoff
+        const userScreenshots = await getScreenshots(isoStart, isoEnd, resolved.hubstaffUserId);
 
         screenshotData = {
-          totalScreenshotsInOrg: allScreenshots.length,
+          filteredByUserId: resolved.hubstaffUserId,
           userScreenshots: userScreenshots.length,
           sampleScreenshot: userScreenshots[0] ? {
             id: userScreenshots[0].id,
             recorded_at: userScreenshots[0].recorded_at,
             user_id: userScreenshots[0].user_id,
           } : null,
-          uniqueUserIds: [...new Set(allScreenshots.map(s => s.user_id))],
         };
       } catch (e: any) {
         screenshotData = { error: e.message };
