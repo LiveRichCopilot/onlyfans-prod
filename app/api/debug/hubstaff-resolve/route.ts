@@ -97,6 +97,20 @@ export async function GET(req: NextRequest) {
       take: 10,
     });
 
+    // 7. Check scoring data — is conversationData populated?
+    const scoringSample = await prisma.chatterHourlyScore.findFirst({
+      where: {
+        chatterEmail: { contains: email, mode: "insensitive" },
+        windowStart: { gte: dayStart, lte: dayEnd },
+      },
+      select: {
+        windowStart: true, totalScore: true, messagesAnalyzed: true,
+        aiNotes: true, notableQuotes: true,
+        conversationData: true, strengthTags: true, mistakeTags: true,
+      },
+      orderBy: { windowStart: "desc" },
+    });
+
     return NextResponse.json({
       searchEmail: email,
       targetDate,
@@ -104,9 +118,21 @@ export async function GET(req: NextRequest) {
       existingMappings: mappings,
       resolved,
       hubstaffMemberCount: hubstaffMembers.length,
-      hubstaffMembers,
+      hubstaffMembers: hubstaffMembers.slice(0, 5), // trim for readability
       activityData,
       screenshotData,
+      scoringSample: scoringSample ? {
+        windowStart: scoringSample.windowStart,
+        totalScore: scoringSample.totalScore,
+        messagesAnalyzed: scoringSample.messagesAnalyzed,
+        hasAiNotes: !!scoringSample.aiNotes,
+        hasNotableQuotes: !!scoringSample.notableQuotes,
+        hasConversationData: !!scoringSample.conversationData,
+        conversationDataType: scoringSample.conversationData ? (Array.isArray(scoringSample.conversationData) ? "array" : typeof scoringSample.conversationData) : "null",
+        conversationDataKeys: scoringSample.conversationData && typeof scoringSample.conversationData === "object" && !Array.isArray(scoringSample.conversationData) ? Object.keys(scoringSample.conversationData as object) : null,
+        strengthTags: scoringSample.strengthTags,
+        mistakeTags: scoringSample.mistakeTags,
+      } : "NO_SCORING_DATA",
       sessions,
     });
   } catch (err: any) {

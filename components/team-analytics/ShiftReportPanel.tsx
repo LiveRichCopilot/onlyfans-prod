@@ -27,7 +27,14 @@ type ShiftReportData = {
   penalties: { copyPaste: number; missedTrigger: number; spam: number };
   strengthTags: string[];
   mistakeTags: string[];
-  hourlyTimeline: { windowStart: string; windowEnd: string; totalScore: number; messagesAnalyzed: number; conversationsScanned: number; archetype: string | null; aiNotes: string | null }[];
+  hourlyTimeline: {
+    windowStart: string; windowEnd: string; totalScore: number;
+    messagesAnalyzed: number; conversationsScanned: number;
+    archetype: string | null; aiNotes: string | null;
+    notableQuotes?: any[] | null; conversationData?: any;
+    scores?: { sla: number; followup: number; trigger: number; quality: number; revenue: number };
+    strengthTags?: string[]; mistakeTags?: string[];
+  }[];
   dominantArchetype: string | null;
   hubstaff: { keyboard: number; mouse: number; overall: number; totalTrackedSeconds: number; totalTrackedHrs: number } | null;
   topApps: { name: string; seconds: number; pct: number }[];

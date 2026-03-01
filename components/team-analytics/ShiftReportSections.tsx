@@ -36,6 +36,14 @@ function activityColor(pct: number): string {
 
 const quoteColor: Record<string, string> = { great: "#34d399", good: "#2dd4bf", bad: "#fbbf24", ugly: "#f87171" };
 
+/** Extract conversation array — handles both plain array and {conversations:[...]} wrapper */
+function getConversations(data: any): ConvoChat[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (data.conversations && Array.isArray(data.conversations)) return data.conversations;
+  return [];
+}
+
 /** Hourly performance timeline — collapsible, click to see conversations */
 export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -55,7 +63,8 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
       <div className="space-y-1">
         {visible.map((h, i) => {
           const isOpen = openIndex === i;
-          const hasEvidence = h.aiNotes || (h.notableQuotes && (h.notableQuotes as NotableQuote[]).length > 0) || (h.conversationData && (h.conversationData as ConvoChat[]).length > 0);
+          const convos = getConversations(h.conversationData);
+          const hasEvidence = h.aiNotes || (h.notableQuotes && (h.notableQuotes as NotableQuote[]).length > 0) || convos.length > 0;
           return (
             <div key={i}>
               {/* Score bar row — clickable */}
@@ -136,12 +145,12 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
                   )}
 
                   {/* Conversation thread */}
-                  {h.conversationData && (h.conversationData as ConvoChat[]).length > 0 && (
+                  {convos.length > 0 && (
                     <div className="space-y-2">
                       <div className="text-[9px] text-white/40 font-medium flex items-center gap-1">
                         <MessageSquare size={9} /> Conversations Scored
                       </div>
-                      {(h.conversationData as ConvoChat[]).slice(0, 3).map((chat, ci) => (
+                      {convos.slice(0, 3).map((chat, ci) => (
                         <div key={ci} className="space-y-0.5">
                           <div className="text-[9px] text-white/50 font-medium">Fan: {chat.fanName || "Unknown"}</div>
                           <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
@@ -161,8 +170,8 @@ export function HourlyTimeline({ timeline }: { timeline: HourlyEntry[] }) {
                           </div>
                         </div>
                       ))}
-                      {(h.conversationData as ConvoChat[]).length > 3 && (
-                        <div className="text-[9px] text-white/25 text-center">+{(h.conversationData as ConvoChat[]).length - 3} more chats</div>
+                      {convos.length > 3 && (
+                        <div className="text-[9px] text-white/25 text-center">+{convos.length - 3} more chats</div>
                       )}
                     </div>
                   )}
