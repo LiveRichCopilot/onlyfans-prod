@@ -27,13 +27,6 @@ export async function POST() {
       userIdToMapping.set(parseInt(m.hubstaffUserId, 10), m);
     }
 
-    // Get who's online
-    const lastActivities = await getLastActivities(config.organizationId);
-    const onlineUserIds = new Set<number>();
-    for (const act of lastActivities) {
-      if (act.online) onlineUserIds.add(act.user_id);
-    }
-
     // Pull activity data for last 30 min
     const now = new Date();
     const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000);
@@ -42,6 +35,24 @@ export async function POST() {
       activityBlocks = await getActivities(thirtyMinAgo.toISOString(), now.toISOString());
     } catch (e: any) {
       console.warn("[Hubstaff Sync Now] Activity fetch failed:", e.message);
+    }
+
+    // Get who's strictly online right now
+    const lastActivities = await getLastActivities(config.organizationId);
+    const strictOnlineIds = new Set<number>();
+    for (const act of lastActivities) {
+      if (act.online) strictOnlineIds.add(act.user_id);
+    }
+
+    // Build working set: anyone online NOW or who tracked time in the last 30 min
+    // Hubstaff's `online` flag is stricter than its web UI "Working" status —
+    // someone on a short break or between tracking intervals shows as "Working"
+    // in the web UI but `online: false` in the API. Using recent activity fixes this.
+    const onlineUserIds = new Set<number>(strictOnlineIds);
+    for (const block of activityBlocks) {
+      if (block.tracked > 0) {
+        onlineUserIds.add(block.user_id);
+      }
     }
 
     // Aggregate per user: sum seconds, then convert to percentage
