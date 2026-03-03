@@ -25,6 +25,7 @@ model Creator {
   active                Boolean @default(true)
   onlineFanCache        Json?
   purchaseAlertsEnabled Boolean @default(true)
+  maxLiveChatters       Int     @default(1) // 1 normally, 2 during promos
   organizationId        String?
   group                 String? // Creator group/category for reporting
 

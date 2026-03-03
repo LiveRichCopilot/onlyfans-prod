@@ -176,6 +176,27 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Enforce max live chatters per model (default 1, promo = 2)
+    const creators = await prisma.creator.findMany({
+      where: { active: true },
+      select: { id: true, maxLiveChatters: true },
+    });
+    for (const creator of creators) {
+      const allowed = creator.maxLiveChatters ?? 1;
+      const live = await prisma.chatterSession.findMany({
+        where: { creatorId: creator.id, isLive: true },
+        orderBy: { clockIn: "desc" },
+      });
+      if (live.length > allowed) {
+        const stale = live.slice(allowed);
+        await prisma.chatterSession.updateMany({
+          where: { id: { in: stale.map(s => s.id) } },
+          data: { isLive: false, clockOut: now },
+        });
+        clockedOut += stale.length;
+      }
+    }
+
     await updateLastSync();
 
     console.log(`[Hubstaff Sync] In: ${clockedIn} | Out: ${clockedOut} | Activity updated: ${activityUpdated} | Online: ${onlineUserIds.size} | Active: ${activeEmails.size}`);
