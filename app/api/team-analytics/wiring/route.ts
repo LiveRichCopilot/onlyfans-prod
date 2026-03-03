@@ -21,12 +21,11 @@ export async function GET() {
       }),
       prisma.assignmentOverride.findMany({
         where: { startAt: { lte: now }, endAt: { gt: now } },
-        select: { creatorId: true, chatterEmail: true, endAt: true, reason: true },
+        select: { id: true, creatorId: true, chatterEmail: true, endAt: true, reason: true },
         orderBy: { createdAt: "desc" },
       }),
       prisma.chatterSchedule.findMany({
-        select: { email: true, name: true },
-        distinct: ["email"],
+        select: { email: true, name: true, creatorId: true, shift: true },
       }),
       prisma.user.findMany({
         where: { role: "EMPLOYEE" },
@@ -63,7 +62,15 @@ export async function GET() {
       liveByCreator.set(s.creatorId, arr);
     }
 
-    type Chatter = { email: string; name: string; source: "override" | "live"; detail: string };
+    // Group schedule entries by creator
+    const schedByCreator = new Map<string, typeof scheduleNames>();
+    for (const s of scheduleNames) {
+      const arr = schedByCreator.get(s.creatorId) || [];
+      arr.push(s);
+      schedByCreator.set(s.creatorId, arr);
+    }
+
+    type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string };
 
     const nodes = creators.map(c => {
       const chatters: Chatter[] = [];
@@ -79,6 +86,7 @@ export async function GET() {
             name: nameMap.get(o.chatterEmail) || o.chatterEmail.split("@")[0],
             source: "override",
             detail: `${mins}m left${o.reason ? ` · ${o.reason}` : ""}`,
+            overrideId: o.id,
           });
         }
       }
@@ -93,6 +101,19 @@ export async function GET() {
             name: nameMap.get(s.email) || s.email.split("@")[0],
             source: "live",
             detail: `${mins}m in`,
+          });
+        }
+      }
+
+      // Assigned from schedule (not live, not overridden — show as assigned)
+      for (const s of schedByCreator.get(c.id) || []) {
+        if (!seen.has(s.email)) {
+          seen.add(s.email);
+          chatters.push({
+            email: s.email,
+            name: nameMap.get(s.email) || s.email.split("@")[0],
+            source: "assigned",
+            detail: s.shift === "default" ? "assigned" : s.shift,
           });
         }
       }

@@ -1,6 +1,8 @@
 "use client";
 
-type Chatter = { email: string; name: string; source: "override" | "live"; detail: string };
+import { X } from "lucide-react";
+
+type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string };
 
 export type WiringNode = {
   id: string;
@@ -16,8 +18,7 @@ const WIRE_TOP = 14;
 const CHATTER_H = 46;
 const CHATTER_GAP = 6;
 
-export function WiringGraph({ nodes }: { nodes: WiringNode[] }) {
-  // Tallest column determines overall height
+export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDisconnect?: (email: string, creatorId: string) => void }) {
   const maxChatters = Math.max(1, ...nodes.map(n => n.chatters.length));
   const chatterZoneH = maxChatters * (CHATTER_H + CHATTER_GAP);
   const totalH = MODEL_H + WIRE_TOP + chatterZoneH + 16;
@@ -29,9 +30,11 @@ export function WiringGraph({ nodes }: { nodes: WiringNode[] }) {
         {nodes.map((node, i) => {
           const x = i * COL_W + 8;
           const hasChatters = node.chatters.length > 0;
+          const hasLive = node.chatters.some(c => c.source === "live");
           const hasOverride = node.chatters.some(c => c.source === "override");
           const borderColor = hasOverride ? "border-orange-500/30 bg-orange-500/5"
-            : hasChatters ? "border-teal-500/30 bg-teal-500/5"
+            : hasLive ? "border-teal-500/30 bg-teal-500/5"
+            : hasChatters ? "border-white/10 bg-white/[0.02]"
             : "border-red-500/20 bg-red-500/5";
 
           return (
@@ -49,7 +52,7 @@ export function WiringGraph({ nodes }: { nodes: WiringNode[] }) {
                   <div className="text-[11px] font-medium text-white/90 truncate">{node.name || "Unknown"}</div>
                   {node.ofUsername && <div className="text-[9px] text-white/25 truncate">@{node.ofUsername}</div>}
                 </div>
-                {hasChatters && <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ backgroundColor: hasOverride ? "#f97316" : "#2dd4bf" }} />}
+                {hasLive && <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 bg-teal-400" />}
               </div>
 
               {/* Wires + chatter cards */}
@@ -58,25 +61,27 @@ export function WiringGraph({ nodes }: { nodes: WiringNode[] }) {
                   <svg width={COL_W - 8} height={WIRE_TOP + chatterZoneH} className="absolute top-0 left-0 pointer-events-none">
                     {node.chatters.map((ch, ci) => {
                       const cx = (COL_W - 8) / 2;
-                      const splitX = 16 + ci * ((COL_W - 40) / Math.max(1, node.chatters.length - 1) || 0);
-                      const endX = (COL_W - 8) / 2;
                       const endY = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP) + CHATTER_H / 2;
-                      const wireColor = ch.source === "override" ? "#f97316" : "#2dd4bf";
+                      const isLive = ch.source === "live" || ch.source === "override";
+                      const wireColor = ch.source === "override" ? "#f97316" : isLive ? "#2dd4bf" : "rgba(255,255,255,0.12)";
 
-                      // Simple vertical line for single chatter, branching for multiple
                       const d = node.chatters.length === 1
                         ? `M ${cx} 0 L ${cx} ${endY}`
-                        : `M ${cx} 0 L ${cx} ${WIRE_TOP * 0.6} Q ${cx} ${WIRE_TOP}, ${endX} ${WIRE_TOP} L ${endX} ${endY}`;
+                        : `M ${cx} 0 L ${cx} ${WIRE_TOP * 0.6} Q ${cx} ${WIRE_TOP}, ${cx} ${WIRE_TOP} L ${cx} ${endY}`;
 
                       return (
                         <g key={ch.email}>
-                          <path d={d} fill="none" stroke={wireColor} strokeWidth={1.5} opacity={0.5} />
-                          <circle r="2.5" fill={wireColor}>
-                            <animateMotion dur="2s" repeatCount="indefinite" path={d} />
-                          </circle>
-                          <circle r="5" fill={wireColor} opacity={0.12}>
-                            <animateMotion dur="2s" repeatCount="indefinite" path={d} />
-                          </circle>
+                          <path d={d} fill="none" stroke={wireColor} strokeWidth={1.5} opacity={isLive ? 0.5 : 0.3} />
+                          {isLive && (
+                            <>
+                              <circle r="2.5" fill={wireColor}>
+                                <animateMotion dur="2s" repeatCount="indefinite" path={d} />
+                              </circle>
+                              <circle r="5" fill={wireColor} opacity={0.12}>
+                                <animateMotion dur="2s" repeatCount="indefinite" path={d} />
+                              </circle>
+                            </>
+                          )}
                         </g>
                       );
                     })}
@@ -84,21 +89,34 @@ export function WiringGraph({ nodes }: { nodes: WiringNode[] }) {
 
                   {/* Chatter cards */}
                   {node.chatters.map((ch, ci) => {
+                    const isLive = ch.source === "live" || ch.source === "override";
                     const isOvr = ch.source === "override";
                     const top = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP);
+                    const cardBorder = isOvr ? "border-orange-500/20 bg-orange-500/[0.03]"
+                      : isLive ? "border-teal-500/20 bg-teal-500/[0.03]"
+                      : "border-white/10 bg-white/[0.02]";
+                    const detailColor = isOvr ? "#f9731660" : isLive ? "#2dd4bf60" : "rgba(255,255,255,0.2)";
+
                     return (
-                      <div key={ch.email} className={`absolute left-0 right-0 rounded-xl border px-2 py-1.5 flex items-center gap-1.5 ${
-                        isOvr ? "border-orange-500/20 bg-orange-500/[0.03]" : "border-teal-500/20 bg-teal-500/[0.03]"
-                      }`} style={{ top, height: CHATTER_H }}>
+                      <div key={ch.email} className={`absolute left-0 right-0 rounded-xl border px-2 py-1.5 flex items-center gap-1.5 group ${cardBorder}`} style={{ top, height: CHATTER_H }}>
                         <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[8px] text-white/50 font-bold uppercase flex-shrink-0">
                           {ch.name[0]}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-[10px] font-medium text-white/90 truncate">{ch.name}</div>
-                          <div className="text-[8px] truncate" style={{ color: isOvr ? "#f9731660" : "#2dd4bf60" }}>
+                          <div className="text-[8px] truncate" style={{ color: detailColor }}>
                             {ch.detail}
                           </div>
                         </div>
+                        {onDisconnect && (
+                          <button
+                            onClick={() => onDisconnect(ch.email, node.id)}
+                            className="opacity-0 group-hover:opacity-100 transition w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 hover:bg-red-500/40"
+                            title="Disconnect"
+                          >
+                            <X size={8} className="text-red-400" />
+                          </button>
+                        )}
                       </div>
                     );
                   })}
