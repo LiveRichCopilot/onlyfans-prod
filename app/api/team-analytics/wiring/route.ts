@@ -85,7 +85,7 @@ export async function GET() {
       shiftByCreator.set(s.creatorId, arr);
     }
 
-    type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string; isLive?: boolean };
+    type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string; isLive: boolean };
 
     // Pre-resolve all emails through alias table so dedup works across email mismatches
     const allRawEmails = new Set<string>();
@@ -170,6 +170,7 @@ export async function GET() {
           name: nameMap.get(resolved) || nameMap.get(s.email) || resolved.split("@")[0],
           source: "assigned",
           detail: s.shift === "default" ? "assigned" : s.shift,
+          isLive: creatorLive.has(resolved),
         });
       }
 

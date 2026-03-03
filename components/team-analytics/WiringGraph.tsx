@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 
-type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string; isLive?: boolean };
+type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string; isLive: boolean };
 
 export type WiringNode = {
   id: string;
@@ -30,7 +30,7 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
         {nodes.map((node, i) => {
           const x = i * COL_W + 8;
           const hasChatters = node.chatters.length > 0;
-          const hasLive = node.chatters.some(c => c.source === "live");
+          const hasLive = node.chatters.some(c => c.isLive);
           const hasOverride = node.chatters.some(c => c.source === "override");
           const borderColor = hasOverride ? "border-orange-500/30 bg-orange-500/5"
             : hasLive ? "border-teal-500/30 bg-teal-500/5"
@@ -62,8 +62,7 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
                     {node.chatters.map((ch, ci) => {
                       const cx = (COL_W - 8) / 2;
                       const endY = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP) + CHATTER_H / 2;
-                      const isLive = ch.isLive || ch.source === "live" || ch.source === "override";
-                      const wireColor = ch.source === "override" ? "#f97316" : isLive ? "#2dd4bf" : "rgba(255,255,255,0.12)";
+                      const wireColor = ch.source === "override" ? "#f97316" : ch.isLive ? "#2dd4bf" : "rgba(255,255,255,0.12)";
 
                       const d = node.chatters.length === 1
                         ? `M ${cx} 0 L ${cx} ${endY}`
@@ -71,8 +70,8 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
 
                       return (
                         <g key={ch.email}>
-                          <path d={d} fill="none" stroke={wireColor} strokeWidth={1.5} opacity={isLive ? 0.5 : 0.3} />
-                          {isLive && (
+                          <path d={d} fill="none" stroke={wireColor} strokeWidth={1.5} opacity={ch.isLive ? 0.5 : 0.3} />
+                          {ch.isLive && (
                             <>
                               <circle r="2.5" fill={wireColor}>
                                 <animateMotion dur="2s" repeatCount="indefinite" path={d} />
@@ -89,13 +88,12 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
 
                   {/* Chatter cards */}
                   {node.chatters.map((ch, ci) => {
-                    const isLive = ch.source === "live" || ch.source === "override";
                     const isOvr = ch.source === "override";
                     const top = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP);
                     const cardBorder = isOvr ? "border-orange-500/20 bg-orange-500/[0.03]"
-                      : isLive ? "border-teal-500/20 bg-teal-500/[0.03]"
+                      : ch.isLive ? "border-teal-500/20 bg-teal-500/[0.03]"
                       : "border-white/10 bg-white/[0.02]";
-                    const detailColor = isOvr ? "#f9731660" : isLive ? "#2dd4bf60" : "rgba(255,255,255,0.2)";
+                    const detailColor = isOvr ? "#f9731660" : ch.isLive ? "#2dd4bf60" : "rgba(255,255,255,0.2)";
 
                     return (
                       <div key={ch.email} className={`absolute left-0 right-0 rounded-xl border px-2 py-1.5 flex items-center gap-1.5 group ${cardBorder}`} style={{ top, height: CHATTER_H }}>

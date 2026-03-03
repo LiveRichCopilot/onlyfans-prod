@@ -58,7 +58,7 @@ export function WiringPanel() {
     busyRef.current = false;
   }
 
-  const liveCount = nodes.filter(n => n.chatters.some(c => c.isLive || c.source === "live")).length;
+  const liveCount = nodes.filter(n => n.chatters.some(c => c.isLive)).length;
   const assignedCount = nodes.filter(n => n.chatters.length > 0).length;
   const unassigned = nodes.filter(n => n.chatters.length === 0).length;
 
