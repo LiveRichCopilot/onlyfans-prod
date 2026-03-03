@@ -59,6 +59,16 @@ export async function GET(req: NextRequest) {
     );
     const totals = buildTotals(rows);
 
+    // Diagnostics: compare OFAPI earnings vs attributed revenue
+    for (const [cId, earnings] of ofapi.creatorEarnings) {
+      const creatorName = ofapi.creators.find(c => c.id === cId)?.name || cId;
+      const msgRev = ofapi.messages
+        .filter(m => m.creatorId === cId)
+        .reduce((s, m) => s + m.purchasedCount * m.price, 0);
+      console.log(`[chatter-perf] ${creatorName}: OFAPI earnings=$${earnings.total}, msg revenue=$${msgRev.toFixed(2)}, tips=$${earnings.tips}`);
+    }
+    console.log(`[chatter-perf] Attributed total: $${totals.totalSales}, chatters: ${totals.activeChatters}`);
+
     return NextResponse.json({
       chatters: rows,
       totals,

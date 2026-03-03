@@ -86,19 +86,41 @@ export async function fetchOfapiData(
     }
   }
 
-  return { messages, creatorEarnings, creators };
+  // Deduplicate messages by ID (OFAPI can return the same message in both direct + mass)
+  const seen = new Set<string>();
+  const deduped: RawMessage[] = [];
+  for (const msg of messages) {
+    if (!seen.has(msg.id)) {
+      seen.add(msg.id);
+      deduped.push(msg);
+    }
+  }
+
+  if (deduped.length !== messages.length) {
+    console.log(`[chatter-perf] Deduped ${messages.length} → ${deduped.length} messages (${messages.length - deduped.length} duplicates removed)`);
+  }
+
+  // Log revenue diagnostics
+  const totalRev = deduped.reduce((s, m) => s + m.purchasedCount * m.price, 0);
+  console.log(`[chatter-perf] ${deduped.length} messages, gross revenue: $${totalRev.toFixed(2)}, creators: ${creators.length}`);
+  if (deduped[0]) {
+    const s = deduped[0];
+    console.log(`[chatter-perf] sample msg: id=${s.id} price=${s.price} (${typeof s.price}) purchased=${s.purchasedCount} (${typeof s.purchasedCount}) source=${s.source}`);
+  }
+
+  return { messages: deduped, creatorEarnings, creators };
 }
 
 function parseMessage(item: any, creatorId: string, source: "direct" | "mass"): RawMessage {
   return {
     id: String(item.id || item.messageId || Math.random()),
     date: item.date || item.createdAt || "",
-    price: item.price || 0,
-    purchasedCount: item.purchasedCount || 0,
-    viewedCount: item.viewedCount || 0,
-    sentCount: item.sentCount || (source === "direct" ? 1 : 0),
+    price: Number(item.price ?? 0),
+    purchasedCount: Number(item.purchasedCount ?? 0),
+    viewedCount: Number(item.viewedCount ?? 0),
+    sentCount: Number(item.sentCount ?? (source === "direct" ? 1 : 0)),
     text: item.rawText || item.text || "",
-    mediaCount: item.mediaCount || 0,
+    mediaCount: Number(item.mediaCount ?? 0),
     creatorId,
     source,
   };
