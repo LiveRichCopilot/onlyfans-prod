@@ -15,7 +15,7 @@ export async function GET() {
     const ukHour = ukNow.getHours();
     const currentShiftType = ukHour >= 7 && ukHour < 15 ? "morning" : ukHour >= 15 && ukHour < 23 ? "afternoon" : "night";
 
-    const [creators, liveSessions, overrides, scheduleShifts, hubstaffMappings] = await Promise.all([
+    const [creators, liveSessions, overrides, scheduleNames, scheduleShifts, hubstaffMappings] = await Promise.all([
       prisma.creator.findMany({
         where: { active: true },
         select: { id: true, name: true, ofUsername: true, avatarUrl: true },
@@ -31,6 +31,9 @@ export async function GET() {
         select: { id: true, creatorId: true, chatterEmail: true, endAt: true, reason: true },
         orderBy: { createdAt: "desc" },
       }),
+      prisma.chatterSchedule.findMany({
+        select: { email: true, name: true, creatorId: true, shift: true },
+      }),
       prisma.scheduleShift.findMany({
         where: { dayOfWeek: ukDow },
         select: { chatterEmail: true, chatterName: true, creatorId: true, shiftType: true },
@@ -41,8 +44,9 @@ export async function GET() {
       }),
     ]);
 
-    // Name lookup — Hubstaff is source of truth for chatter names
+    // Name lookup — schedule names first, then Hubstaff overwrites (Hubstaff wins)
     const nameMap = new Map<string, string>();
+    for (const s of scheduleNames) nameMap.set(normalizeEmail(s.email), s.name);
     for (const h of hubstaffMappings) {
       if (h.hubstaffName) {
         nameMap.set(normalizeEmail(h.chatterEmail), h.hubstaffName);
@@ -57,7 +61,23 @@ export async function GET() {
       ovrByCreator.set(o.creatorId, arr);
     }
 
-    // Group ScheduleShift entries by creator (source of truth)
+    // Group live sessions by creator
+    const liveByCreator = new Map<string, typeof liveSessions>();
+    for (const s of liveSessions) {
+      const arr = liveByCreator.get(s.creatorId) || [];
+      arr.push(s);
+      liveByCreator.set(s.creatorId, arr);
+    }
+
+    // Group schedule entries by creator (legacy)
+    const schedByCreator = new Map<string, typeof scheduleNames>();
+    for (const s of scheduleNames) {
+      const arr = schedByCreator.get(s.creatorId) || [];
+      arr.push(s);
+      schedByCreator.set(s.creatorId, arr);
+    }
+
+    // Group ScheduleShift entries by creator (new recurring template)
     const shiftByCreator = new Map<string, typeof scheduleShifts>();
     for (const s of scheduleShifts) {
       const arr = shiftByCreator.get(s.creatorId) || [];
@@ -71,7 +91,7 @@ export async function GET() {
     const allRawEmails = new Set<string>();
     overrides.forEach(o => allRawEmails.add(normalizeEmail(o.chatterEmail)));
     liveSessions.forEach(s => allRawEmails.add(normalizeEmail(s.email)));
-    scheduleShifts.forEach(s => allRawEmails.add(normalizeEmail(s.chatterEmail)));
+    scheduleNames.forEach(s => allRawEmails.add(normalizeEmail(s.email)));
     hubstaffMappings.forEach(h => allRawEmails.add(normalizeEmail(h.chatterEmail)));
     const resolvedMap = new Map<string, string>();
     for (const email of allRawEmails) {
@@ -121,6 +141,35 @@ export async function GET() {
           name: nameMap.get(resolved) || s.chatterName || resolved.split("@")[0],
           source: "assigned",
           detail: shiftLabel,
+          isLive: creatorLive.has(resolved),
+        });
+      }
+
+      // Live sessions (skip if already overridden or scheduled)
+      for (const s of liveByCreator.get(c.id) || []) {
+        const resolved = re(s.email);
+        if (!resolved || seen.has(resolved)) continue;
+        seen.add(resolved);
+        const mins = Math.round((now.getTime() - s.clockIn.getTime()) / 60000);
+        chatters.push({
+          email: resolved,
+          name: nameMap.get(resolved) || nameMap.get(s.email) || resolved.split("@")[0],
+          source: "live",
+          detail: `${mins}m in`,
+          isLive: true,
+        });
+      }
+
+      // Assigned from schedule (not live, not overridden — show as assigned)
+      for (const s of schedByCreator.get(c.id) || []) {
+        const resolved = re(s.email);
+        if (!resolved || seen.has(resolved)) continue;
+        seen.add(resolved);
+        chatters.push({
+          email: resolved,
+          name: nameMap.get(resolved) || nameMap.get(s.email) || resolved.split("@")[0],
+          source: "assigned",
+          detail: s.shift === "default" ? "assigned" : s.shift,
           isLive: creatorLive.has(resolved),
         });
       }
