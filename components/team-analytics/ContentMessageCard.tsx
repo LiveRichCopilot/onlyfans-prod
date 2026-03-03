@@ -128,13 +128,11 @@ export function ContentMessageCard({ msg, rank, replyStats }: { msg: MessageCard
               {rank && (
                 <span className="text-[10px] font-bold text-white/40 tabular-nums">#{rank}</span>
               )}
-              <span className="text-white/60 text-[10px]">{msg.creatorName}</span>
+              <span className="text-white/70 text-xs">{msg.creatorName}</span>
               {msg.likelySender && (
-                <span className="text-white/40 text-[10px] group/sender relative cursor-default">
-                  by <span className="text-teal-400/70">{msg.likelySender}</span>
-                  <span className="absolute left-0 -top-6 hidden group-hover/sender:block bg-[#12141a]/95 backdrop-blur-xl border border-white/10 rounded-lg px-2 py-1 text-[9px] text-white/50 whitespace-nowrap z-10">
-                    Approximate — was on shift when sent
-                  </span>
+                <span className="text-xs">
+                  <span className="text-white/40">sent by</span>{" "}
+                  <span className="text-teal-400 font-medium">{msg.likelySender}</span>
                 </span>
               )}
             </div>
