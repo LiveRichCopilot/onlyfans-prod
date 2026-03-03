@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { Clock, X, AlertCircle } from "lucide-react";
-import type { WiringCreator, WiringChatter } from "./WiringPanel";
-
 const DURATIONS = [
   { label: "1h", hours: 1 },
   { label: "4h", hours: 4 },
@@ -12,8 +10,8 @@ const DURATIONS = [
 ];
 
 export function AddOverrideForm({ creators, chatters, onClose, onCreated }: {
-  creators: WiringCreator[];
-  chatters: WiringChatter[];
+  creators: { id: string; name: string | null }[];
+  chatters: { email: string; name: string }[];
   onClose: () => void;
   onCreated: () => void;
 }) {
