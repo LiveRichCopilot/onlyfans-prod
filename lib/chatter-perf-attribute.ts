@@ -38,7 +38,14 @@ export type AttributeResult = {
   scheduleMap: Map<string, ScheduleInfo>;
 };
 
-/** Load sessions + schedules from DB */
+export type ShiftEntry = {
+  chatterEmail: string;
+  chatterName: string | null;
+  creatorId: string;
+  shiftType: string;
+};
+
+/** Load sessions + schedules + schedule shifts from DB */
 export async function loadSessionData(
   startDate: Date,
   endDate: Date,
@@ -50,25 +57,30 @@ export async function loadSessionData(
   };
   if (creatorId) sessionWhere.creatorId = creatorId;
 
-  const sessions = await prisma.chatterSession.findMany({
-    where: sessionWhere,
-    select: { email: true, creatorId: true, clockIn: true, clockOut: true },
-  });
+  const shiftWhere: Record<string, unknown> = {};
+  if (creatorId) shiftWhere.creatorId = creatorId;
 
-  const scheduleWhere: Record<string, unknown> = {};
-  if (creatorId) scheduleWhere.creatorId = creatorId;
-
-  const schedules = await prisma.chatterSchedule.findMany({
-    where: scheduleWhere,
-    select: { email: true, name: true, creatorId: true, shift: true },
-  });
+  const [sessions, schedules, scheduleShifts] = await Promise.all([
+    prisma.chatterSession.findMany({
+      where: sessionWhere,
+      select: { email: true, creatorId: true, clockIn: true, clockOut: true },
+    }),
+    prisma.chatterSchedule.findMany({
+      where: creatorId ? { creatorId } : {},
+      select: { email: true, name: true, creatorId: true, shift: true },
+    }),
+    prisma.scheduleShift.findMany({
+      where: shiftWhere,
+      select: { chatterEmail: true, chatterName: true, creatorId: true, shiftType: true },
+    }),
+  ]);
 
   const scheduleMap = new Map<string, ScheduleInfo>();
   for (const s of schedules) {
     scheduleMap.set(s.email, { name: s.name, shift: s.shift });
   }
 
-  return { sessions, scheduleMap };
+  return { sessions, scheduleMap, scheduleShifts };
 }
 
 /** Attribute transactions + sessions to chatters */
@@ -79,11 +91,14 @@ export async function attributeToChatter(
   scheduleMap: Map<string, ScheduleInfo>,
   startDate: Date,
   endDate: Date,
+  scheduleShifts?: ShiftEntry[],
 ): Promise<AttributeResult> {
   // Build attribution resolvers per creator (batch — avoids N+1)
+  // Include creators from schedule shifts so chatters show all assigned models
   const uniqueCreatorIds = [...new Set([
     ...transactions.filter(t => isAttributable(t.category)).map(t => t.creatorId),
     ...sessions.map(s => s.creatorId),
+    ...(scheduleShifts || []).map(s => s.creatorId),
   ])];
 
   const resolvers = new Map<string, Awaited<ReturnType<typeof getActiveChatterBatch>>>();
@@ -175,6 +190,18 @@ export async function attributeToChatter(
     if (source === "override") stats.overrideHours += hours;
     else if (source === "hubstaff") stats.hubstaffHours += hours;
     else stats.unassignedHours += hours;
+  }
+
+  // Add creator associations from schedule shifts (even if no tx/sessions for that model)
+  if (scheduleShifts) {
+    for (const s of scheduleShifts) {
+      const stats = getOrCreate(s.chatterEmail);
+      stats.creators.add(creatorNameMap.get(s.creatorId) || "Unknown");
+      // Use schedule name if we don't have one yet
+      if (s.chatterName && stats.name === s.chatterEmail.split("@")[0]) {
+        stats.name = s.chatterName;
+      }
+    }
   }
 
   return { chatterMap, sessions, scheduleMap };

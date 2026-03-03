@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       loadSessionData(startDate, endDate, creatorId),
     ]);
 
-    // Attribute transactions + sessions to chatters
+    // Attribute transactions + sessions to chatters (include schedule shifts for creator associations)
     const { chatterMap } = await attributeToChatter(
       txData.transactions,
       txData.creators,
@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
       sessionData.scheduleMap,
       startDate,
       endDate,
+      sessionData.scheduleShifts,
     );
 
     // Build final rows + totals
