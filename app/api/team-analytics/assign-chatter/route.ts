@@ -65,12 +65,22 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    // Delete all schedule entries for this chatter on this model
-    await prisma.chatterSchedule.deleteMany({
+    // Delete schedule entries for this chatter on this model
+    const sched = await prisma.chatterSchedule.deleteMany({
       where: { email, creatorId },
     });
 
-    return NextResponse.json({ deleted: true });
+    // Also close any live sessions for this chatter on this model
+    const sessions = await prisma.chatterSession.updateMany({
+      where: { email, creatorId, isLive: true },
+      data: { isLive: false, clockOut: new Date() },
+    });
+
+    return NextResponse.json({
+      deleted: true,
+      schedulesDeleted: sched.count,
+      sessionsClosed: sessions.count,
+    });
   } catch (err: any) {
     console.error("[assign-chatter] DELETE error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
