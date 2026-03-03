@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const now = new Date();
 
-    const [creators, liveSessions, overrides, scheduleNames, employees, hubstaffMappings] = await Promise.all([
+    const [creators, liveSessions, overrides, scheduleNames, hubstaffMappings] = await Promise.all([
       prisma.creator.findMany({
         where: { active: true },
         select: { id: true, name: true, ofUsername: true, avatarUrl: true },
@@ -28,26 +28,20 @@ export async function GET() {
       prisma.chatterSchedule.findMany({
         select: { email: true, name: true, creatorId: true, shift: true },
       }),
-      prisma.user.findMany({
-        where: { role: "EMPLOYEE" },
-        select: { email: true, name: true },
-      }),
       prisma.hubstaffUserMapping.findMany({
         select: { chatterEmail: true, hubstaffName: true },
         distinct: ["chatterEmail"],
       }),
     ]);
 
+    // Name lookup — schedule names first, then Hubstaff overwrites (Hubstaff wins)
     const nameMap = new Map<string, string>();
+    for (const s of scheduleNames) nameMap.set(normalizeEmail(s.email), s.name);
     for (const h of hubstaffMappings) {
       if (h.hubstaffName) {
         nameMap.set(normalizeEmail(h.chatterEmail), h.hubstaffName);
       }
     }
-    for (const e of employees) {
-      if (e.email && e.name) nameMap.set(normalizeEmail(e.email), e.name);
-    }
-    for (const s of scheduleNames) nameMap.set(normalizeEmail(s.email), s.name);
 
     // Group overrides by creator
     const ovrByCreator = new Map<string, typeof overrides>();
@@ -81,7 +75,6 @@ export async function GET() {
     liveSessions.forEach(s => allRawEmails.add(normalizeEmail(s.email)));
     scheduleNames.forEach(s => allRawEmails.add(normalizeEmail(s.email)));
     hubstaffMappings.forEach(h => allRawEmails.add(normalizeEmail(h.chatterEmail)));
-    employees.forEach(e => e.email && allRawEmails.add(normalizeEmail(e.email)));
     const resolvedMap = new Map<string, string>();
     for (const email of allRawEmails) {
       if (!email) continue;
@@ -138,35 +131,12 @@ export async function GET() {
       return { ...c, chatters };
     });
 
-    // ALL employees — HubstaffUserMapping is source of truth, then fill gaps from schedule/employees
-    // Dedupe by resolved email AND by name (same person, different emails = one entry)
+    // ALL chatters — Hubstaff is the single source of truth
     const chatterMap = new Map<string, { email: string; name: string }>();
-    const seenNames = new Map<string, string>(); // lowercase name → email key (first wins)
-
-    // Hubstaff mappings first (source of truth)
     for (const h of hubstaffMappings) {
       const key = re(h.chatterEmail);
-      const name = h.hubstaffName || key.split("@")[0];
-      chatterMap.set(key, { email: key, name });
-      seenNames.set(name.toLowerCase(), key);
-    }
-    // Employees — skip if name already seen
-    for (const e of employees) {
-      if (e.email) {
-        const key = re(e.email);
-        const name = e.name || key.split("@")[0];
-        if (!chatterMap.has(key) && !seenNames.has(name.toLowerCase())) {
-          chatterMap.set(key, { email: key, name });
-          seenNames.set(name.toLowerCase(), key);
-        }
-      }
-    }
-    // Schedule — skip if name already seen
-    for (const s of scheduleNames) {
-      const key = re(s.email);
-      if (!chatterMap.has(key) && !seenNames.has(s.name.toLowerCase())) {
-        chatterMap.set(key, { email: key, name: s.name });
-        seenNames.set(s.name.toLowerCase(), key);
+      if (!chatterMap.has(key)) {
+        chatterMap.set(key, { email: key, name: h.hubstaffName || key.split("@")[0] });
       }
     }
     const allChatters = Array.from(chatterMap.values())
