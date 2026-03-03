@@ -108,11 +108,19 @@ export async function fetchAndAttributeMessages(
     fanMessages: string[];
     allMessages: AttributedMessage[];
     responseDelays: number[];
+    dmsSent: number;
+    ppvsSent: number;
+    fansChatted: number;
+    characterCount: number;
 }> {
     const chatterMessages: string[] = [];
     const fanMessages: string[] = [];
     const allMessages: AttributedMessage[] = [];
     const responseDelays: number[] = [];
+    let dmsSent = 0;
+    let ppvsSent = 0;
+    let characterCount = 0;
+    const fanIdSet = new Set<string>();
 
     try {
         const chatData = await listChats(window.ofapiCreatorId, window.ofapiToken, maxChats, 0);
@@ -150,6 +158,10 @@ export async function fetchAndAttributeMessages(
 
                     if (isChatter) {
                         chatterMessages.push(text);
+                        dmsSent++;
+                        characterCount += text.length;
+                        fanIdSet.add(String(chatId));
+                        if ((m as any).price > 0) ppvsSent++;
                         if (lastFanMsgTime) {
                             const delaySec = (createdAt.getTime() - lastFanMsgTime) / 1000;
                             if (delaySec > 0 && delaySec < 7200) {
@@ -170,7 +182,7 @@ export async function fetchAndAttributeMessages(
         console.error(`[Scorer] OFAPI fetch error for ${window.creatorName}:`, e.message);
     }
 
-    return { chatterMessages, fanMessages, allMessages, responseDelays };
+    return { chatterMessages, fanMessages, allMessages, responseDelays, dmsSent, ppvsSent, fansChatted: fanIdSet.size, characterCount };
 }
 
 // --- Main Orchestrator ---
@@ -199,7 +211,7 @@ export async function scoreChatter(
             return null;
         }
 
-        const { chatterMessages, allMessages, responseDelays } =
+        const { chatterMessages, allMessages, responseDelays, dmsSent, ppvsSent, fansChatted, characterCount } =
             await fetchAndAttributeMessages(window);
 
         if (allMessages.length === 0) {
@@ -332,6 +344,13 @@ export async function scoreChatter(
                 copyPasteBlasts: copyPasteBlasts.length > 0 ? copyPasteBlasts : undefined,
                 mistakeTags: result.mistakeTags,
                 strengthTags: result.strengthTags,
+                dmsSent,
+                ppvsSent,
+                fansChatted,
+                characterCount,
+                avgResponseTimeSec: responseDelays.length > 0
+                    ? responseDelays.reduce((a, b) => a + b, 0) / responseDelays.length
+                    : null,
             },
         });
 

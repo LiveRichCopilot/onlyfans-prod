@@ -456,6 +456,11 @@ model ChatterHourlyScore {
   copyPasteBlasts       Json?     // [{message, fanCount}]
   mistakeTags           String[]
   strengthTags          String[]
+  dmsSent              Int      @default(0)
+  ppvsSent             Int      @default(0)
+  fansChatted          Int      @default(0)
+  characterCount       Int      @default(0)
+  avgResponseTimeSec   Float?
   createdAt             DateTime @default(now())
 
   @@unique([chatterEmail, creatorId, windowStart])
