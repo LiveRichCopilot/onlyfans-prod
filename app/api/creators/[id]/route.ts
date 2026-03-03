@@ -325,11 +325,14 @@ export async function PATCH(
     }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+    _req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const creatorId = params.id;
+        const { id } = await params;
         await prisma.creator.update({
-            where: { id: creatorId },
+            where: { id },
             data: { active: false },
         });
         return NextResponse.json({ success: true });
