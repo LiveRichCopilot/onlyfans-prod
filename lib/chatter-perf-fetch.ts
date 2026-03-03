@@ -29,6 +29,61 @@ function formatDateForApi(d: Date): string {
   return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
 }
 
+const PAGE_SIZE = 100;
+const MAX_ITEMS = 2000; // Safety cap per source per creator
+
+/** Paginate through all messages using OFAPI cursor (_pagination.next_page) */
+async function fetchAllPages(
+  account: string, token: string,
+  fetcher: (account: string, token: string, start: Date, end: Date, limit: number, offset: number) => Promise<unknown>,
+  startDate: Date, endDate: Date,
+  requestStart: number,
+): Promise<any[]> {
+  const allItems: any[] = [];
+
+  // First page via our wrapper
+  const firstRes = await fetcher(account, token, startDate, endDate, PAGE_SIZE, 0).catch(() => null) as any;
+  if (!firstRes) return allItems;
+
+  const firstItems = firstRes?.data?.items || firstRes?.items || [];
+  allItems.push(...firstItems);
+
+  // Follow _pagination.next_page cursor (check both top-level and _meta paths)
+  let nextPage: string | null =
+    firstRes?._pagination?.next_page ??
+    firstRes?._meta?._pagination?.next_page ??
+    firstRes?.data?._pagination?.next_page ?? null;
+
+  // Resolve token for raw fetch (same logic as ofapi-core)
+  const resolvedToken = token === "linked_via_auth_module"
+    ? (process.env.OFAPI_API_KEY || process.env.TEST_OFAPI_KEY || "")
+    : token;
+
+  while (nextPage && allItems.length < MAX_ITEMS && Date.now() - requestStart < 45000) {
+    const r = await fetch(nextPage, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${resolvedToken}`,
+      },
+    }).catch(() => null);
+    if (!r || !r.ok) break;
+
+    const nextData = await r.json().catch(() => null);
+    if (!nextData) break;
+
+    const nextItems = nextData?.data?.items || nextData?.items || [];
+    if (nextItems.length === 0) break;
+
+    allItems.push(...nextItems);
+    nextPage =
+      nextData?._pagination?.next_page ??
+      nextData?._meta?._pagination?.next_page ??
+      nextData?.data?._pagination?.next_page ?? null;
+  }
+
+  return allItems;
+}
+
 /** Fetch all OFAPI engagement data for creators in the date range */
 export async function fetchOfapiData(
   startDate: Date,
@@ -47,42 +102,36 @@ export async function fetchOfapiData(
 
   const messages: RawMessage[] = [];
   const creatorEarnings = new Map<string, CreatorEarnings>();
-  const batchSize = 5;
+  const batchSize = 3; // Smaller batches since each creator now paginates
   const requestStart = Date.now();
   const startStr = formatDateForApi(startDate);
   const endStr = formatDateForApi(endDate);
 
   for (let i = 0; i < creators.length; i += batchSize) {
-    if (Date.now() - requestStart > 40000) break;
+    if (Date.now() - requestStart > 45000) break;
 
     const batch = creators.slice(i, i + batchSize);
     const results = await Promise.all(batch.map(async (c) => {
-      const [directRes, massRes, tipsRes, totalRes] = await Promise.all([
-        getDirectMessageStats(c.ofapiCreatorId, c.ofapiToken, startDate, endDate, 50, 0).catch(() => null),
-        getMassMessageStats(c.ofapiCreatorId, c.ofapiToken, startDate, endDate, 50, 0).catch(() => null),
+      const [directItems, massItems, tipsRes, totalRes] = await Promise.all([
+        fetchAllPages(c.ofapiCreatorId, c.ofapiToken, getDirectMessageStats, startDate, endDate, requestStart),
+        fetchAllPages(c.ofapiCreatorId, c.ofapiToken, getMassMessageStats, startDate, endDate, requestStart),
         getEarningsByType(c.ofapiCreatorId, c.ofapiToken, "tips", startStr, endStr).catch(() => null),
         getEarningsByType(c.ofapiCreatorId, c.ofapiToken, "total", startStr, endStr).catch(() => null),
       ]);
-      return { creator: c, directRes, massRes, tipsRes, totalRes };
+      return { creator: c, directItems, massItems, tipsRes, totalRes };
     }));
 
     for (const r of results) {
-      const directItems = (r.directRes as any)?.data?.items || (r.directRes as any)?.items || [];
-      for (const item of directItems) {
+      for (const item of r.directItems) {
         messages.push(parseMessage(item, r.creator.id, "direct"));
       }
-
-      const massItems = (r.massRes as any)?.data?.items || (r.massRes as any)?.items || [];
-      for (const item of massItems) {
+      for (const item of r.massItems) {
         messages.push(parseMessage(item, r.creator.id, "mass"));
       }
 
-      const tips = (r.tipsRes as any)?.data?.total || (r.tipsRes as any)?.total || 0;
-      const total = (r.totalRes as any)?.data?.total || (r.totalRes as any)?.total || 0;
-      creatorEarnings.set(r.creator.id, {
-        tips: typeof tips === "number" ? tips : 0,
-        total: typeof total === "number" ? total : 0,
-      });
+      const tips = Number((r.tipsRes as any)?.data?.total ?? (r.tipsRes as any)?.total ?? 0);
+      const total = Number((r.totalRes as any)?.data?.total ?? (r.totalRes as any)?.total ?? 0);
+      creatorEarnings.set(r.creator.id, { tips, total });
     }
   }
 
