@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { ShiftBlock } from "./ShiftBlock";
 import type { TimezoneOption } from "./ShiftScheduler";
 
@@ -71,6 +71,29 @@ function pad2(n: number): string {
 
 export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, onFillWeek, timezone }: Props) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
+  const scrollRAF = useRef<number>(0);
+
+  // Auto-scroll the page when dragging near top/bottom edges
+  useEffect(() => {
+    const EDGE = 80; // px from viewport edge to start scrolling
+    const SPEED = 12; // px per frame
+
+    function onDragOver(e: DragEvent) {
+      const y = e.clientY;
+      const h = window.innerHeight;
+      if (y < EDGE) {
+        window.scrollBy(0, -SPEED);
+      } else if (y > h - EDGE) {
+        window.scrollBy(0, SPEED);
+      }
+    }
+
+    window.addEventListener("dragover", onDragOver);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      cancelAnimationFrame(scrollRAF.current);
+    };
+  }, []);
 
   // Index shifts: key = `${creatorId}-${dayOfWeek}-${shiftType}`
   const shiftMap = new Map<string, Shift[]>();
