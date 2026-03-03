@@ -138,22 +138,36 @@ export async function GET() {
       return { ...c, chatters };
     });
 
-    // ALL employees — merge User(EMPLOYEE) + ChatterSchedule + HubstaffUserMapping
-    // Dedupe by RESOLVED email to collapse aliases into one person
+    // ALL employees — HubstaffUserMapping is source of truth, then fill gaps from schedule/employees
+    // Dedupe by resolved email AND by name (same person, different emails = one entry)
     const chatterMap = new Map<string, { email: string; name: string }>();
+    const seenNames = new Map<string, string>(); // lowercase name → email key (first wins)
+
+    // Hubstaff mappings first (source of truth)
     for (const h of hubstaffMappings) {
       const key = re(h.chatterEmail);
-      chatterMap.set(key, { email: key, name: h.hubstaffName || key.split("@")[0] });
+      const name = h.hubstaffName || key.split("@")[0];
+      chatterMap.set(key, { email: key, name });
+      seenNames.set(name.toLowerCase(), key);
     }
+    // Employees — skip if name already seen
     for (const e of employees) {
       if (e.email) {
         const key = re(e.email);
-        chatterMap.set(key, { email: key, name: e.name || key.split("@")[0] });
+        const name = e.name || key.split("@")[0];
+        if (!chatterMap.has(key) && !seenNames.has(name.toLowerCase())) {
+          chatterMap.set(key, { email: key, name });
+          seenNames.set(name.toLowerCase(), key);
+        }
       }
     }
+    // Schedule — skip if name already seen
     for (const s of scheduleNames) {
       const key = re(s.email);
-      chatterMap.set(key, { email: key, name: s.name });
+      if (!chatterMap.has(key) && !seenNames.has(s.name.toLowerCase())) {
+        chatterMap.set(key, { email: key, name: s.name });
+        seenNames.set(s.name.toLowerCase(), key);
+      }
     }
     const allChatters = Array.from(chatterMap.values())
       .sort((a, b) => a.name.localeCompare(b.name));
