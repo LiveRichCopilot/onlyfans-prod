@@ -27,9 +27,9 @@ export async function GET() {
 
     // Build per-chatter report
     const allEmails = new Set<string>();
-    mappings.forEach(m => allEmails.add(m.chatterEmail.toLowerCase()));
-    schedules.forEach(s => allEmails.add(s.email.toLowerCase()));
-    liveSessions.forEach(s => allEmails.add(s.email.toLowerCase()));
+    mappings.forEach(m => m.chatterEmail && allEmails.add(m.chatterEmail.toLowerCase()));
+    schedules.forEach(s => s.email && allEmails.add(s.email.toLowerCase()));
+    liveSessions.forEach(s => s.email && allEmails.add(s.email.toLowerCase()));
 
     const report = Array.from(allEmails).sort().map(email => {
       const mapping = mappings.filter(m => m.chatterEmail.toLowerCase() === email);
