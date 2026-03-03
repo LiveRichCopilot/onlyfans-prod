@@ -159,7 +159,7 @@ export function DateRangePicker({
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref}>
       {/* Trigger button */}
       <button
         onClick={() => setOpen(!open)}
@@ -170,9 +170,9 @@ export function DateRangePicker({
         <ChevronDown size={11} className={`text-white/30 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Dropdown */}
+      {/* Inline panel — pushes content down, not a floating overlay */}
       {open && (
-        <div className="absolute top-full right-0 mt-2 z-50 w-72 rounded-2xl p-3 shadow-2xl border border-white/10 space-y-2" style={{ background: "#111827" }}>
+        <div className="mt-2 w-72 rounded-2xl p-3 border border-white/10 space-y-2" style={{ background: "#454445" }}>
           {/* Preset grid */}
           <div className="grid grid-cols-4 gap-1.5">
             {PRESETS.map(p => (
@@ -181,8 +181,8 @@ export function DateRangePicker({
                 onClick={() => selectPreset(p)}
                 className={`px-2 py-1.5 rounded-lg text-[11px] font-medium transition flex items-center justify-center gap-1 ${
                   value.label === p.label
-                    ? "glass-prominent text-white"
-                    : "glass-inset text-white/50 hover:text-white"
+                    ? "bg-white/20 text-white"
+                    : "bg-white/5 text-white/50 hover:text-white hover:bg-white/10"
                 }`}
               >
                 {p.icon === "clock" && <Clock size={10} />}
@@ -192,12 +192,12 @@ export function DateRangePicker({
           </div>
 
           {/* Divider */}
-          <div className="border-t border-white/5" />
+          <div className="border-t border-white/10" />
 
           {/* Custom date range */}
           <button
             onClick={() => setShowCustom(!showCustom)}
-            className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium text-white/50 hover:text-white flex items-center gap-1.5 transition glass-inset"
+            className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-medium text-white/50 hover:text-white flex items-center gap-1.5 transition bg-white/5 hover:bg-white/10"
           >
             <Calendar size={10} className="text-teal-400" />
             Custom Range
@@ -214,7 +214,8 @@ export function DateRangePicker({
                     value={customStart}
                     onChange={e => setCustomStart(e.target.value)}
                     max={toInputDate(new Date())}
-                    className="w-full mt-0.5 px-2 py-1.5 rounded-lg glass-inset text-white text-[11px] border border-white/10 bg-transparent [color-scheme:dark]"
+                    className="w-full mt-0.5 px-2 py-1.5 rounded-lg text-white text-[11px] border border-white/10 [color-scheme:dark]"
+                    style={{ background: "#333" }}
                   />
                 </div>
                 <div className="flex-1">
@@ -224,14 +225,15 @@ export function DateRangePicker({
                     value={customEnd}
                     onChange={e => setCustomEnd(e.target.value)}
                     max={toInputDate(new Date())}
-                    className="w-full mt-0.5 px-2 py-1.5 rounded-lg glass-inset text-white text-[11px] border border-white/10 bg-transparent [color-scheme:dark]"
+                    className="w-full mt-0.5 px-2 py-1.5 rounded-lg text-white text-[11px] border border-white/10 [color-scheme:dark]"
+                    style={{ background: "#333" }}
                   />
                 </div>
               </div>
               <button
                 onClick={applyCustom}
                 disabled={!customStart || !customEnd}
-                className="w-full py-1.5 rounded-lg text-[11px] font-semibold transition glass-prominent text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-full py-1.5 rounded-lg text-[11px] font-semibold transition bg-white/15 text-white hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 Apply Range
               </button>
