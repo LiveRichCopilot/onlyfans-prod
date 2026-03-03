@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Zap, ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { RefreshCw, Zap, ChevronUp, ChevronDown, Plus, Radio } from "lucide-react";
 import { WiringGraph, type WiringNode } from "./WiringGraph";
 import { AddOverrideForm } from "./AddOverrideForm";
 
@@ -9,9 +9,11 @@ export function WiringPanel() {
   const [nodes, setNodes] = useState<WiringNode[]>([]);
   const [allChatters, setAllChatters] = useState<{ email: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const busyRef = useRef(false); // prevent double-click on disconnect
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,13 +33,29 @@ export function WiringPanel() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const i = setInterval(load, 30000); return () => clearInterval(i); }, [load]);
 
+  /** Sync Hubstaff → sessions, then reload wiring */
+  async function handleSyncNow() {
+    setSyncing(true);
+    try {
+      await fetch("/api/hubstaff/sync-now", { method: "POST" });
+      await load();
+    } catch {}
+    setSyncing(false);
+  }
+
+  /** Disconnect — wait for completion, then sync + reload */
   async function handleDisconnect(email: string, creatorId: string) {
+    if (busyRef.current) return; // prevent double-click
+    busyRef.current = true;
     try {
       await fetch(`/api/team-analytics/assign-chatter?email=${encodeURIComponent(email)}&creatorId=${encodeURIComponent(creatorId)}`, {
         method: "DELETE",
       });
-      load();
+      // Auto-sync after disconnect so wiring reflects reality immediately
+      await fetch("/api/hubstaff/sync-now", { method: "POST" });
+      await load();
     } catch {}
+    busyRef.current = false;
   }
 
   const liveCount = nodes.filter(n => n.chatters.some(c => c.source === "live")).length;
@@ -67,6 +85,15 @@ export function WiringPanel() {
           <button onClick={() => setShowAssign(!showAssign)} className="glass-button rounded-xl px-2.5 py-1 text-[10px] font-medium text-teal-400 hover:text-teal-300 flex items-center gap-1">
             <Plus size={10} /> Assign
           </button>
+          <button
+            onClick={handleSyncNow}
+            disabled={syncing}
+            className="glass-button rounded-xl px-2.5 py-1 text-[10px] font-medium text-teal-400 hover:text-teal-300 flex items-center gap-1 disabled:opacity-40"
+            title="Sync with Hubstaff now"
+          >
+            <Radio size={10} className={syncing ? "animate-pulse" : ""} />
+            {syncing ? "Syncing..." : "Sync"}
+          </button>
           <button onClick={load} className="glass-button rounded-xl p-1.5 text-white/40 hover:text-white">
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           </button>
@@ -85,7 +112,7 @@ export function WiringPanel() {
           creators={nodes.map(n => ({ id: n.id, name: n.name }))}
           chatters={allChatters}
           onClose={() => setShowAssign(false)}
-          onCreated={() => { setShowAssign(false); load(); }}
+          onCreated={() => { setShowAssign(false); handleSyncNow(); }}
         />
       )}
     </div>
