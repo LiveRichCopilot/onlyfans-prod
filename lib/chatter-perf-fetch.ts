@@ -1,176 +1,110 @@
 import { prisma } from "@/lib/prisma";
-import { getDirectMessageStats, getMassMessageStats } from "@/lib/ofapi-engagement";
-import { getEarningsByType } from "@/lib/ofapi-analytics";
 
-/** Raw message from OFAPI with timestamp — attributable per-chatter */
-export type RawMessage = {
+/** Transaction from DB — synced by cron every 5 min. Source of truth for revenue. */
+export type TransactionRow = {
   id: string;
-  date: string;
-  price: number;
-  purchasedCount: number;
-  viewedCount: number;
-  sentCount: number;
-  text: string;
-  mediaCount: number;
+  amount: number;
+  type: string;
+  date: Date;
   creatorId: string;
-  source: "direct" | "mass";
+  fanId: string;
+  category: TxCategory;
 };
 
-/** Aggregated earnings per creator (NOT per-chatter attributable) */
-export type CreatorEarnings = { tips: number; total: number };
+/** Normalized categories from raw OFAPI type strings */
+export type TxCategory = "message" | "tip" | "post" | "subscription" | "stream" | "other";
+
+/** Map raw type string (stored by sync cron) to a normalized category */
+export function categorizeType(rawType: string): TxCategory {
+  const lower = rawType.toLowerCase().trim();
+  if (lower === "message" || lower.includes("chat_message")) return "message";
+  if (lower === "tip" || lower === "tips") return "tip";
+  if (lower === "post") return "post";
+  if (lower.includes("subscription") || lower.includes("subscribe")) return "subscription";
+  if (lower === "stream") return "stream";
+  return "other";
+}
+
+/** Categories we attribute to chatters (per Sales Settings) */
+const ATTRIBUTED: Set<TxCategory> = new Set(["message", "tip", "post"]);
+
+export function isAttributable(category: TxCategory): boolean {
+  return ATTRIBUTED.has(category);
+}
 
 export type FetchResult = {
-  messages: RawMessage[];
-  creatorEarnings: Map<string, CreatorEarnings>;
-  creators: { id: string; name: string | null; ofapiCreatorId: string; ofapiToken: string }[];
+  transactions: TransactionRow[];
+  creators: { id: string; name: string | null }[];
 };
 
-function formatDateForApi(d: Date): string {
-  return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
-}
-
-const PAGE_SIZE = 100;
-const MAX_ITEMS = 2000; // Safety cap per source per creator
-
-/** Paginate through all messages using OFAPI cursor (_pagination.next_page) */
-async function fetchAllPages(
-  account: string, token: string,
-  fetcher: (account: string, token: string, start: Date, end: Date, limit: number, offset: number) => Promise<unknown>,
-  startDate: Date, endDate: Date,
-  requestStart: number,
-): Promise<any[]> {
-  const allItems: any[] = [];
-
-  // First page via our wrapper
-  const firstRes = await fetcher(account, token, startDate, endDate, PAGE_SIZE, 0).catch(() => null) as any;
-  if (!firstRes) return allItems;
-
-  const firstItems = firstRes?.data?.items || firstRes?.items || [];
-  allItems.push(...firstItems);
-
-  // Follow _pagination.next_page cursor (check both top-level and _meta paths)
-  let nextPage: string | null =
-    firstRes?._pagination?.next_page ??
-    firstRes?._meta?._pagination?.next_page ??
-    firstRes?.data?._pagination?.next_page ?? null;
-
-  // Resolve token for raw fetch (same logic as ofapi-core)
-  const resolvedToken = token === "linked_via_auth_module"
-    ? (process.env.OFAPI_API_KEY || process.env.TEST_OFAPI_KEY || "")
-    : token;
-
-  while (nextPage && allItems.length < MAX_ITEMS && Date.now() - requestStart < 45000) {
-    const r = await fetch(nextPage, {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${resolvedToken}`,
-      },
-    }).catch(() => null);
-    if (!r || !r.ok) break;
-
-    const nextData = await r.json().catch(() => null);
-    if (!nextData) break;
-
-    const nextItems = nextData?.data?.items || nextData?.items || [];
-    if (nextItems.length === 0) break;
-
-    allItems.push(...nextItems);
-    nextPage =
-      nextData?._pagination?.next_page ??
-      nextData?._meta?._pagination?.next_page ??
-      nextData?.data?._pagination?.next_page ?? null;
-  }
-
-  return allItems;
-}
-
-/** Fetch all OFAPI engagement data for creators in the date range */
-export async function fetchOfapiData(
+/** Fetch all transaction data from DB — no caps, no pagination, just SQL */
+export async function fetchTransactionData(
   startDate: Date,
   endDate: Date,
   creatorId: string | null,
 ): Promise<FetchResult> {
-  const creatorWhere: Record<string, unknown> = { active: true, ofapiToken: { not: null } };
+  // Get active creators — don't require OFAPI tokens since revenue is from DB
+  const creatorWhere: Record<string, unknown> = { active: true };
   if (creatorId) creatorWhere.id = creatorId;
 
-  const allCreators = await prisma.creator.findMany({
+  const creators = await prisma.creator.findMany({
     where: creatorWhere,
-    select: { id: true, name: true, ofapiCreatorId: true, ofapiToken: true },
+    select: { id: true, name: true },
   });
 
-  const creators = allCreators.filter(c => c.ofapiToken && c.ofapiCreatorId) as FetchResult["creators"];
-
-  const messages: RawMessage[] = [];
-  const creatorEarnings = new Map<string, CreatorEarnings>();
-  const batchSize = 3; // Smaller batches since each creator now paginates
-  const requestStart = Date.now();
-  const startStr = formatDateForApi(startDate);
-  const endStr = formatDateForApi(endDate);
-
-  for (let i = 0; i < creators.length; i += batchSize) {
-    if (Date.now() - requestStart > 45000) break;
-
-    const batch = creators.slice(i, i + batchSize);
-    const results = await Promise.all(batch.map(async (c) => {
-      const [directItems, massItems, tipsRes, totalRes] = await Promise.all([
-        fetchAllPages(c.ofapiCreatorId, c.ofapiToken, getDirectMessageStats, startDate, endDate, requestStart),
-        fetchAllPages(c.ofapiCreatorId, c.ofapiToken, getMassMessageStats, startDate, endDate, requestStart),
-        getEarningsByType(c.ofapiCreatorId, c.ofapiToken, "tips", startStr, endStr).catch(() => null),
-        getEarningsByType(c.ofapiCreatorId, c.ofapiToken, "total", startStr, endStr).catch(() => null),
-      ]);
-      return { creator: c, directItems, massItems, tipsRes, totalRes };
-    }));
-
-    for (const r of results) {
-      for (const item of r.directItems) {
-        messages.push(parseMessage(item, r.creator.id, "direct"));
-      }
-      for (const item of r.massItems) {
-        messages.push(parseMessage(item, r.creator.id, "mass"));
-      }
-
-      const tips = Number((r.tipsRes as any)?.data?.total ?? (r.tipsRes as any)?.total ?? 0);
-      const total = Number((r.totalRes as any)?.data?.total ?? (r.totalRes as any)?.total ?? 0);
-      creatorEarnings.set(r.creator.id, { tips, total });
-    }
+  const creatorIds = creators.map(c => c.id);
+  if (creatorIds.length === 0) {
+    console.log("[chatter-perf] No active creators found");
+    return { transactions: [], creators: [] };
   }
 
-  // Deduplicate messages by ID (OFAPI can return the same message in both direct + mass)
-  const seen = new Set<string>();
-  const deduped: RawMessage[] = [];
-  for (const msg of messages) {
-    if (!seen.has(msg.id)) {
-      seen.add(msg.id);
-      deduped.push(msg);
-    }
+  // ALL transactions in date range — no caps, no pagination
+  // amount > 0 excludes refunds/chargebacks (stored as negative by sync cron)
+  const rawTx = await prisma.transaction.findMany({
+    where: {
+      date: { gte: startDate, lte: endDate },
+      creatorId: { in: creatorIds },
+      amount: { gt: 0 },
+    },
+    select: {
+      id: true,
+      amount: true,
+      type: true,
+      date: true,
+      creatorId: true,
+      fanId: true,
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const transactions: TransactionRow[] = rawTx.map(tx => {
+    const rawType = tx.type || "unknown";
+    return {
+      id: tx.id,
+      amount: tx.amount,
+      type: rawType,
+      date: tx.date,
+      creatorId: tx.creatorId!,
+      fanId: tx.fanId,
+      category: categorizeType(rawType),
+    };
+  });
+
+  // Diagnostics — breakdown by category
+  const byCategory = new Map<TxCategory, { count: number; total: number }>();
+  for (const tx of transactions) {
+    const entry = byCategory.get(tx.category) || { count: 0, total: 0 };
+    entry.count += 1;
+    entry.total += tx.amount;
+    byCategory.set(tx.category, entry);
   }
 
-  if (deduped.length !== messages.length) {
-    console.log(`[chatter-perf] Deduped ${messages.length} → ${deduped.length} messages (${messages.length - deduped.length} duplicates removed)`);
+  const totalAttr = transactions.filter(t => isAttributable(t.category));
+  console.log(`[chatter-perf] ${transactions.length} total tx, ${totalAttr.length} attributable, ${creators.length} creators`);
+  for (const [cat, info] of byCategory) {
+    const tag = isAttributable(cat) ? "ATTR" : "skip";
+    console.log(`[chatter-perf]   ${cat}: ${info.count} tx, $${info.total.toFixed(2)} [${tag}]`);
   }
 
-  // Log revenue diagnostics
-  const totalRev = deduped.reduce((s, m) => s + m.purchasedCount * m.price, 0);
-  console.log(`[chatter-perf] ${deduped.length} messages, gross revenue: $${totalRev.toFixed(2)}, creators: ${creators.length}`);
-  if (deduped[0]) {
-    const s = deduped[0];
-    console.log(`[chatter-perf] sample msg: id=${s.id} price=${s.price} (${typeof s.price}) purchased=${s.purchasedCount} (${typeof s.purchasedCount}) source=${s.source}`);
-  }
-
-  return { messages: deduped, creatorEarnings, creators };
-}
-
-function parseMessage(item: any, creatorId: string, source: "direct" | "mass"): RawMessage {
-  return {
-    id: String(item.id || item.messageId || Math.random()),
-    date: item.date || item.createdAt || "",
-    price: Number(item.price ?? 0),
-    purchasedCount: Number(item.purchasedCount ?? 0),
-    viewedCount: Number(item.viewedCount ?? 0),
-    sentCount: Number(item.sentCount ?? (source === "direct" ? 1 : 0)),
-    text: item.rawText || item.text || "",
-    mediaCount: Number(item.mediaCount ?? 0),
-    creatorId,
-    source,
-  };
+  return { transactions, creators };
 }

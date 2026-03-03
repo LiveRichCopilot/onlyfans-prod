@@ -1,20 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { getActiveChatterBatch } from "@/lib/chatter-attribution";
-import type { RawMessage, CreatorEarnings } from "./chatter-perf-fetch";
+import type { TransactionRow } from "./chatter-perf-fetch";
+import { isAttributable } from "./chatter-perf-fetch";
 
 /** Mutable stats accumulator per chatter */
 export type ChatterStats = {
   email: string;
   name: string;
   creators: Set<string>;
-  ppvSales: number;
-  directMsgSales: number;
-  massSales: number;
-  dmsSent: number;
-  directPpvsSent: number;
-  ppvsUnlocked: number;
-  charCount: number;
-  spenderCount: number;
+  // Revenue by transaction type (from DB — real dollars)
+  messageSales: number;
+  tipSales: number;
+  postSales: number;
+  // Activity counts from transactions
+  txCount: number;
+  messageTxCount: number;
+  uniqueFans: Set<string>;
+  // Hours
   clockedSeconds: number;
   overrideHours: number;
   hubstaffHours: number;
@@ -34,7 +36,6 @@ export type AttributeResult = {
   chatterMap: Map<string, ChatterStats>;
   sessions: SessionRow[];
   scheduleMap: Map<string, ScheduleInfo>;
-  tipShares: Map<string, number>;
 };
 
 /** Load sessions + schedules from DB */
@@ -70,10 +71,9 @@ export async function loadSessionData(
   return { sessions, scheduleMap };
 }
 
-/** Attribute messages + sessions to chatters using override → hubstaff → unassigned */
+/** Attribute transactions + sessions to chatters */
 export async function attributeToChatter(
-  messages: RawMessage[],
-  creatorEarnings: Map<string, CreatorEarnings>,
+  transactions: TransactionRow[],
   creators: { id: string; name: string | null }[],
   sessions: SessionRow[],
   scheduleMap: Map<string, ScheduleInfo>,
@@ -82,7 +82,7 @@ export async function attributeToChatter(
 ): Promise<AttributeResult> {
   // Build attribution resolvers per creator (batch — avoids N+1)
   const uniqueCreatorIds = [...new Set([
-    ...messages.map(m => m.creatorId),
+    ...transactions.filter(t => isAttributable(t.category)).map(t => t.creatorId),
     ...sessions.map(s => s.creatorId),
   ])];
 
@@ -102,49 +102,59 @@ export async function attributeToChatter(
         email,
         name: sched?.name || email.split("@")[0],
         creators: new Set(),
-        ppvSales: 0, directMsgSales: 0, massSales: 0,
-        dmsSent: 0, directPpvsSent: 0, ppvsUnlocked: 0,
-        charCount: 0, spenderCount: 0, clockedSeconds: 0,
+        messageSales: 0, tipSales: 0, postSales: 0,
+        txCount: 0, messageTxCount: 0,
+        uniqueFans: new Set(),
+        clockedSeconds: 0,
         overrideHours: 0, hubstaffHours: 0, unassignedHours: 0,
       });
     }
     return chatterMap.get(email)!;
   }
 
-  // Attribute messages
-  for (const msg of messages) {
-    if (!msg.date) continue;
-    const resolver = resolvers.get(msg.creatorId);
-    if (!resolver) continue;
+  // Attribute each transaction to the active chatter at tx.date
+  let attributed = 0;
+  let skipped = 0;
+  let unassigned = 0;
 
-    const attr = resolver.resolve(new Date(msg.date));
-    if (!attr.email) continue;
-
-    const stats = getOrCreate(attr.email);
-    stats.creators.add(creatorNameMap.get(msg.creatorId) || "Unknown");
-
-    if (msg.source === "direct") {
-      stats.dmsSent += 1;
-      stats.charCount += msg.text.length;
-      if (msg.price > 0) stats.directPpvsSent += 1;
+  for (const tx of transactions) {
+    if (!isAttributable(tx.category)) {
+      skipped++;
+      continue;
     }
 
-    if (msg.purchasedCount > 0) {
-      stats.ppvsUnlocked += msg.purchasedCount;
-      const revenue = msg.purchasedCount * msg.price;
-      if (msg.source === "direct") {
-        stats.directMsgSales += revenue;
-        stats.ppvSales += revenue;
-      } else {
-        stats.massSales += revenue;
-      }
-      stats.spenderCount += 1;
+    const resolver = resolvers.get(tx.creatorId);
+    if (!resolver) { skipped++; continue; }
+
+    const attr = resolver.resolve(tx.date);
+    if (!attr.email) {
+      unassigned++;
+      continue;
+    }
+
+    attributed++;
+    const stats = getOrCreate(attr.email);
+    stats.creators.add(creatorNameMap.get(tx.creatorId) || "Unknown");
+    stats.txCount += 1;
+    stats.uniqueFans.add(tx.fanId);
+
+    switch (tx.category) {
+      case "message":
+        stats.messageSales += tx.amount;
+        stats.messageTxCount += 1;
+        break;
+      case "tip":
+        stats.tipSales += tx.amount;
+        break;
+      case "post":
+        stats.postSales += tx.amount;
+        break;
     }
   }
 
-  // Attribute session hours
-  const hoursPerCreatorChatter = new Map<string, Map<string, number>>();
+  console.log(`[chatter-perf] Attribution: ${attributed} attributed, ${unassigned} unassigned, ${skipped} skipped (non-attributable)`);
 
+  // Attribute session hours
   for (const s of sessions) {
     const sessionStart = Math.max(s.clockIn.getTime(), startDate.getTime());
     const sessionEnd = Math.min(
@@ -165,28 +175,7 @@ export async function attributeToChatter(
     if (source === "override") stats.overrideHours += hours;
     else if (source === "hubstaff") stats.hubstaffHours += hours;
     else stats.unassignedHours += hours;
-
-    // Track hours per creator per chatter for tip distribution
-    if (!hoursPerCreatorChatter.has(s.creatorId)) {
-      hoursPerCreatorChatter.set(s.creatorId, new Map());
-    }
-    const m = hoursPerCreatorChatter.get(s.creatorId)!;
-    m.set(s.email, (m.get(s.email) || 0) + hours);
   }
 
-  // Distribute tips proportionally by clocked hours
-  const tipShares = new Map<string, number>();
-  for (const [cId, emailMap] of hoursPerCreatorChatter) {
-    const earnings = creatorEarnings.get(cId);
-    if (!earnings?.tips) continue;
-    const totalHrs = [...emailMap.values()].reduce((a, b) => a + b, 0);
-    if (totalHrs <= 0) continue;
-
-    for (const [email, hrs] of emailMap) {
-      const share = earnings.tips * (hrs / totalHrs);
-      tipShares.set(email, (tipShares.get(email) || 0) + share);
-    }
-  }
-
-  return { chatterMap, sessions, scheduleMap, tipShares };
+  return { chatterMap, sessions, scheduleMap };
 }

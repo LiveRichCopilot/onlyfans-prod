@@ -7,11 +7,11 @@ export type ChatterRowData = {
   email: string;
   name: string;
   creators: string[];
-  revenue: { totalSales: number; ppvSales: number; tips: number | null; directMsgSales: number; massSales: number };
-  activity: { dmsSent: number; directPpvsSent: number; ppvsUnlocked: number; fansChatted: number | null; fansWhoSpent: number; charCount: number };
-  conversions: { goldenRatio: number | null; unlockRate: number | null; fanCvr: number | null; avgEarningsPerSpender: number | null };
-  efficiency: { salesPerHour: number | null; msgsPerHour: number | null; fansPerHour: number | null };
-  time: { scheduledHours: number | null; clockedHours: number; avgResponseTime: number | null };
+  revenue: { totalSales: number; netSales: number; messageSales: number; tipSales: number; postSales: number };
+  activity: { txCount: number; messageTxCount: number; fansWhoSpent: number };
+  conversions: { avgPerSpender: number | null };
+  efficiency: { salesPerHour: number | null };
+  time: { scheduledHours: number | null; clockedHours: number };
   attributionBreakdown: { override: number; hubstaff: number; unassigned: number };
 };
 
@@ -20,12 +20,12 @@ function Cell({ children, className = "" }: { children: React.ReactNode; classNa
 }
 
 function Metric({ value, prefix = "", suffix = "" }: { value: number | null; prefix?: string; suffix?: string }) {
-  if (value === null || value === undefined) return <span className="text-white/20">—</span>;
+  if (value === null || value === undefined) return <span className="text-white/20">&mdash;</span>;
   return <span className="text-white/80 tabular-nums">{prefix}{value.toLocaleString()}{suffix}</span>;
 }
 
 function MoneyCell({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-white/20">—</span>;
+  if (value === null) return <span className="text-white/20">&mdash;</span>;
   if (value === 0) return <span className="text-white/30">$0</span>;
   return (
     <span className={`tabular-nums font-medium ${value > 0 ? "text-teal-400" : "text-white/60"}`}>
@@ -69,36 +69,26 @@ export function ChatterPerfRow({
         {/* Creators — sticky */}
         <td className="px-3 py-2.5 sticky left-[180px] z-10 bg-[#0a0a0f]">
           <div className="text-xs text-white/50 max-w-[120px] truncate" title={row.creators.join(", ")}>
-            {row.creators.join(", ") || "—"}
+            {row.creators.join(", ") || "&mdash;"}
           </div>
         </td>
 
-        {/* Revenue */}
+        {/* Revenue — Gross */}
         <Cell><MoneyCell value={row.revenue.totalSales} /></Cell>
-        <Cell><MoneyCell value={row.revenue.ppvSales} /></Cell>
-        <Cell><MoneyCell value={row.revenue.tips} /></Cell>
-        <Cell><MoneyCell value={row.revenue.directMsgSales} /></Cell>
+        <Cell><MoneyCell value={row.revenue.netSales} /></Cell>
+        <Cell><MoneyCell value={row.revenue.messageSales} /></Cell>
+        <Cell><MoneyCell value={row.revenue.tipSales} /></Cell>
+        <Cell><MoneyCell value={row.revenue.postSales} /></Cell>
 
         {/* Activity */}
-        <Cell><Metric value={row.activity.dmsSent} /></Cell>
-        <Cell><Metric value={row.activity.directPpvsSent} /></Cell>
-        <Cell><Metric value={row.conversions.goldenRatio} suffix="%" /></Cell>
-        <Cell><Metric value={row.activity.ppvsUnlocked} /></Cell>
-        <Cell><Metric value={row.conversions.unlockRate} suffix="%" /></Cell>
-
-        {/* Extended — scrollable */}
-        <Cell><MoneyCell value={row.revenue.massSales} /></Cell>
-        <Cell><Metric value={row.activity.fansChatted} /></Cell>
+        <Cell><Metric value={row.activity.txCount} /></Cell>
+        <Cell><Metric value={row.activity.messageTxCount} /></Cell>
         <Cell><Metric value={row.activity.fansWhoSpent} /></Cell>
-        <Cell><Metric value={row.conversions.fanCvr} suffix="%" /></Cell>
-        <Cell><Metric value={row.conversions.avgEarningsPerSpender} prefix="$" /></Cell>
-        <Cell><Metric value={row.activity.charCount} /></Cell>
-        <Cell><Metric value={row.time.avgResponseTime} suffix="m" /></Cell>
-        <Cell><Metric value={row.time.scheduledHours} suffix="h" /></Cell>
-        <Cell><Metric value={row.time.clockedHours} suffix="h" /></Cell>
+
+        {/* Conversions + Efficiency */}
+        <Cell><Metric value={row.conversions.avgPerSpender} prefix="$" /></Cell>
         <Cell><Metric value={row.efficiency.salesPerHour} prefix="$" /></Cell>
-        <Cell><Metric value={row.efficiency.msgsPerHour} /></Cell>
-        <Cell><Metric value={row.efficiency.fansPerHour} /></Cell>
+        <Cell><Metric value={row.time.clockedHours} suffix="h" /></Cell>
       </tr>
 
       {/* Expanded: hourly breakdown placeholder */}
@@ -106,7 +96,7 @@ export function ChatterPerfRow({
         <tr>
           <td colSpan={colCount} className="px-6 py-3 bg-white/[0.02]">
             <div className="text-xs text-white/40 italic">
-              Hourly breakdown coming soon — will show per-hour stats with attribution source per bucket.
+              Hourly breakdown coming soon.
             </div>
           </td>
         </tr>

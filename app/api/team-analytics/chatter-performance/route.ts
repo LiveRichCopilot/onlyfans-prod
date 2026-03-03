@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchOfapiData } from "@/lib/chatter-perf-fetch";
+import { fetchTransactionData } from "@/lib/chatter-perf-fetch";
 import { loadSessionData, attributeToChatter } from "@/lib/chatter-perf-attribute";
 import { buildChatterRows, buildTotals } from "@/lib/chatter-perf-aggregate";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Chatter Performance API — 22 real stats per chatter
+ * Chatter Performance API — revenue from Transaction table (no caps)
  *
  * Query params:
  *   startDate  (required) — ISO date string
@@ -36,17 +36,16 @@ export async function GET(req: NextRequest) {
   const compEnd = new Date(startDate.getTime());
 
   try {
-    // Fetch OFAPI data + DB sessions in parallel
-    const [ofapi, sessionData] = await Promise.all([
-      fetchOfapiData(startDate, endDate, creatorId),
+    // Fetch transaction data + sessions in parallel
+    const [txData, sessionData] = await Promise.all([
+      fetchTransactionData(startDate, endDate, creatorId),
       loadSessionData(startDate, endDate, creatorId),
     ]);
 
-    // Attribute everything to chatters
-    const { chatterMap, tipShares } = await attributeToChatter(
-      ofapi.messages,
-      ofapi.creatorEarnings,
-      ofapi.creators,
+    // Attribute transactions + sessions to chatters
+    const { chatterMap } = await attributeToChatter(
+      txData.transactions,
+      txData.creators,
       sessionData.sessions,
       sessionData.scheduleMap,
       startDate,
@@ -54,20 +53,10 @@ export async function GET(req: NextRequest) {
     );
 
     // Build final rows + totals
-    const rows = buildChatterRows(
-      chatterMap, tipShares, sessionData.scheduleMap, daysInRange,
-    );
+    const rows = buildChatterRows(chatterMap, sessionData.scheduleMap, daysInRange);
     const totals = buildTotals(rows);
 
-    // Diagnostics: compare OFAPI earnings vs attributed revenue
-    for (const [cId, earnings] of ofapi.creatorEarnings) {
-      const creatorName = ofapi.creators.find(c => c.id === cId)?.name || cId;
-      const msgRev = ofapi.messages
-        .filter(m => m.creatorId === cId)
-        .reduce((s, m) => s + m.purchasedCount * m.price, 0);
-      console.log(`[chatter-perf] ${creatorName}: OFAPI earnings=$${earnings.total}, msg revenue=$${msgRev.toFixed(2)}, tips=$${earnings.tips}`);
-    }
-    console.log(`[chatter-perf] Attributed total: $${totals.totalSales}, chatters: ${totals.activeChatters}`);
+    console.log(`[chatter-perf] Result: $${totals.totalSales} gross, $${totals.netSales} net, ${totals.activeChatters} chatters, ${totals.txCount} tx`);
 
     return NextResponse.json({
       chatters: rows,

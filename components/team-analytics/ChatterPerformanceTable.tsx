@@ -6,27 +6,18 @@ import { DateRangePicker, type DateRange } from "./DateRangePicker";
 import { ChatterPerfRow, type ChatterRowData } from "./ChatterPerfRow";
 import { ExportButtons } from "./ExportButtons";
 
-type SortField =
-  | "name"
-  | "totalSales"
-  | "ppvSales"
-  | "tips"
-  | "dmsSent"
-  | "clockedHours"
-  | "salesPerHour"
-  | "goldenRatio";
+type SortField = "name" | "totalSales" | "netSales" | "messageSales" | "tipSales" | "clockedHours" | "salesPerHour";
 type SortDir = "asc" | "desc";
 
 function getSortValue(row: ChatterRowData, field: SortField): number {
   switch (field) {
     case "name": return 0;
     case "totalSales": return row.revenue.totalSales;
-    case "ppvSales": return row.revenue.ppvSales;
-    case "tips": return row.revenue.tips ?? -Infinity;
-    case "dmsSent": return row.activity.dmsSent;
+    case "netSales": return row.revenue.netSales;
+    case "messageSales": return row.revenue.messageSales;
+    case "tipSales": return row.revenue.tipSales;
     case "clockedHours": return row.time.clockedHours;
     case "salesPerHour": return row.efficiency.salesPerHour ?? -Infinity;
-    case "goldenRatio": return row.conversions.goldenRatio ?? -Infinity;
     default: return 0;
   }
 }
@@ -36,9 +27,21 @@ type Props = {
   onChatterClick?: (email: string, creatorId?: string) => void;
 };
 
+type Totals = {
+  totalSales: number;
+  netSales: number;
+  messageSales: number;
+  tipSales: number;
+  postSales: number;
+  txCount: number;
+  fansWhoSpent: number;
+  clockedHours: number;
+  activeChatters: number;
+};
+
 export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props) {
   const [data, setData] = useState<ChatterRowData[]>([]);
-  const [totals, setTotals] = useState<{ totalSales: number; ppvSales: number; dmsSent: number; ppvsUnlocked: number; clockedHours: number; activeChatters: number } | null>(null);
+  const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("totalSales");
@@ -98,18 +101,16 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
 
   const HEADER_LABELS = [
     "", "Employee", "Creators",
-    "Sales", "PPV Sales", "Tips", "DM Sales",
-    "DMs Sent", "PPVs Sent", "Golden %", "Unlocked", "Unlock %",
-    "Mass Sales", "Fans Chat", "Fans Spent", "Fan CVR", "$/Spender",
-    "Chars", "Resp Time", "Sched Hrs", "Clock Hrs", "$/Hr", "Msgs/Hr", "Fans/Hr",
+    "Gross", "Net", "Messages", "Tips", "Posts",
+    "Tx", "Msg Tx", "Fans Spent",
+    "$/Spender", "$/Hr", "Hours",
   ];
 
   const SORT_FIELDS: (SortField | null)[] = [
     null, "name", null,
-    "totalSales", "ppvSales", "tips", null,
-    "dmsSent", null, "goldenRatio", null, null,
-    null, null, null, null, null,
-    null, null, null, "clockedHours", "salesPerHour", null, null,
+    "totalSales", "netSales", "messageSales", "tipSales", null,
+    null, null, null,
+    null, "salesPerHour", "clockedHours",
   ];
 
   const COL_COUNT = HEADER_LABELS.length;
@@ -137,28 +138,35 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
         </div>
       </div>
 
-      {/* Revenue KPI Pills — same data, same fetch */}
+      {/* Revenue KPI Pills */}
       {totals && !loading && (
-        <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-white/5">
+        <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-white/5">
           <div className="flex items-center gap-2">
             <DollarSign size={14} className="text-teal-400/60" />
             <div>
               <div className="text-lg font-bold text-teal-400 tabular-nums">${totals.totalSales.toLocaleString()}</div>
-              <div className="text-[10px] text-white/40 uppercase tracking-wider">Total Sales</div>
+              <div className="text-[10px] text-white/40 uppercase tracking-wider">Gross Sales</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <DollarSign size={14} className="text-white/30" />
+            <div>
+              <div className="text-lg font-bold text-white tabular-nums">${totals.netSales.toLocaleString()}</div>
+              <div className="text-[10px] text-white/40 uppercase tracking-wider">Net (after 20%)</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Target size={14} className="text-teal-400/60" />
             <div>
-              <div className="text-lg font-bold text-white tabular-nums">{totals.ppvsUnlocked.toLocaleString()}</div>
-              <div className="text-[10px] text-white/40 uppercase tracking-wider">PPVs Unlocked</div>
+              <div className="text-lg font-bold text-white tabular-nums">{totals.txCount.toLocaleString()}</div>
+              <div className="text-[10px] text-white/40 uppercase tracking-wider">Transactions</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <TrendingUp size={14} className="text-teal-400/60" />
             <div>
               <div className="text-lg font-bold text-white tabular-nums">
-                {totals.clockedHours > 0 ? `$${Math.round(totals.totalSales / totals.clockedHours).toLocaleString()}` : "—"}
+                {totals.clockedHours > 0 ? `$${Math.round(totals.totalSales / totals.clockedHours).toLocaleString()}` : "\u2014"}
               </div>
               <div className="text-[10px] text-white/40 uppercase tracking-wider">Avg $/Hour</div>
             </div>

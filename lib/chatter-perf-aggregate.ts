@@ -7,34 +7,25 @@ export type ChatterRow = {
   creators: string[];
   revenue: {
     totalSales: number;
-    ppvSales: number;
-    tips: number | null;
-    directMsgSales: number;
-    massSales: number;
+    netSales: number;
+    messageSales: number;
+    tipSales: number;
+    postSales: number;
   };
   activity: {
-    dmsSent: number;
-    directPpvsSent: number;
-    ppvsUnlocked: number;
-    fansChatted: number | null;
+    txCount: number;
+    messageTxCount: number;
     fansWhoSpent: number;
-    charCount: number;
   };
   conversions: {
-    goldenRatio: number | null;
-    unlockRate: number | null;
-    fanCvr: number | null;
-    avgEarningsPerSpender: number | null;
+    avgPerSpender: number | null;
   };
   efficiency: {
     salesPerHour: number | null;
-    msgsPerHour: number | null;
-    fansPerHour: number | null;
   };
   time: {
     scheduledHours: number | null;
     clockedHours: number;
-    avgResponseTime: number | null;
   };
   attributionBreakdown: {
     override: number;
@@ -43,10 +34,11 @@ export type ChatterRow = {
   };
 };
 
+const OF_FEE = 0.20; // OnlyFans takes 20%
+
 /** Build final rows from accumulated stats */
 export function buildChatterRows(
   chatterMap: Map<string, ChatterStats>,
-  tipShares: Map<string, number>,
   scheduleMap: Map<string, { name: string; shift: string }>,
   daysInRange: number,
 ): ChatterRow[] {
@@ -54,28 +46,17 @@ export function buildChatterRows(
 
   for (const [email, stats] of chatterMap) {
     const clockedHours = stats.clockedSeconds / 3600;
-    const tipShare = tipShares.get(email) || 0;
-    const ppvRevenue = stats.ppvSales + stats.massSales;
-    const totalSales = ppvRevenue + tipShare;
-    const fansWhoSpent = stats.spenderCount;
+    const totalSales = stats.messageSales + stats.tipSales + stats.postSales;
+    const netSales = round2(totalSales * (1 - OF_FEE));
+    const fansWhoSpent = stats.uniqueFans.size;
 
-    // Conversions
-    // Golden Ratio = PPVs Unlocked / Direct PPVs Sent (1:1 DMs only)
-    const goldenRatio = stats.directPpvsSent > 0
-      ? round1((stats.ppvsUnlocked / stats.directPpvsSent) * 100) : null;
-    // Unlock Rate needs all PPVs sent (direct + mass) per chatter — not available yet
-    const unlockRate: number | null = null;
-    const avgEarningsPerSpender = fansWhoSpent > 0
+    const avgPerSpender = fansWhoSpent > 0
       ? round2(totalSales / fansWhoSpent) : null;
 
-    // Efficiency (only compute if clocked > 30 min to avoid misleading ratios)
+    // Only compute if clocked > 30 min to avoid misleading ratios
     const salesPerHour = clockedHours > 0.5 ? round2(totalSales / clockedHours) : null;
-    const msgsPerHour = clockedHours > 0.5 ? Math.round(stats.dmsSent / clockedHours) : null;
 
-    // Scheduled hours — not computable from shift name alone, needs numeric field
-    const scheduledHours: number | null = null;
-
-    // Attribution breakdown
+    // Attribution breakdown percentages
     const attrTotal = stats.overrideHours + stats.hubstaffHours + stats.unassignedHours;
     const attributionBreakdown = attrTotal > 0 ? {
       override: Math.round((stats.overrideHours / attrTotal) * 100),
@@ -89,34 +70,25 @@ export function buildChatterRows(
       creators: [...stats.creators],
       revenue: {
         totalSales: round2(totalSales),
-        ppvSales: round2(stats.ppvSales),
-        tips: tipShare > 0 ? round2(tipShare) : null,
-        directMsgSales: round2(stats.directMsgSales),
-        massSales: round2(stats.massSales),
+        netSales,
+        messageSales: round2(stats.messageSales),
+        tipSales: round2(stats.tipSales),
+        postSales: round2(stats.postSales),
       },
       activity: {
-        dmsSent: stats.dmsSent,
-        directPpvsSent: stats.directPpvsSent,
-        ppvsUnlocked: stats.ppvsUnlocked,
-        fansChatted: null, // Too expensive for batch — requires listChats per creator
+        txCount: stats.txCount,
+        messageTxCount: stats.messageTxCount,
         fansWhoSpent,
-        charCount: stats.charCount,
       },
       conversions: {
-        goldenRatio,
-        unlockRate,
-        fanCvr: null, // Needs fansChatted
-        avgEarningsPerSpender,
+        avgPerSpender,
       },
       efficiency: {
         salesPerHour,
-        msgsPerHour,
-        fansPerHour: null, // Needs fansChatted
       },
       time: {
-        scheduledHours,
+        scheduledHours: null,
         clockedHours: round2(clockedHours),
-        avgResponseTime: null, // Available in ChatterHourlyScore — TODO
       },
       attributionBreakdown,
     });
@@ -127,18 +99,19 @@ export function buildChatterRows(
 
 /** Compute totals across all chatters */
 export function buildTotals(rows: ChatterRow[]) {
+  const totalSales = round2(rows.reduce((s, r) => s + r.revenue.totalSales, 0));
+  const clockedHours = round2(rows.reduce((s, r) => s + r.time.clockedHours, 0));
   return {
-    totalSales: round2(rows.reduce((s, r) => s + r.revenue.totalSales, 0)),
-    ppvSales: round2(rows.reduce((s, r) => s + r.revenue.ppvSales, 0)),
-    dmsSent: rows.reduce((s, r) => s + r.activity.dmsSent, 0),
-    ppvsUnlocked: rows.reduce((s, r) => s + r.activity.ppvsUnlocked, 0),
-    clockedHours: round2(rows.reduce((s, r) => s + r.time.clockedHours, 0)),
+    totalSales,
+    netSales: round2(totalSales * (1 - OF_FEE)),
+    messageSales: round2(rows.reduce((s, r) => s + r.revenue.messageSales, 0)),
+    tipSales: round2(rows.reduce((s, r) => s + r.revenue.tipSales, 0)),
+    postSales: round2(rows.reduce((s, r) => s + r.revenue.postSales, 0)),
+    txCount: rows.reduce((s, r) => s + r.activity.txCount, 0),
+    fansWhoSpent: rows.reduce((s, r) => s + r.activity.fansWhoSpent, 0),
+    clockedHours,
     activeChatters: rows.length,
   };
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
 }
 
 function round2(n: number): number {
