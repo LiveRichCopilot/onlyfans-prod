@@ -157,18 +157,30 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE — Remove a shift assignment.
- * Query param: ?id=xxx
+ * DELETE — Remove shift(s).
+ * Query param: ?id=xxx           → delete one shift
+ * Query param: ?dayOfWeek=2      → bulk clear all shifts for that day
  */
 export async function DELETE(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "Missing shift id" }, { status: 400 });
+    const dayParam = req.nextUrl.searchParams.get("dayOfWeek");
+
+    if (id) {
+      await prisma.scheduleShift.delete({ where: { id } });
+      return NextResponse.json({ ok: true });
     }
 
-    await prisma.scheduleShift.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    if (dayParam !== null) {
+      const dayOfWeek = parseInt(dayParam);
+      if (isNaN(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        return NextResponse.json({ error: "Invalid dayOfWeek (0-6)" }, { status: 400 });
+      }
+      const result = await prisma.scheduleShift.deleteMany({ where: { dayOfWeek } });
+      return NextResponse.json({ ok: true, deleted: result.count });
+    }
+
+    return NextResponse.json({ error: "Provide ?id=xxx or ?dayOfWeek=N" }, { status: 400 });
   } catch (err: any) {
     console.error("[schedule] DELETE error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

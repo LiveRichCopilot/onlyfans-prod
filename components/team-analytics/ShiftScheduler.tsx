@@ -147,33 +147,28 @@ export function ShiftScheduler() {
     setSaving(false);
   }, []);
 
-  // Copy a day's assignments to all other days
+  // Copy a day's assignments to all other days (atomic — one API call)
   const handleCopyDayToAll = useCallback(
     async (sourceDay: number) => {
       setSaving(true);
-      const sourceShifts = shifts.filter((s) => s.dayOfWeek === sourceDay);
-      const otherDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => d !== sourceDay);
-
-      for (const day of otherDays) {
-        for (const s of sourceShifts) {
-          await fetch("/api/team-analytics/schedule", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              creatorId: s.creatorId,
-              chatterEmail: s.chatterEmail,
-              chatterName: s.chatterName,
-              dayOfWeek: day,
-              shiftType: s.shiftType,
-            }),
-          });
+      try {
+        const res = await fetch("/api/team-analytics/schedule/copy-day", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceDayOfWeek: sourceDay }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error("[copy-day] Failed:", err);
         }
+      } catch (e) {
+        console.error("[copy-day] Error:", e);
       }
       await load();
       setSaving(false);
       setCopyMode(null);
     },
-    [shifts, load]
+    [load]
   );
 
   // Fill a chatter across all 7 days for one model + shift type
