@@ -34,9 +34,9 @@ const DAY_ORDER = [2, 3, 4, 5, 6, 0, 1]; // Tue, Wed, Thu, Fri, Sat, Sun, Mon
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SHIFT_TYPES = ["morning", "afternoon", "night"] as const;
 const SHIFT_LABELS: Record<string, string> = {
-  morning: "AM",
-  afternoon: "PM",
-  night: "Night",
+  morning: "AM 07–15",
+  afternoon: "PM 15–23",
+  night: "Night 23–07",
 };
 
 // UK shift start/end hours
@@ -83,8 +83,8 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, ti
   const handleDragOver = useCallback((e: React.DragEvent, cellKey: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
-    setDragOverCell(cellKey);
-  }, []);
+    if (dragOverCell !== cellKey) setDragOverCell(cellKey);
+  }, [dragOverCell]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     // Only clear if we actually left the container (not a child element)

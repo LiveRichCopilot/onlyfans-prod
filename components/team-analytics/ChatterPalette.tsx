@@ -33,7 +33,7 @@ export function ChatterPalette({ chatters, shifts }: Props) {
         chatterName: chatter.name,
       })
     );
-    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.effectAllowed = "move";
   }
 
   return (
