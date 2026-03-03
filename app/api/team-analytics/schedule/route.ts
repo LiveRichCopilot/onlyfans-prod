@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const [shifts, creators, hubstaffMappings] = await Promise.all([
+    const [shifts, creators, hubstaffMappings, liveSessions] = await Promise.all([
       prisma.scheduleShift.findMany({
         orderBy: [{ creatorId: "asc" }, { dayOfWeek: "asc" }, { shiftType: "asc" }],
       }),
@@ -22,6 +22,11 @@ export async function GET() {
       prisma.hubstaffUserMapping.findMany({
         select: { chatterEmail: true, hubstaffName: true },
         distinct: ["chatterEmail"],
+      }),
+      prisma.chatterSession.findMany({
+        where: { isLive: true },
+        select: { email: true },
+        distinct: ["email"],
       }),
     ]);
 
@@ -40,7 +45,9 @@ export async function GET() {
       a.name.localeCompare(b.name)
     );
 
-    return NextResponse.json({ shifts, creators, chatters });
+    const liveEmails = liveSessions.map(s => normalizeEmail(s.email));
+
+    return NextResponse.json({ shifts, creators, chatters, liveEmails });
   } catch (err: any) {
     console.error("[schedule] GET error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

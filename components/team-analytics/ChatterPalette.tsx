@@ -10,9 +10,10 @@ type Shift = { chatterEmail: string };
 type Props = {
   chatters: Chatter[];
   shifts: Shift[];
+  liveEmails?: Set<string>;
 };
 
-export function ChatterPalette({ chatters, shifts }: Props) {
+export function ChatterPalette({ chatters, shifts, liveEmails }: Props) {
   const [search, setSearch] = useState("");
 
   const scheduledEmails = new Set(shifts.map((s) => s.chatterEmail));
@@ -57,6 +58,7 @@ export function ChatterPalette({ chatters, shifts }: Props) {
         {filtered.map((c) => {
           const color = getChatterColor(c.email);
           const isScheduled = scheduledEmails.has(c.email);
+          const isLive = liveEmails?.has(c.email) ?? false;
 
           return (
             <div
@@ -69,6 +71,9 @@ export function ChatterPalette({ chatters, shifts }: Props) {
               }}
             >
               <GripVertical size={12} className="text-white/20 flex-shrink-0" />
+              {isLive && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+              )}
               <span className="text-xs font-medium text-white/80 truncate flex-1">
                 {c.name}
               </span>

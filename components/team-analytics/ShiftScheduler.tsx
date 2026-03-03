@@ -40,6 +40,7 @@ export function ShiftScheduler() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [creators, setCreators] = useState<Creator[]>([]);
   const [chatters, setChatters] = useState<Chatter[]>([]);
+  const [liveEmails, setLiveEmails] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [timezone, setTimezone] = useState<TimezoneOption>(TIMEZONES[0]); // default UK
@@ -61,6 +62,7 @@ export function ShiftScheduler() {
         setShifts(data.shifts || []);
         setCreators(data.creators || []);
         setChatters(data.chatters || []);
+        setLiveEmails(new Set(data.liveEmails || []));
       }
     } catch {
       // silent
@@ -348,7 +350,7 @@ export function ShiftScheduler() {
             </div>
             <div className="hidden lg:block w-[220px] flex-shrink-0">
               <div className="sticky top-4">
-                <ChatterPalette chatters={chatters} shifts={shifts} />
+                <ChatterPalette chatters={chatters} shifts={shifts} liveEmails={liveEmails} />
               </div>
             </div>
           </div>
