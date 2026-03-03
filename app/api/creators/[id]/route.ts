@@ -324,3 +324,16 @@ export async function PATCH(
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+    try {
+        const creatorId = params.id;
+        await prisma.creator.update({
+            where: { id: creatorId },
+            data: { active: false },
+        });
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

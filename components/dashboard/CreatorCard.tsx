@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { RefreshCw, Unlink, MoreVertical } from "lucide-react";
+import { RefreshCw, Unlink, MoreVertical, Trash2 } from "lucide-react";
 import { ConnectButton } from "./creator-card/ConnectButton";
 import { StatusBadge } from "./creator-card/StatusBadge";
 import { ThresholdSlider } from "./creator-card/ThresholdSlider";
@@ -22,6 +22,21 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
     const [syncError, setSyncError] = useState<string | null>(null);
     const [showMenu, setShowMenu] = useState(false);
     const [disconnecting, setDisconnecting] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    async function handleDelete(e: React.MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowMenu(false);
+        if (!confirm(`Permanently remove ${c.name || "this creator"} from the dashboard?\n\nThis hides the card. No revenue data is lost.`)) return;
+        setDeleting(true);
+        try {
+            await fetch(`/api/creators/${c.id}`, { method: "DELETE" });
+            onRefresh?.();
+        } catch {} finally {
+            setDeleting(false);
+        }
+    }
 
     // Missing profile data = needs sync (no avatar AND no header)
     const needsSync = isLinked && (!c.avatarUrl && !c.headerUrl);
@@ -183,6 +198,14 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                             >
                                                 <Unlink size={13} />
                                                 Disconnect Account
+                                            </button>
+                                            <button
+                                                onClick={handleDelete}
+                                                disabled={deleting}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2.5 transition-colors disabled:opacity-50"
+                                            >
+                                                <Trash2 size={13} />
+                                                {deleting ? "Deleting..." : "Delete Creator"}
                                             </button>
                                         </div>
                                     )}
