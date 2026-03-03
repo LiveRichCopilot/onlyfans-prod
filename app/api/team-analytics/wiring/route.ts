@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-/** Wiring API — each creator with their ONE active chatter right now. */
+/** Wiring API — each creator with ALL active chatters right now. */
 export async function GET() {
   try {
     const now = new Date();
@@ -33,45 +33,57 @@ export async function GET() {
     const nameMap = new Map<string, string>();
     for (const s of scheduleNames) nameMap.set(s.email, s.name);
 
-    // One override per creator (first wins — newest)
-    const ovrMap = new Map<string, typeof overrides[0]>();
-    for (const o of overrides) if (!ovrMap.has(o.creatorId)) ovrMap.set(o.creatorId, o);
+    // Group overrides by creator
+    const ovrByCreator = new Map<string, typeof overrides>();
+    for (const o of overrides) {
+      const arr = ovrByCreator.get(o.creatorId) || [];
+      arr.push(o);
+      ovrByCreator.set(o.creatorId, arr);
+    }
 
-    // One live session per creator (first wins — most recent clockIn)
-    const liveMap = new Map<string, typeof liveSessions[0]>();
-    for (const s of liveSessions) if (!liveMap.has(s.creatorId)) liveMap.set(s.creatorId, s);
+    // Group live sessions by creator
+    const liveByCreator = new Map<string, typeof liveSessions>();
+    for (const s of liveSessions) {
+      const arr = liveByCreator.get(s.creatorId) || [];
+      arr.push(s);
+      liveByCreator.set(s.creatorId, arr);
+    }
+
+    type Chatter = { email: string; name: string; source: "override" | "live"; detail: string };
 
     const nodes = creators.map(c => {
-      const ovr = ovrMap.get(c.id);
-      const live = liveMap.get(c.id);
+      const chatters: Chatter[] = [];
+      const seen = new Set<string>();
 
-      if (ovr) {
-        const mins = Math.round((ovr.endAt.getTime() - now.getTime()) / 60000);
-        return {
-          ...c,
-          chatter: {
-            email: ovr.chatterEmail,
-            name: nameMap.get(ovr.chatterEmail) || ovr.chatterEmail.split("@")[0],
-            source: "override" as const,
-            detail: `${mins}m left${ovr.reason ? ` · ${ovr.reason}` : ""}`,
-          },
-        };
+      // Overrides first (highest priority)
+      for (const o of ovrByCreator.get(c.id) || []) {
+        if (!seen.has(o.chatterEmail)) {
+          seen.add(o.chatterEmail);
+          const mins = Math.round((o.endAt.getTime() - now.getTime()) / 60000);
+          chatters.push({
+            email: o.chatterEmail,
+            name: nameMap.get(o.chatterEmail) || o.chatterEmail.split("@")[0],
+            source: "override",
+            detail: `${mins}m left${o.reason ? ` · ${o.reason}` : ""}`,
+          });
+        }
       }
 
-      if (live) {
-        const mins = Math.round((now.getTime() - live.clockIn.getTime()) / 60000);
-        return {
-          ...c,
-          chatter: {
-            email: live.email,
-            name: nameMap.get(live.email) || live.email.split("@")[0],
-            source: "live" as const,
+      // Live sessions (skip if already overridden)
+      for (const s of liveByCreator.get(c.id) || []) {
+        if (!seen.has(s.email)) {
+          seen.add(s.email);
+          const mins = Math.round((now.getTime() - s.clockIn.getTime()) / 60000);
+          chatters.push({
+            email: s.email,
+            name: nameMap.get(s.email) || s.email.split("@")[0],
+            source: "live",
             detail: `${mins}m in`,
-          },
-        };
+          });
+        }
       }
 
-      return { ...c, chatter: null };
+      return { ...c, chatters };
     });
 
     return NextResponse.json({ nodes });

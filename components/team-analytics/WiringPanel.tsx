@@ -29,9 +29,9 @@ export function WiringPanel() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const i = setInterval(load, 30000); return () => clearInterval(i); }, [load]);
 
-  const liveCount = nodes.filter(n => n.chatter?.source === "live").length;
-  const overrideCount = nodes.filter(n => n.chatter?.source === "override").length;
-  const unassigned = nodes.filter(n => !n.chatter).length;
+  const liveCount = nodes.filter(n => n.chatters.some(c => c.source === "live")).length;
+  const overrideCount = nodes.filter(n => n.chatters.some(c => c.source === "override")).length;
+  const unassigned = nodes.filter(n => n.chatters.length === 0).length;
 
   return (
     <div className="glass-card rounded-3xl overflow-hidden">
@@ -74,7 +74,7 @@ export function WiringPanel() {
       {showOverride && !collapsed && (
         <AddOverrideForm
           creators={nodes.map(n => ({ id: n.id, name: n.name }))}
-          chatters={nodes.filter(n => n.chatter).map(n => ({ email: n.chatter!.email, name: n.chatter!.name }))}
+          chatters={[...new Map(nodes.flatMap(n => n.chatters).map(c => [c.email, { email: c.email, name: c.name }])).values()]}
           onClose={() => setShowOverride(false)}
           onCreated={() => { setShowOverride(false); load(); }}
         />
