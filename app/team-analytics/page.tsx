@@ -20,6 +20,7 @@ import { ContentPerformancePanel } from "@/components/team-analytics/ContentPerf
 import { LiveActivityPanel } from "@/components/team-analytics/LiveActivityPanel";
 import { TimelinePanel } from "@/components/team-analytics/TimelinePanel";
 import { ShiftReportPanel } from "@/components/team-analytics/ShiftReportPanel";
+import { ChatterPerformanceTable } from "@/components/team-analytics/ChatterPerformanceTable";
 import { TeamReportsPanel } from "@/components/team-analytics/TeamReportsPanel";
 import { DateRangePicker, type DateRange } from "@/components/team-analytics/DateRangePicker";
 
@@ -184,6 +185,12 @@ export default function TeamAnalytics() {
 
       {/* Row 4: Chatter Reports by Hubstaff Team — who has reports, who doesn't */}
       <TeamReportsPanel days={days} onChatterClick={(email) => setShiftReportTarget({ email })} />
+
+      {/* Chatter Performance Table — 22 real stats, own date picker */}
+      <ChatterPerformanceTable
+        creatorFilter={creatorFilter !== "all" ? creatorFilter : undefined}
+        onChatterClick={(email, creatorId) => setShiftReportTarget({ email, creatorId })}
+      />
 
       {/* Row 5: Chatter Rankings bar chart (full width) — click name for shift report */}
       <ChatterComparisonBar data={d.chatterComparison || []} onChatterClick={(email, creatorId) => setShiftReportTarget({ email, creatorId })} />

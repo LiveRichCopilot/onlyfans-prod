@@ -38,6 +38,7 @@ model Creator {
   hubstaffMappings     HubstaffUserMapping[]
   massMessageReplies   MassMessageReply[]
   dailyReports         CreatorDailyReport[]
+  assignmentOverrides  AssignmentOverride[]
   organization         Organization?       @relation(fields: [organizationId], references: [id])
 
   createdAt DateTime @default(now())
@@ -707,4 +708,19 @@ model Invite {
 
   @@index([token])
   @@index([email])
+}
+
+model AssignmentOverride {
+  id           String   @id @default(cuid())
+  creatorId    String   // The model/creator account being worked
+  chatterEmail String   // The chatter getting ALL credit for this window
+  startAt      DateTime // Override begins
+  endAt        DateTime // Override ends (auto-reverts after)
+  reason       String?  // "sick", "coverage", "shift swap"
+  createdBy    String   // Admin email who created it
+  createdAt    DateTime @default(now())
+  creator      Creator  @relation(fields: [creatorId], references: [id])
+
+  @@index([creatorId, startAt])
+  @@index([creatorId, endAt])
 }
