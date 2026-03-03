@@ -1,7 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, AppWindow, ChevronDown, ChevronUp, MessageSquare, Quote } from "lucide-react";
+import { Clock, AppWindow, ChevronDown, ChevronUp, MessageSquare, Quote, AlertTriangle } from "lucide-react";
+
+/** Subset of ShiftReportData needed by DataSourceDiagnostic */
+export type DiagnosticData = {
+  hubstaff: { totalTrackedHrs: number; overall: number } | null;
+  scoringWindows: number;
+  totalMessages: number;
+  sessionCount: number;
+  totalShiftDurationHrs: number;
+  avgScore: number;
+  activityVerdict: string;
+  effortVerdict: string;
+};
 
 type NotableQuote = { text: string; type: "great" | "good" | "bad" | "ugly"; context?: string };
 type ConvoMessage = { text: string; isChatter: boolean; time: string };
@@ -257,6 +269,99 @@ export function TagsSection({ strengths, mistakes }: { strengths: string[]; mist
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Explains WHY data is missing or mismatched — covers every combination of the 3 data sources */
+export function DataSourceDiagnostic({ data }: { data: DiagnosticData }) {
+  const hasHubstaff = !!data.hubstaff;
+  const hasScores = data.scoringWindows > 0 && data.totalMessages > 0;
+  const hasSessions = data.sessionCount > 0;
+  const hubstaffHrs = data.hubstaff?.totalTrackedHrs || 0;
+  const overallPct = data.hubstaff?.overall || 0;
+  const isEarlyDay = hubstaffHrs < 1 && data.totalShiftDurationHrs < 1;
+
+  // All 3 sources connected and enough data — nothing to explain
+  if (hasHubstaff && hasScores && hasSessions && !isEarlyDay) return null;
+
+  const notes: { text: string; color: string }[] = [];
+
+  // Early day / timezone
+  if (isEarlyDay && (hasHubstaff || hasSessions)) {
+    notes.push({
+      text: `This report uses UK time. The shift just started — only ${Math.max(hubstaffHrs, data.totalShiftDurationHrs).toFixed(1)}h of data so far. Scores update every 30 minutes as more messages come in.`,
+      color: "bg-blue-400",
+    });
+  }
+
+  // Hubstaff tracked but no OF messages scored
+  if (hasHubstaff && !hasScores) {
+    notes.push({
+      text: `Tracked in Hubstaff (${hubstaffHrs}h, ${overallPct}% activity), but no OnlyFans messages were found for this shift. Either no messages were sent, or the creator account isn't connected in the OF API so scoring can't pull chats.`,
+      color: "bg-amber-400",
+    });
+  }
+
+  // Has scores but no Hubstaff
+  if (!hasHubstaff && hasScores) {
+    notes.push({
+      text: `OF messages were scored (${data.totalMessages} messages, avg ${data.avgScore}/100), but no Hubstaff activity data. Hubstaff may not be installed, not running, or this chatter isn't mapped in the Hubstaff system.`,
+      color: "bg-blue-400",
+    });
+  }
+
+  // Has Hubstaff + sessions but no scores
+  if (hasHubstaff && hasSessions && !hasScores && !isEarlyDay) {
+    notes.push({
+      text: `Tracked in Hubstaff and has ${data.sessionCount} session${data.sessionCount !== 1 ? "s" : ""}, but this chatter isn't mapped to a creator or the creator isn't connected in the OF API. Scoring can't run without access to the creator's messages.`,
+      color: "bg-amber-400",
+    });
+  }
+
+  // No data at all
+  if (!hasHubstaff && !hasScores && !hasSessions) {
+    notes.push({
+      text: "No data found for this date. The chatter has no Hubstaff tracking, no clock-in sessions, and no OF messages scored. They likely did not work this shift.",
+      color: "bg-red-400",
+    });
+  }
+
+  // Sessions but nothing else
+  if (!hasHubstaff && !hasScores && hasSessions) {
+    notes.push({
+      text: `Chatter has ${data.sessionCount} clock-in session${data.sessionCount !== 1 ? "s" : ""} but no Hubstaff tracking and no messages scored. Check that Hubstaff is running and the chatter is assigned to a creator.`,
+      color: "bg-amber-400",
+    });
+  }
+
+  // Hubstaff running but very low activity
+  if (hasHubstaff && overallPct < 10 && hubstaffHrs > 0.5 && !isEarlyDay) {
+    notes.push({
+      text: `Hubstaff tracked ${hubstaffHrs}h but only ${overallPct}% activity. The chatter may have left Hubstaff running while away from their computer.`,
+      color: "bg-amber-400",
+    });
+  }
+
+  if (notes.length === 0) return null;
+
+  return (
+    <div className="rounded-xl px-4 py-3 space-y-2.5 border border-amber-500/20 bg-amber-500/5">
+      <div className="flex items-center gap-2 text-sm font-semibold text-white/90">
+        <AlertTriangle size={14} className="text-amber-400" />
+        Data Source Status
+      </div>
+      <div className="text-xs text-white/50 leading-relaxed pb-2 border-b border-white/5">
+        This report combines 3 systems: <span className="text-blue-400 font-medium">Hubstaff</span> (computer activity tracking),{" "}
+        <span className="text-teal-400 font-medium">Internal DB</span> (clock-in sessions + creator assignments), and{" "}
+        <span className="text-purple-400 font-medium">OnlyFans API</span> (actual messages sent). All three must be connected for a complete picture.
+      </div>
+      {notes.map((note, i) => (
+        <div key={i} className="flex items-start gap-2.5">
+          <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${note.color}`} />
+          <p className="text-sm text-white/80 leading-relaxed">{note.text}</p>
+        </div>
+      ))}
     </div>
   );
 }

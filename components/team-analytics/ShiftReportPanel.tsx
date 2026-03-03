@@ -7,7 +7,7 @@ import {
   TrendingUp, TrendingDown, Copy, Shield,
 } from "lucide-react";
 import { ScreenshotTimeline } from "./ScreenshotTimeline";
-import { HourlyTimeline, TagsSection, TopAppsSection } from "./ShiftReportSections";
+import { HourlyTimeline, TagsSection, TopAppsSection, DataSourceDiagnostic } from "./ShiftReportSections";
 
 type ShiftReportData = {
   email: string;
@@ -238,39 +238,8 @@ function ShiftSummaryRow({ data }: { data: ShiftReportData }) {
         </div>
       </div>
 
-      {/* Diagnostic — explain WHY data is missing */}
-      {(data.activityVerdict === "no_data" || data.effortVerdict === "idle" || (data.scoringWindows === 0 && data.totalMessages === 0)) && (
-        <div className="glass-inset rounded-xl px-4 py-3 space-y-1.5 border border-amber-500/15">
-          <div className="flex items-center gap-1.5 text-amber-400 text-sm font-semibold">
-            <AlertTriangle size={12} /> Why is this report empty?
-          </div>
-          {!data.hubstaff && data.sessionCount === 0 && (
-            <p className="text-sm text-white/70 leading-relaxed">
-              Chatter not linked to Hubstaff and no clock-in sessions recorded for this date. They may not have worked this shift.
-            </p>
-          )}
-          {!data.hubstaff && data.sessionCount > 0 && (
-            <p className="text-sm text-white/70 leading-relaxed">
-              No Hubstaff tracking. Chatter has {data.sessionCount} session{data.sessionCount !== 1 ? "s" : ""} but no activity data was recorded — check Hubstaff mapping.
-            </p>
-          )}
-          {data.hubstaff && data.scoringWindows === 0 && (
-            <p className="text-sm text-white/70 leading-relaxed">
-              Tracked by Hubstaff ({data.hubstaff.totalTrackedHrs}h) but no conversations were scored — chatter may not be assigned to a creator, or no messages were sent.
-            </p>
-          )}
-          {data.totalMessages === 0 && data.scoringWindows > 0 && (
-            <p className="text-sm text-white/70 leading-relaxed">
-              No messages sent during this shift. Scoring windows exist but message count is zero — possible data sync delay.
-            </p>
-          )}
-          {data.hubstaff && data.hubstaff.overall < 10 && data.hubstaff.totalTrackedHrs > 0 && (
-            <p className="text-sm text-white/70 leading-relaxed">
-              Hubstaff shows {data.hubstaff.totalTrackedHrs}h tracked but only {data.hubstaff.overall}% activity — chatter may have left tracking running while away.
-            </p>
-          )}
-        </div>
-      )}
+      {/* Diagnostic — explain data source status clearly */}
+      <DataSourceDiagnostic data={data} />
 
       {/* Quick stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
