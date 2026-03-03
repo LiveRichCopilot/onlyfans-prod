@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       chatters: rows,
       totals,
+      diagnostics: txData.diagnostics,
       period: {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
