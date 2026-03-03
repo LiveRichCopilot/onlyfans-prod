@@ -45,7 +45,7 @@ export function WiringPanel() {
   const unassigned = nodes.filter(n => n.chatters.length === 0).length;
 
   return (
-    <div className="glass-card rounded-3xl overflow-hidden">
+    <div className="glass-card rounded-3xl overflow-visible">
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/5">
         <div className="flex items-center gap-3">
           <Zap size={16} className="text-teal-400" />

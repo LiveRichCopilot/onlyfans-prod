@@ -116,7 +116,7 @@ export function AddOverrideForm({ creators, chatters, onClose, onCreated }: {
           )}
 
           {dropdownOpen && (
-            <div className="absolute z-50 top-full mt-1 left-0 w-[260px] max-h-[280px] overflow-hidden rounded-xl border border-white/10 bg-[#111] shadow-2xl flex flex-col">
+            <div className="absolute z-50 bottom-full mb-1 left-0 w-[280px] max-h-[340px] overflow-hidden rounded-xl border border-white/10 bg-[#111] shadow-2xl flex flex-col">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
                 <Search size={12} className="text-white/30" />
                 <input
