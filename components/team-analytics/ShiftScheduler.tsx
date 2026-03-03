@@ -322,9 +322,11 @@ export function ShiftScheduler() {
           />
         </div>
 
-        {/* Chatter Palette (right sidebar) */}
+        {/* Chatter Palette (right sidebar — sticky) */}
         <div className="hidden lg:block w-[220px] flex-shrink-0">
-          <ChatterPalette chatters={chatters} shifts={shifts} />
+          <div className="sticky top-4">
+            <ChatterPalette chatters={chatters} shifts={shifts} />
+          </div>
         </div>
       </div>
 
