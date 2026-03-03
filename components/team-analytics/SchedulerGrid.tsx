@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { ShiftBlock } from "./ShiftBlock";
+import type { TimezoneOption } from "./ShiftScheduler";
 
 type Shift = {
   id: string;
@@ -25,6 +26,7 @@ type Props = {
   onAssign: (creatorId: string, chatterEmail: string, chatterName: string, dayOfWeek: number, shiftType: string) => Promise<void>;
   onMove: (shiftId: string, newCreatorId: string, newDayOfWeek: number, newShiftType: string) => Promise<void>;
   onRemove: (shiftId: string) => Promise<void>;
+  timezone: TimezoneOption;
 };
 
 // Tue→Mon order (payment cycle)
@@ -36,13 +38,37 @@ const SHIFT_LABELS: Record<string, string> = {
   afternoon: "PM",
   night: "Night",
 };
-const SHIFT_TIMES: Record<string, string> = {
-  morning: "07–15",
-  afternoon: "15–23",
-  night: "23–07",
+
+// UK shift start/end hours
+const UK_SHIFT_HOURS: Record<string, [number, number]> = {
+  morning: [7, 15],
+  afternoon: [15, 23],
+  night: [23, 7],
 };
 
-export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove }: Props) {
+/** Convert a UK hour to target timezone hour (handles wrap) */
+function convertHour(ukHour: number, offsetFromUK: number): number {
+  return ((ukHour + offsetFromUK) % 24 + 24) % 24;
+}
+
+/** Get the current offset from UK for a timezone (accounts for DST) */
+function getOffsetFromUK(tzValue: string): number {
+  const now = new Date();
+  const ukStr = now.toLocaleString("en-GB", { timeZone: "Europe/London", hour: "numeric", hour12: false });
+  const targetStr = now.toLocaleString("en-GB", { timeZone: tzValue, hour: "numeric", hour12: false });
+  const ukHour = parseInt(ukStr);
+  const targetHour = parseInt(targetStr);
+  let diff = targetHour - ukHour;
+  if (diff > 12) diff -= 24;
+  if (diff < -12) diff += 24;
+  return diff;
+}
+
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+
+export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, timezone }: Props) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
 
   // Index shifts: key = `${creatorId}-${dayOfWeek}-${shiftType}`
@@ -201,14 +227,47 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove }: 
         </tbody>
       </table>
 
-      {/* Shift time legend */}
-      <div className="flex items-center gap-4 mt-3 px-2">
-        {SHIFT_TYPES.map((st) => (
-          <span key={st} className="text-[10px] text-white/30">
-            {SHIFT_LABELS[st]} = {SHIFT_TIMES[st]} UK
-          </span>
-        ))}
-      </div>
+      {/* Shift time legend — all three timezones, selected one highlighted */}
+      <ShiftTimeLegend timezone={timezone} />
+    </div>
+  );
+}
+
+/** Shows all 3 shift types with UK / PHT / PST times, selected TZ highlighted */
+function ShiftTimeLegend({ timezone }: { timezone: TimezoneOption }) {
+  const phtOffset = getOffsetFromUK("Asia/Manila");
+  const pstOffset = getOffsetFromUK("America/Los_Angeles");
+
+  return (
+    <div className="mt-3 px-2 space-y-1.5">
+      {SHIFT_TYPES.map((st) => {
+        const [ukStart, ukEnd] = UK_SHIFT_HOURS[st];
+        const phtStart = convertHour(ukStart, phtOffset);
+        const phtEnd = convertHour(ukEnd, phtOffset);
+        const pstStart = convertHour(ukStart, pstOffset);
+        const pstEnd = convertHour(ukEnd, pstOffset);
+
+        const isUK = timezone.value === "Europe/London";
+        const isPHT = timezone.value === "Asia/Manila";
+        const isPST = timezone.value === "America/Los_Angeles";
+
+        return (
+          <div key={st} className="flex items-center gap-3">
+            <span className="text-[10px] font-medium text-white/50 w-10">{SHIFT_LABELS[st]}</span>
+            <span className={`text-[10px] ${isUK ? "text-[#5B9BD5] font-semibold" : "text-white/30"}`}>
+              {pad2(ukStart)}–{pad2(ukEnd)} UK
+            </span>
+            <span className="text-white/10">|</span>
+            <span className={`text-[10px] ${isPHT ? "text-[#E8735A] font-semibold" : "text-white/30"}`}>
+              {pad2(phtStart)}–{pad2(phtEnd)} PHT
+            </span>
+            <span className="text-white/10">|</span>
+            <span className={`text-[10px] ${isPST ? "text-[#D4A843] font-semibold" : "text-white/30"}`}>
+              {pad2(pstStart)}–{pad2(pstEnd)} PST
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

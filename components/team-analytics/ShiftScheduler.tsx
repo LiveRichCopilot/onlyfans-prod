@@ -1,9 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Copy, Calendar } from "lucide-react";
+import { RefreshCw, Copy, Calendar, Globe } from "lucide-react";
 import { SchedulerGrid } from "./SchedulerGrid";
 import { ChatterPalette } from "./ChatterPalette";
+
+// Timezone options — UK is source of truth, others are display conversions
+const TIMEZONES = [
+  { label: "UK", value: "Europe/London", offset: 0 },
+  { label: "PHT", value: "Asia/Manila", offset: 8 },
+  { label: "PST", value: "America/Los_Angeles", offset: -8 },
+] as const;
+
+export type TimezoneOption = (typeof TIMEZONES)[number];
 
 type Shift = {
   id: string;
@@ -31,6 +40,7 @@ export function ShiftScheduler() {
   const [chatters, setChatters] = useState<Chatter[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [timezone, setTimezone] = useState<TimezoneOption>(TIMEZONES[0]); // default UK
 
   // Copy feature state
   const [copyMode, setCopyMode] = useState<"day" | "shift" | null>(null);
@@ -250,6 +260,24 @@ export function ShiftScheduler() {
             </button>
           )}
 
+          {/* Timezone selector */}
+          <div className="flex items-center gap-1 glass-button rounded-xl px-2 py-1">
+            <Globe size={12} className="text-white/40" />
+            {TIMEZONES.map((tz) => (
+              <button
+                key={tz.value}
+                onClick={() => setTimezone(tz)}
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-medium transition ${
+                  timezone.value === tz.value
+                    ? "bg-[#5B9BD5]/20 text-[#5B9BD5]"
+                    : "text-white/40 hover:text-white/60"
+                }`}
+              >
+                {tz.label}
+              </button>
+            ))}
+          </div>
+
           {/* Refresh */}
           <button
             onClick={load}
@@ -270,6 +298,7 @@ export function ShiftScheduler() {
             onAssign={handleAssign}
             onMove={handleMove}
             onRemove={handleRemove}
+            timezone={timezone}
           />
         </div>
 
