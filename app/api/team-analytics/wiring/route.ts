@@ -9,7 +9,13 @@ export async function GET() {
   try {
     const now = new Date();
 
-    const [creators, liveSessions, overrides, scheduleNames, hubstaffMappings] = await Promise.all([
+    // Compute current UK day-of-week and shift type for schedule lookup
+    const ukNow = new Date(now.toLocaleString("en-GB", { timeZone: "Europe/London" }));
+    const ukDow = ukNow.getDay();
+    const ukHour = ukNow.getHours();
+    const currentShiftType = ukHour >= 7 && ukHour < 15 ? "morning" : ukHour >= 15 && ukHour < 23 ? "afternoon" : "night";
+
+    const [creators, liveSessions, overrides, scheduleNames, scheduleShifts, hubstaffMappings] = await Promise.all([
       prisma.creator.findMany({
         where: { active: true },
         select: { id: true, name: true, ofUsername: true, avatarUrl: true },
@@ -27,6 +33,10 @@ export async function GET() {
       }),
       prisma.chatterSchedule.findMany({
         select: { email: true, name: true, creatorId: true, shift: true },
+      }),
+      prisma.scheduleShift.findMany({
+        where: { dayOfWeek: ukDow, shiftType: currentShiftType },
+        select: { chatterEmail: true, chatterName: true, creatorId: true, shiftType: true },
       }),
       prisma.hubstaffUserMapping.findMany({
         select: { chatterEmail: true, hubstaffName: true },
@@ -59,12 +69,20 @@ export async function GET() {
       liveByCreator.set(s.creatorId, arr);
     }
 
-    // Group schedule entries by creator
+    // Group schedule entries by creator (legacy)
     const schedByCreator = new Map<string, typeof scheduleNames>();
     for (const s of scheduleNames) {
       const arr = schedByCreator.get(s.creatorId) || [];
       arr.push(s);
       schedByCreator.set(s.creatorId, arr);
+    }
+
+    // Group ScheduleShift entries by creator (new recurring template)
+    const shiftByCreator = new Map<string, typeof scheduleShifts>();
+    for (const s of scheduleShifts) {
+      const arr = shiftByCreator.get(s.creatorId) || [];
+      arr.push(s);
+      shiftByCreator.set(s.creatorId, arr);
     }
 
     type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string };
@@ -101,7 +119,21 @@ export async function GET() {
         });
       }
 
-      // Live sessions (skip if already overridden)
+      // Schedule shifts (recurring template — skip if already overridden)
+      for (const s of shiftByCreator.get(c.id) || []) {
+        const resolved = re(s.chatterEmail);
+        if (!resolved || seen.has(resolved)) continue;
+        seen.add(resolved);
+        const shiftLabel = s.shiftType === "morning" ? "AM 07–15" : s.shiftType === "afternoon" ? "PM 15–23" : "Night 23–07";
+        chatters.push({
+          email: resolved,
+          name: nameMap.get(resolved) || s.chatterName || resolved.split("@")[0],
+          source: "assigned",
+          detail: shiftLabel,
+        });
+      }
+
+      // Live sessions (skip if already overridden or scheduled)
       for (const s of liveByCreator.get(c.id) || []) {
         const resolved = re(s.email);
         if (!resolved || seen.has(resolved)) continue;

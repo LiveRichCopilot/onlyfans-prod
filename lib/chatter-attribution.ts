@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 export type AttributionResult = {
   email: string | null;
-  source: "override" | "hubstaff" | "unassigned";
+  source: "override" | "schedule" | "hubstaff" | "unassigned";
   overrideId?: string;
 };
 
@@ -11,8 +11,9 @@ export type AttributionResult = {
  *
  * Priority:
  *   1. Manual override (AssignmentOverride where startAt <= T < endAt)
- *   2. Hubstaff/session baseline (ChatterSession where clockIn <= T < clockOut)
- *   3. "Unassigned" (no one scheduled)
+ *   2. ScheduleShift (recurring weekly template — dayOfWeek + shiftType matching UK time)
+ *   3. Hubstaff/session baseline (ChatterSession where clockIn <= T < clockOut)
+ *   4. "Unassigned" (no one scheduled)
  *
  * For Hubstaff baseline with multiple overlapping sessions, picks the one
  * with the most recent clockIn (latest shift started = active chatter).
@@ -28,7 +29,7 @@ export async function getActiveChatter(
       startAt: { lte: timestamp },
       endAt: { gt: timestamp },
     },
-    orderBy: { createdAt: "desc" }, // newest override wins if somehow overlapping
+    orderBy: { createdAt: "desc" },
   });
 
   if (override) {
@@ -39,7 +40,24 @@ export async function getActiveChatter(
     };
   }
 
-  // 2. Check ChatterSession (Hubstaff baseline)
+  // 2. Check ScheduleShift (recurring weekly template)
+  const ukTime = new Date(timestamp.toLocaleString("en-GB", { timeZone: "Europe/London" }));
+  const dayOfWeek = ukTime.getDay(); // 0=Sun .. 6=Sat
+  const hour = ukTime.getHours();
+  const shiftType = hour >= 7 && hour < 15 ? "morning" : hour >= 15 && hour < 23 ? "afternoon" : "night";
+
+  const scheduleShift = await prisma.scheduleShift.findFirst({
+    where: { creatorId, dayOfWeek, shiftType },
+  });
+
+  if (scheduleShift) {
+    return {
+      email: scheduleShift.chatterEmail,
+      source: "schedule",
+    };
+  }
+
+  // 3. Check ChatterSession (Hubstaff baseline)
   const session = await prisma.chatterSession.findFirst({
     where: {
       creatorId,
@@ -49,7 +67,7 @@ export async function getActiveChatter(
         { clockOut: null, isLive: true },
       ],
     },
-    orderBy: { clockIn: "desc" }, // most recent session started = active chatter
+    orderBy: { clockIn: "desc" },
   });
 
   if (session) {
@@ -59,13 +77,13 @@ export async function getActiveChatter(
     };
   }
 
-  // 3. No one assigned
+  // 4. No one assigned
   return { email: null, source: "unassigned" };
 }
 
 /**
  * Batch version — resolves attribution for multiple timestamps at once.
- * Pre-loads overrides and sessions for the date range to avoid N+1 queries.
+ * Pre-loads overrides, schedule shifts, and sessions to avoid N+1 queries.
  */
 export async function getActiveChatterBatch(
   creatorId: string,
@@ -85,6 +103,17 @@ export async function getActiveChatterBatch(
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Pre-load all schedule shifts for this creator (recurring — all days/shifts)
+  const scheduleShifts = await prisma.scheduleShift.findMany({
+    where: { creatorId },
+  });
+
+  // Index schedule shifts by dayOfWeek-shiftType for O(1) lookup
+  const scheduleMap = new Map<string, string>();
+  for (const s of scheduleShifts) {
+    scheduleMap.set(`${s.dayOfWeek}-${s.shiftType}`, s.chatterEmail);
+  }
 
   // Pre-load all sessions for this creator in the date range
   const sessions = await prisma.chatterSession.findMany({
@@ -114,7 +143,17 @@ export async function getActiveChatterBatch(
       };
     }
 
-    // 2. Check sessions (already sorted by clockIn desc — first match = most recent)
+    // 2. Check ScheduleShift (recurring weekly template)
+    const ukTime = new Date(timestamp.toLocaleString("en-GB", { timeZone: "Europe/London" }));
+    const dayOfWeek = ukTime.getDay();
+    const hour = ukTime.getHours();
+    const shiftType = hour >= 7 && hour < 15 ? "morning" : hour >= 15 && hour < 23 ? "afternoon" : "night";
+    const scheduleEmail = scheduleMap.get(`${dayOfWeek}-${shiftType}`);
+    if (scheduleEmail) {
+      return { email: scheduleEmail, source: "schedule" };
+    }
+
+    // 3. Check sessions (already sorted by clockIn desc — first match = most recent)
     const session = sessions.find(
       (s) =>
         s.clockIn.getTime() <= t &&
@@ -124,7 +163,7 @@ export async function getActiveChatterBatch(
       return { email: session.email, source: "hubstaff" };
     }
 
-    // 3. Unassigned
+    // 4. Unassigned
     return { email: null, source: "unassigned" };
   }
 

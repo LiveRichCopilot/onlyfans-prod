@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2 } from "lucide-react";
+import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2, Calendar } from "lucide-react";
 import Link from "next/link";
 
 type Creator = {
@@ -83,6 +83,12 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
                                 <BarChart2 size={16} /> Team Analytics
                                 <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">NEW</span>
+                            </li>
+                        </Link>
+                        <Link href="/schedule">
+                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
+                                <Calendar size={16} /> Shift Schedule
+                                <span className="bg-[#5B9BD5]/20 text-[#5B9BD5] text-[10px] px-1.5 py-0.5 rounded ml-auto border border-[#5B9BD5]/30 font-bold tracking-wider">NEW</span>
                             </li>
                         </Link>
                         <Link href="/performance">

@@ -33,6 +33,7 @@ model Creator {
   assignedUsers       CreatorAssignment[]
   chatterSessions     ChatterSession[]
   chatterSchedules    ChatterSchedule[]
+  scheduleShifts      ScheduleShift[]
   chatterHourlyScores ChatterHourlyScore[]
   chatterProfiles      ChatterProfile[]
   hubstaffMappings     HubstaffUserMapping[]
@@ -733,4 +734,23 @@ model AssignmentOverride {
 
   @@index([creatorId, startAt])
   @@index([creatorId, endAt])
+}
+
+// Recurring weekly shift template — source of truth for chatter attribution
+// Week runs Tue→Mon (payment cycle). Shifts are UK time.
+// morning = 07:00–15:00 UK | afternoon = 15:00–23:00 UK | night = 23:00–07:00 UK
+model ScheduleShift {
+  id           String   @id @default(cuid())
+  creatorId    String
+  chatterEmail String   // stable key — canonical email
+  chatterName  String?  // cached display name (resolved from Hubstaff/schedule)
+  dayOfWeek    Int      // 0=Sun, 1=Mon, 2=Tue, ..., 6=Sat
+  shiftType    String   // "morning" | "afternoon" | "night"
+  creator      Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([creatorId, dayOfWeek, shiftType, chatterEmail])
+  @@index([creatorId])
+  @@index([chatterEmail])
 }
