@@ -28,6 +28,7 @@ type Props = {
   onRemove: (shiftId: string) => Promise<void>;
   onFillWeek: (creatorId: string, chatterEmail: string, chatterName: string, shiftType: string) => Promise<void>;
   timezone: TimezoneOption;
+  liveEmails?: Set<string>;
 };
 
 // Tue→Mon order (payment cycle)
@@ -69,7 +70,7 @@ function pad2(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
-export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, onFillWeek, timezone }: Props) {
+export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, onFillWeek, timezone, liveEmails }: Props) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const scrollRAF = useRef<number>(0);
 
@@ -241,6 +242,7 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, on
                                   shiftType={s.shiftType}
                                   onRemove={onRemove}
                                   onFillWeek={onFillWeek}
+                                  isLive={liveEmails?.has(s.chatterEmail) ?? false}
                                 />
                               ))}
                             </div>

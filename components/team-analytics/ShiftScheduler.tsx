@@ -346,6 +346,7 @@ export function ShiftScheduler() {
                 onRemove={handleRemove}
                 onFillWeek={handleFillWeek}
                 timezone={timezone}
+                liveEmails={liveEmails}
               />
             </div>
             <div className="hidden lg:block w-[220px] flex-shrink-0">

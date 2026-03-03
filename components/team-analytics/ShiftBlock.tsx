@@ -34,6 +34,7 @@ type Props = {
   shiftType: string;
   onRemove: (id: string) => void;
   onFillWeek?: (creatorId: string, chatterEmail: string, chatterName: string, shiftType: string) => void;
+  isLive?: boolean;
 };
 
 export function ShiftBlock({
@@ -45,6 +46,7 @@ export function ShiftBlock({
   shiftType,
   onRemove,
   onFillWeek,
+  isLive,
 }: Props) {
   const color = getChatterColor(chatterEmail);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -85,6 +87,9 @@ export function ShiftBlock({
         borderLeft: `3px solid ${color}`,
       }}
     >
+      {isLive && (
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+      )}
       <span
         className="text-[11px] font-medium truncate flex-1"
         style={{ color: `${color}dd` }}
