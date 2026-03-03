@@ -35,7 +35,7 @@ export async function GET() {
         select: { email: true, name: true, creatorId: true, shift: true },
       }),
       prisma.scheduleShift.findMany({
-        where: { dayOfWeek: ukDow, shiftType: currentShiftType },
+        where: { dayOfWeek: ukDow },
         select: { chatterEmail: true, chatterName: true, creatorId: true, shiftType: true },
       }),
       prisma.hubstaffUserMapping.findMany({
