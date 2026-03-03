@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, ChevronsRight } from "lucide-react";
 
 // Warm pastel palette — Apple Reminders inspired
 const COLORS = [
@@ -32,6 +32,7 @@ type Props = {
   dayOfWeek: number;
   shiftType: string;
   onRemove: (id: string) => void;
+  onFillWeek?: (creatorId: string, chatterEmail: string, chatterName: string, shiftType: string) => void;
 };
 
 export function ShiftBlock({
@@ -42,6 +43,7 @@ export function ShiftBlock({
   dayOfWeek,
   shiftType,
   onRemove,
+  onFillWeek,
 }: Props) {
   const color = getChatterColor(chatterEmail);
 
@@ -77,6 +79,18 @@ export function ShiftBlock({
       >
         {chatterName}
       </span>
+      {onFillWeek && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onFillWeek(creatorId, chatterEmail, chatterName, shiftType);
+          }}
+          title="Fill all days"
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/10"
+        >
+          <ChevronsRight size={10} className="text-white/40" />
+        </button>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();

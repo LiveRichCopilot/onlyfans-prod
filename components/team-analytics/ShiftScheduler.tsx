@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Copy, Calendar, Globe } from "lucide-react";
+import { RefreshCw, Copy, Calendar, Globe, Filter, Check } from "lucide-react";
 import { SchedulerGrid } from "./SchedulerGrid";
 import { ChatterPalette } from "./ChatterPalette";
 
@@ -41,6 +41,10 @@ export function ShiftScheduler() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [timezone, setTimezone] = useState<TimezoneOption>(TIMEZONES[0]); // default UK
+
+  // Model filter — which models are visible in the grid
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const [showModelFilter, setShowModelFilter] = useState(false);
 
   // Copy feature state
   const [copyMode, setCopyMode] = useState<"day" | "shift" | null>(null);
@@ -195,6 +199,38 @@ export function ShiftScheduler() {
     [shifts, load]
   );
 
+  // Fill a chatter across all 7 days for one model + shift type
+  const handleFillWeek = useCallback(
+    async (creatorId: string, chatterEmail: string, chatterName: string, shiftType: string) => {
+      setSaving(true);
+      for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+        await fetch("/api/team-analytics/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ creatorId, chatterEmail, chatterName, dayOfWeek: day, shiftType }),
+        });
+      }
+      await load();
+      setSaving(false);
+    },
+    [load]
+  );
+
+  // Toggle a model in/out of the filter
+  const toggleModel = useCallback((id: string) => {
+    setSelectedModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Filtered creators — show all if none selected, otherwise only selected
+  const visibleCreators = selectedModels.size === 0
+    ? creators
+    : creators.filter((c) => selectedModels.has(c.id));
+
   // Current week display label (Tue→Mon)
   const now = new Date();
   const ukNow = new Date(now.toLocaleString("en-GB", { timeZone: "Europe/London" }));
@@ -288,16 +324,71 @@ export function ShiftScheduler() {
         </div>
       </div>
 
+      {/* Model Filter Bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setShowModelFilter(!showModelFilter)}
+          className={`glass-button rounded-xl px-3 py-1.5 text-xs font-medium flex items-center gap-1.5 transition ${
+            selectedModels.size > 0 ? "text-[#5B9BD5] border-[#5B9BD5]/30" : "text-white/50"
+          }`}
+        >
+          <Filter size={12} />
+          {selectedModels.size > 0 ? `${selectedModels.size} models` : "Filter models"}
+        </button>
+
+        {showModelFilter && (
+          <>
+            <button
+              onClick={() => setSelectedModels(new Set())}
+              className="px-2 py-1 rounded-lg text-[10px] font-medium bg-white/5 text-white/50 hover:text-white/80 transition"
+            >
+              All
+            </button>
+            <div className="flex items-center gap-1 flex-wrap">
+              {creators.map((c) => {
+                const isSelected = selectedModels.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => toggleModel(c.id)}
+                    className={`relative flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 text-[10px] font-medium transition ${
+                      isSelected
+                        ? "bg-[#5B9BD5]/20 text-[#5B9BD5] ring-1 ring-[#5B9BD5]/40"
+                        : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
+                    }`}
+                  >
+                    {c.avatarUrl ? (
+                      <img
+                        src={`/api/proxy-media?url=${encodeURIComponent(c.avatarUrl)}`}
+                        alt=""
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[8px]">
+                        {c.name ? c.name.charAt(0) : "?"}
+                      </div>
+                    )}
+                    <span className="truncate max-w-[60px]">{c.name || c.ofUsername || "?"}</span>
+                    {isSelected && <Check size={8} className="text-[#5B9BD5] ml-0.5" />}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Grid + Palette */}
       <div className="flex gap-4">
         {/* Main Grid */}
         <div className="glass-card rounded-3xl p-4 flex-1 overflow-hidden">
           <SchedulerGrid
             shifts={shifts}
-            creators={creators}
+            creators={visibleCreators}
             onAssign={handleAssign}
             onMove={handleMove}
             onRemove={handleRemove}
+            onFillWeek={handleFillWeek}
             timezone={timezone}
           />
         </div>

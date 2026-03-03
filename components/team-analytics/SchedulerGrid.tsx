@@ -26,6 +26,7 @@ type Props = {
   onAssign: (creatorId: string, chatterEmail: string, chatterName: string, dayOfWeek: number, shiftType: string) => Promise<void>;
   onMove: (shiftId: string, newCreatorId: string, newDayOfWeek: number, newShiftType: string) => Promise<void>;
   onRemove: (shiftId: string) => Promise<void>;
+  onFillWeek: (creatorId: string, chatterEmail: string, chatterName: string, shiftType: string) => Promise<void>;
   timezone: TimezoneOption;
 };
 
@@ -68,7 +69,7 @@ function pad2(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
-export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, timezone }: Props) {
+export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, onFillWeek, timezone }: Props) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
 
   // Index shifts: key = `${creatorId}-${dayOfWeek}-${shiftType}`
@@ -216,6 +217,7 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, ti
                                   dayOfWeek={s.dayOfWeek}
                                   shiftType={s.shiftType}
                                   onRemove={onRemove}
+                                  onFillWeek={onFillWeek}
                                 />
                               ))}
                             </div>
