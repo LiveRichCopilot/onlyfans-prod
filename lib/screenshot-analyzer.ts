@@ -103,7 +103,7 @@ async function analyzeOne(screenshotUrl: string): Promise<AnalysisResult> {
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 300,
+      max_completion_tokens: 300,
     }),
   });
 
