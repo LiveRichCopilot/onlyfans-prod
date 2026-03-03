@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getLastActivities, getActivities, getConfig, updateLastSync } from "@/lib/hubstaff";
+import { resolveEmail } from "@/lib/resolve-chatter-email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
@@ -96,15 +97,18 @@ export async function GET(req: NextRequest) {
       const isOnline = onlineUserIds.has(userId);
 
       if (isOnline) {
-        activeEmails.add(mapping.chatterEmail);
+        // Resolve through alias table so mismatched emails still match
+        const resolvedEmail = await resolveEmail(mapping.chatterEmail);
+        activeEmails.add(resolvedEmail);
 
         // Get creator IDs: prefer direct mapping, fall back to schedule
         const creatorIds: string[] = [];
         if (mapping.creatorId) {
           creatorIds.push(mapping.creatorId);
         } else {
+          // Check schedule for BOTH the raw and resolved email
           const schedules = await prisma.chatterSchedule.findMany({
-            where: { email: mapping.chatterEmail },
+            where: { email: { in: [mapping.chatterEmail, resolvedEmail] } },
             select: { creatorId: true },
           });
           creatorIds.push(...[...new Set(schedules.map(s => s.creatorId))]);
@@ -117,11 +121,11 @@ export async function GET(req: NextRequest) {
         const avgOverall = ua && ua.tracked > 0 ? Math.round((ua.overall / ua.tracked) * 100) : null;
 
         for (const creatorId of creatorIds) {
-          const key = `${mapping.chatterEmail}|${creatorId}`;
+          const key = `${resolvedEmail}|${creatorId}`;
           if (liveSet.has(key)) {
             // Already clocked in — update activity data on existing session
             if (avgOverall !== null) {
-              const sessionIds = liveByEmail.get(mapping.chatterEmail) || [];
+              const sessionIds = liveByEmail.get(resolvedEmail) || [];
               for (const sid of sessionIds) {
                 await prisma.chatterSession.update({
                   where: { id: sid },
@@ -140,7 +144,7 @@ export async function GET(req: NextRequest) {
 
           await prisma.chatterSession.create({
             data: {
-              email: mapping.chatterEmail,
+              email: resolvedEmail, // Use canonical email so sessions match schedules
               creatorId,
               source: "hubstaff",
               keyboardPct: avgKeyboard,

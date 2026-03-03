@@ -710,6 +710,16 @@ model Invite {
   @@index([email])
 }
 
+model ChatterAlias {
+  id             String   @id @default(cuid())
+  aliasEmail     String   @unique // alternate email from Hubstaff/Infloww/etc
+  canonicalEmail String   // the email we use everywhere internally
+  name           String?  // display name
+  createdAt      DateTime @default(now())
+
+  @@index([canonicalEmail])
+}
+
 model AssignmentOverride {
   id           String   @id @default(cuid())
   creatorId    String   // The model/creator account being worked
