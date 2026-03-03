@@ -101,18 +101,23 @@ export async function GET() {
     });
 
     // ALL employees — merge User(EMPLOYEE) + ChatterSchedule + HubstaffUserMapping
-    const chatterMap = new Map<string, string>();
+    // Dedupe by lowercase email to prevent duplicates from casing differences
+    const chatterMap = new Map<string, { email: string; name: string }>();
     for (const h of hubstaffMappings) {
-      chatterMap.set(h.chatterEmail, h.hubstaffName || h.chatterEmail.split("@")[0]);
+      const key = h.chatterEmail.toLowerCase();
+      chatterMap.set(key, { email: h.chatterEmail, name: h.hubstaffName || h.chatterEmail.split("@")[0] });
     }
     for (const e of employees) {
-      if (e.email) chatterMap.set(e.email, e.name || e.email.split("@")[0]);
+      if (e.email) {
+        const key = e.email.toLowerCase();
+        chatterMap.set(key, { email: e.email, name: e.name || e.email.split("@")[0] });
+      }
     }
     for (const s of scheduleNames) {
-      chatterMap.set(s.email, s.name);
+      const key = s.email.toLowerCase();
+      chatterMap.set(key, { email: s.email, name: s.name });
     }
-    const allChatters = Array.from(chatterMap.entries())
-      .map(([email, name]) => ({ email, name }))
+    const allChatters = Array.from(chatterMap.values())
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return NextResponse.json({ nodes, allChatters });
