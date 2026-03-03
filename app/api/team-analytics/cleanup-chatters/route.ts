@@ -20,10 +20,13 @@ export async function POST(req: NextRequest) {
     for (const raw of remove) {
       const email = normalizeEmail(raw);
 
-      const sched = await prisma.chatterSchedule.deleteMany({ where: { email } });
-      const mapping = await prisma.hubstaffUserMapping.deleteMany({ where: { chatterEmail: email } });
+      // Search both raw and normalized to catch +tags stored in DB
+      const emails = [raw.trim().toLowerCase(), email].filter((v, i, a) => a.indexOf(v) === i);
+
+      const sched = await prisma.chatterSchedule.deleteMany({ where: { email: { in: emails } } });
+      const mapping = await prisma.hubstaffUserMapping.deleteMany({ where: { chatterEmail: { in: emails } } });
       const sessions = await prisma.chatterSession.updateMany({
-        where: { email, isLive: true },
+        where: { email: { in: emails }, isLive: true },
         data: { isLive: false, clockOut: new Date() },
       });
 
