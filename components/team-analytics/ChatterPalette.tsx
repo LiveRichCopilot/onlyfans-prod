@@ -26,7 +26,7 @@ export function ChatterPalette({ chatters, shifts }: Props) {
 
   function handleDragStart(e: React.DragEvent, chatter: Chatter) {
     e.dataTransfer.setData(
-      "application/json",
+      "text/plain",
       JSON.stringify({
         type: "new",
         chatterEmail: chatter.email,

@@ -47,7 +47,7 @@ export function ShiftBlock({
 
   function handleDragStart(e: React.DragEvent) {
     e.dataTransfer.setData(
-      "application/json",
+      "text/plain",
       JSON.stringify({
         type: "move",
         shiftId,

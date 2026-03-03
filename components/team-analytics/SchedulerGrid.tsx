@@ -86,8 +86,18 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, ti
     setDragOverCell(cellKey);
   }, []);
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverCell(null);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear if we actually left the container (not a child element)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const { clientX, clientY } = e;
+    if (
+      clientX <= rect.left ||
+      clientX >= rect.right ||
+      clientY <= rect.top ||
+      clientY >= rect.bottom
+    ) {
+      setDragOverCell(null);
+    }
   }, []);
 
   const handleDrop = useCallback(
@@ -96,7 +106,7 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, ti
       setDragOverCell(null);
 
       try {
-        const raw = e.dataTransfer.getData("application/json");
+        const raw = e.dataTransfer.getData("text/plain");
         if (!raw) return;
         const data = JSON.parse(raw);
 
@@ -186,11 +196,11 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, ti
                           onDragOver={(e) => handleDragOver(e, cellKey)}
                           onDragLeave={handleDragLeave}
                           onDrop={(e) => handleDrop(e, creator.id, dow, st)}
-                          className={`min-h-[28px] rounded-lg p-0.5 transition-all ${
+                          className={`min-h-[32px] rounded-lg p-1 transition-all ${
                             isOver
-                              ? "bg-[#5B9BD5]/15 border border-[#5B9BD5]/40 scale-[1.02]"
+                              ? "bg-[#5B9BD5]/15 border-2 border-[#5B9BD5]/40 scale-[1.02]"
                               : cellShifts.length === 0
-                              ? "border border-transparent hover:border-white/5"
+                              ? "border border-white/[0.04] hover:border-white/10 hover:bg-white/[0.02]"
                               : "border border-transparent"
                           }`}
                         >
@@ -210,8 +220,8 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, ti
                               ))}
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center h-full">
-                              <span className="text-[9px] text-white/10">
+                            <div className="flex items-center justify-center h-full pointer-events-none">
+                              <span className="text-[9px] text-white/15 select-none">
                                 {SHIFT_LABELS[st]}
                               </span>
                             </div>
