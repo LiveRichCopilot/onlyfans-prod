@@ -74,6 +74,12 @@ export function ShiftScheduler() {
     load();
   }, [load]);
 
+  // Auto-refresh live status every 30s (matches wiring panel)
+  useEffect(() => {
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [load]);
+
   // Assign a chatter to a slot (from palette drag)
   const handleAssign = useCallback(
     async (creatorId: string, chatterEmail: string, chatterName: string, dayOfWeek: number, shiftType: string) => {
