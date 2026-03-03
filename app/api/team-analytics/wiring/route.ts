@@ -85,7 +85,7 @@ export async function GET() {
       shiftByCreator.set(s.creatorId, arr);
     }
 
-    type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string };
+    type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string; isLive?: boolean };
 
     // Pre-resolve all emails through alias table so dedup works across email mismatches
     const allRawEmails = new Set<string>();
@@ -100,9 +100,19 @@ export async function GET() {
     }
     const re = (email: string) => resolvedMap.get(normalizeEmail(email)) || normalizeEmail(email);
 
+    // Build a set of currently-live emails (resolved) per creator for green dot
+    const liveEmails = new Map<string, Set<string>>(); // creatorId → Set<resolved email>
+    for (const s of liveSessions) {
+      const resolved = re(s.email);
+      if (!resolved) continue;
+      if (!liveEmails.has(s.creatorId)) liveEmails.set(s.creatorId, new Set());
+      liveEmails.get(s.creatorId)!.add(resolved);
+    }
+
     const nodes = creators.map(c => {
       const chatters: Chatter[] = [];
       const seen = new Set<string>(); // uses resolved emails for dedup
+      const creatorLive = liveEmails.get(c.id) || new Set();
 
       // Overrides first (highest priority)
       for (const o of ovrByCreator.get(c.id) || []) {
@@ -116,6 +126,7 @@ export async function GET() {
           source: "override",
           detail: `${mins}m left${o.reason ? ` · ${o.reason}` : ""}`,
           overrideId: o.id,
+          isLive: creatorLive.has(resolved),
         });
       }
 
@@ -130,6 +141,7 @@ export async function GET() {
           name: nameMap.get(resolved) || s.chatterName || resolved.split("@")[0],
           source: "assigned",
           detail: shiftLabel,
+          isLive: creatorLive.has(resolved),
         });
       }
 
@@ -144,6 +156,7 @@ export async function GET() {
           name: nameMap.get(resolved) || nameMap.get(s.email) || resolved.split("@")[0],
           source: "live",
           detail: `${mins}m in`,
+          isLive: true,
         });
       }
 

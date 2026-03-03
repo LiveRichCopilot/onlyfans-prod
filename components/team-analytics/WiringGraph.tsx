@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 
-type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string };
+type Chatter = { email: string; name: string; source: "override" | "live" | "assigned"; detail: string; overrideId?: string; isLive?: boolean };
 
 export type WiringNode = {
   id: string;
@@ -62,7 +62,7 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
                     {node.chatters.map((ch, ci) => {
                       const cx = (COL_W - 8) / 2;
                       const endY = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP) + CHATTER_H / 2;
-                      const isLive = ch.source === "live" || ch.source === "override";
+                      const isLive = ch.isLive || ch.source === "live" || ch.source === "override";
                       const wireColor = ch.source === "override" ? "#f97316" : isLive ? "#2dd4bf" : "rgba(255,255,255,0.12)";
 
                       const d = node.chatters.length === 1
@@ -99,13 +99,16 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
 
                     return (
                       <div key={ch.email} className={`absolute left-0 right-0 rounded-xl border px-2 py-1.5 flex items-center gap-1.5 group ${cardBorder}`} style={{ top, height: CHATTER_H }}>
-                        <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[8px] text-white/50 font-bold uppercase flex-shrink-0">
+                        <div className="relative w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[8px] text-white/50 font-bold uppercase flex-shrink-0">
                           {ch.name[0]}
+                          {ch.isLive && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#0a0a0f] animate-pulse" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-[10px] font-medium text-white/90 truncate">{ch.name}</div>
                           <div className="text-[8px] truncate" style={{ color: detailColor }}>
-                            {ch.detail}
+                            {ch.isLive ? `LIVE · ${ch.detail}` : ch.detail}
                           </div>
                         </div>
                         {onDisconnect && (
