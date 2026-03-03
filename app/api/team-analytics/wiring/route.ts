@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const now = new Date();
 
-    const [creators, liveSessions, overrides, scheduleNames] = await Promise.all([
+    const [creators, liveSessions, overrides, scheduleNames, employees, hubstaffMappings] = await Promise.all([
       prisma.creator.findMany({
         where: { active: true },
         select: { id: true, name: true, ofUsername: true, avatarUrl: true },
@@ -28,9 +28,23 @@ export async function GET() {
         select: { email: true, name: true },
         distinct: ["email"],
       }),
+      prisma.user.findMany({
+        where: { role: "EMPLOYEE" },
+        select: { email: true, name: true },
+      }),
+      prisma.hubstaffUserMapping.findMany({
+        select: { chatterEmail: true, hubstaffName: true },
+        distinct: ["chatterEmail"],
+      }),
     ]);
 
     const nameMap = new Map<string, string>();
+    for (const h of hubstaffMappings) {
+      if (h.hubstaffName) nameMap.set(h.chatterEmail, h.hubstaffName);
+    }
+    for (const e of employees) {
+      if (e.email && e.name) nameMap.set(e.email, e.name);
+    }
     for (const s of scheduleNames) nameMap.set(s.email, s.name);
 
     // Group overrides by creator
@@ -86,7 +100,22 @@ export async function GET() {
       return { ...c, chatters };
     });
 
-    return NextResponse.json({ nodes });
+    // ALL employees — merge User(EMPLOYEE) + ChatterSchedule + HubstaffUserMapping
+    const chatterMap = new Map<string, string>();
+    for (const h of hubstaffMappings) {
+      chatterMap.set(h.chatterEmail, h.hubstaffName || h.chatterEmail.split("@")[0]);
+    }
+    for (const e of employees) {
+      if (e.email) chatterMap.set(e.email, e.name || e.email.split("@")[0]);
+    }
+    for (const s of scheduleNames) {
+      chatterMap.set(s.email, s.name);
+    }
+    const allChatters = Array.from(chatterMap.entries())
+      .map(([email, name]) => ({ email, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return NextResponse.json({ nodes, allChatters });
   } catch (err: any) {
     console.error("[wiring] GET error:", err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });

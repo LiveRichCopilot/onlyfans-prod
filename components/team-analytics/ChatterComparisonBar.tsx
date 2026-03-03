@@ -28,6 +28,7 @@ type SortField = "name" | "creator" | "avgScore" | "totalSessions" | "totalHours
 const COLLAPSED_COUNT = 8;
 
 export function ChatterComparisonBar({ data, onChatterClick }: Props) {
+  const [sectionOpen, setSectionOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [sortField, setSortField] = useState<SortField>("avgScore");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -52,22 +53,22 @@ export function ChatterComparisonBar({ data, onChatterClick }: Props) {
   });
 
   return (
-    <div className="glass-card rounded-3xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
+    <div className="glass-card rounded-3xl overflow-hidden">
+      <button onClick={() => setSectionOpen(!sectionOpen)} className="w-full flex items-center justify-between px-6 py-3 text-left hover:bg-white/[0.02] transition">
+        <div className="flex items-center gap-2">
           <h3 className="text-white font-semibold text-sm">Chatter Rankings</h3>
-          <p className="text-white/40 text-xs mt-0.5">
-            Average score per chatter
-            {onChatterClick && <span className="text-teal-400/50 ml-1">— click row for shift report</span>}
-          </p>
+          <span className="text-white/30 text-xs">{data.length} chatters · AI scores</span>
         </div>
-        <ExportButtons data={data} filename="chatter-rankings" />
-      </div>
+        <div className="flex items-center gap-2">
+          {sectionOpen && <ExportButtons data={data} filename="chatter-rankings" />}
+          {sectionOpen ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
+        </div>
+      </button>
 
-      {data.length === 0 ? (
-        <div className="h-[200px] flex items-center justify-center text-white/30 text-sm">No chatter profiles yet</div>
+      {!sectionOpen ? null : data.length === 0 ? (
+        <div className="h-[100px] flex items-center justify-center text-white/30 text-sm">No chatter profiles yet</div>
       ) : (
-        <>
+        <div className="px-6 pb-6">
           {/* Bar chart — top performers */}
           <ResponsiveContainer width="100%" height={visible.length * 32}>
             <BarChart data={visible} layout="vertical" margin={{ left: 20 }}>
@@ -171,7 +172,7 @@ export function ChatterComparisonBar({ data, onChatterClick }: Props) {
               </table>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

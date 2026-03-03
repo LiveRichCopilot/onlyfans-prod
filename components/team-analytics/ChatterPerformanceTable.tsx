@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, ArrowUpDown, Users, DollarSign, Target, TrendingUp } from "lucide-react";
+import { RefreshCw, ArrowUpDown, Users, DollarSign, Target, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { DateRangePicker, type DateRange } from "./DateRangePicker";
 import { ChatterPerfRow, type ChatterRowData } from "./ChatterPerfRow";
 import { ExportButtons } from "./ExportButtons";
@@ -44,6 +44,7 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
   const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sectionOpen, setSectionOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>("totalSales");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -117,25 +118,33 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
 
   return (
     <div className="glass-card rounded-3xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+      {/* Header — click to expand */}
+      <button onClick={() => setSectionOpen(!sectionOpen)} className="w-full flex items-center justify-between px-6 py-3 text-left hover:bg-white/[0.02] transition">
         <div className="flex items-center gap-3">
-          <Users size={18} className="text-teal-400" />
+          <Users size={16} className="text-teal-400" />
           <div>
             <h3 className="text-white font-semibold text-sm">Chatter Performance</h3>
-            <p className="text-white/40 text-xs">
+            <p className="text-white/40 text-[10px]">
               {data.length} chatters · {dateRange.label}
+              {totals && ` · $${totals.totalSales.toLocaleString()} gross`}
               {loading && " · loading..."}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButtons data={data} filename="chatter-performance" />
-          <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <button onClick={load} className="glass-button rounded-xl p-2 text-white/40 hover:text-white">
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
+          {sectionOpen ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
         </div>
+      </button>
+
+      {!sectionOpen ? null : <>
+
+      {/* Controls */}
+      <div className="flex items-center justify-end gap-2 px-6 py-2 border-t border-white/5">
+        <ExportButtons data={data} filename="chatter-performance" />
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
+        <button onClick={load} className="glass-button rounded-xl p-2 text-white/40 hover:text-white">
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+        </button>
       </div>
 
       {/* Revenue KPI Pills */}
@@ -230,6 +239,7 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
           </tbody>
         </table>
       </div>
+    </>}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { AddOverrideForm } from "./AddOverrideForm";
 
 export function WiringPanel() {
   const [nodes, setNodes] = useState<WiringNode[]>([]);
+  const [allChatters, setAllChatters] = useState<{ email: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -20,6 +21,7 @@ export function WiringPanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setNodes(json.nodes || []);
+      setAllChatters(json.allChatters || []);
     } catch (e: any) {
       setError(e.message);
     }
@@ -74,7 +76,7 @@ export function WiringPanel() {
       {showOverride && !collapsed && (
         <AddOverrideForm
           creators={nodes.map(n => ({ id: n.id, name: n.name }))}
-          chatters={[...new Map(nodes.flatMap(n => n.chatters).map(c => [c.email, { email: c.email, name: c.name }])).values()]}
+          chatters={allChatters}
           onClose={() => setShowOverride(false)}
           onCreated={() => { setShowOverride(false); load(); }}
         />
