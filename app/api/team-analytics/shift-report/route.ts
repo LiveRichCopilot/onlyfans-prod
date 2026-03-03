@@ -26,8 +26,12 @@ export async function GET(req: NextRequest) {
   const creatorId = req.nextUrl.searchParams.get("creatorId") || null;
   const dateParam = req.nextUrl.searchParams.get("date");
 
-  // Use UK timezone for "today" default
-  const targetDate = dateParam || new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  // Default to yesterday UK time — today's shift is usually incomplete
+  let targetDate = dateParam;
+  if (!targetDate) {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    targetDate = yesterday.toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  }
   const dayStart = new Date(`${targetDate}T00:00:00Z`);
   const dayEnd = new Date(`${targetDate}T23:59:59Z`);
 

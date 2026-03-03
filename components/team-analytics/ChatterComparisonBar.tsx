@@ -10,6 +10,7 @@ import { scoreColor } from "./chart-colors";
 type ChatterEntry = {
   name: string;
   email: string;
+  creatorId?: string;
   creator: string;
   avgScore: number;
   totalSessions: number;
@@ -19,7 +20,7 @@ type ChatterEntry = {
 
 type Props = {
   data: ChatterEntry[];
-  onChatterClick?: (email: string) => void;
+  onChatterClick?: (email: string, creatorId?: string) => void;
 };
 
 type SortField = "name" | "creator" | "avgScore" | "totalSessions" | "totalHours" | "improvementIndex";
@@ -143,7 +144,7 @@ export function ChatterComparisonBar({ data, onChatterClick }: Props) {
                   {sorted.map((c) => (
                     <tr
                       key={`${c.email}-${c.creator}`}
-                      onClick={() => onChatterClick?.(c.email)}
+                      onClick={() => onChatterClick?.(c.email, c.creatorId)}
                       className={`border-b border-white/5 ${onChatterClick ? "cursor-pointer hover:bg-white/5" : ""} transition`}
                     >
                       <td className="py-2 px-2">

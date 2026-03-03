@@ -37,7 +37,7 @@ export default function TeamAnalytics() {
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
   const [showGuide, setShowGuide] = useState(false);
-  const [shiftReportEmail, setShiftReportEmail] = useState<string | null>(null);
+  const [shiftReportTarget, setShiftReportTarget] = useState<{ email: string; creatorId?: string } | null>(null);
   const [contentDateRange, setContentDateRange] = useState<DateRange>({
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     endDate: new Date().toISOString(),
@@ -183,10 +183,10 @@ export default function TeamAnalytics() {
       </div>
 
       {/* Row 4: Chatter Reports by Hubstaff Team — who has reports, who doesn't */}
-      <TeamReportsPanel days={days} onChatterClick={(email) => setShiftReportEmail(email)} />
+      <TeamReportsPanel days={days} onChatterClick={(email) => setShiftReportTarget({ email })} />
 
       {/* Row 5: Chatter Rankings bar chart (full width) — click name for shift report */}
-      <ChatterComparisonBar data={d.chatterComparison || []} onChatterClick={(email) => setShiftReportEmail(email)} />
+      <ChatterComparisonBar data={d.chatterComparison || []} onChatterClick={(email, creatorId) => setShiftReportTarget({ email, creatorId })} />
 
       {/* Row 5: Hours + Tags */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -211,11 +211,11 @@ export default function TeamAnalytics() {
       <ConversationPhoneGallery data={d.conversationSamples || []} />
 
       {/* Shift Report Modal */}
-      {shiftReportEmail && (
+      {shiftReportTarget && (
         <ShiftReportPanel
-          email={shiftReportEmail}
-          creatorId={creatorFilter !== "all" ? creatorFilter : undefined}
-          onClose={() => setShiftReportEmail(null)}
+          email={shiftReportTarget.email}
+          creatorId={shiftReportTarget.creatorId || (creatorFilter !== "all" ? creatorFilter : undefined)}
+          onClose={() => setShiftReportTarget(null)}
         />
       )}
     </div>

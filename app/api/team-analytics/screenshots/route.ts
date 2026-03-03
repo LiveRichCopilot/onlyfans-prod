@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
   const dateParam = req.nextUrl.searchParams.get("date");
   const analyze = req.nextUrl.searchParams.get("analyze") === "true";
 
-  const targetDate =
-    dateParam || new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+  // Default to yesterday UK time — today's shift is usually incomplete
+  const targetDate = dateParam || new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-CA", { timeZone: "Europe/London" });
   const isoStart = `${targetDate}T00:00:00Z`;
   const isoEnd = `${targetDate}T23:59:59Z`;
 

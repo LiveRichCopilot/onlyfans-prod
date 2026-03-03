@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
     const chatterComparison = profiles.map(p => ({
       name: p.chatterName || p.chatterEmail.split("@")[0],
       email: p.chatterEmail,
+      creatorId: p.creatorId,
       creator: p.creator.name || "Unknown",
       avgScore: Math.round(p.avgTotalScore),
       totalSessions: p.totalScoringSessions,
