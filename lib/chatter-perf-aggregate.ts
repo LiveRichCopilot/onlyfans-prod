@@ -47,7 +47,7 @@ export type ChatterRow = {
 export function buildChatterRows(
   chatterMap: Map<string, ChatterStats>,
   tipShares: Map<string, number>,
-  scheduleMap: Map<string, { name: string; hoursPerShift: number | null }>,
+  scheduleMap: Map<string, { name: string; shift: string }>,
   daysInRange: number,
 ): ChatterRow[] {
   const rows: ChatterRow[] = [];
@@ -72,10 +72,8 @@ export function buildChatterRows(
     const salesPerHour = clockedHours > 0.5 ? round2(totalSales / clockedHours) : null;
     const msgsPerHour = clockedHours > 0.5 ? Math.round(stats.dmsSent / clockedHours) : null;
 
-    // Scheduled hours estimate
-    const sched = scheduleMap.get(email);
-    const scheduledHours = sched?.hoursPerShift
-      ? round1(sched.hoursPerShift * daysInRange) : null;
+    // Scheduled hours — not computable from shift name alone, needs numeric field
+    const scheduledHours: number | null = null;
 
     // Attribution breakdown
     const attrTotal = stats.overrideHours + stats.hubstaffHours + stats.unassignedHours;

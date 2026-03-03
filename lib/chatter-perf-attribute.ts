@@ -28,7 +28,7 @@ type SessionRow = {
   clockOut: Date | null;
 };
 
-type ScheduleInfo = { name: string; hoursPerShift: number | null };
+type ScheduleInfo = { name: string; shift: string };
 
 export type AttributeResult = {
   chatterMap: Map<string, ChatterStats>;
@@ -59,12 +59,12 @@ export async function loadSessionData(
 
   const schedules = await prisma.chatterSchedule.findMany({
     where: scheduleWhere,
-    select: { email: true, name: true, creatorId: true, hoursPerShift: true },
+    select: { email: true, name: true, creatorId: true, shift: true },
   });
 
   const scheduleMap = new Map<string, ScheduleInfo>();
   for (const s of schedules) {
-    scheduleMap.set(s.email, { name: s.name, hoursPerShift: s.hoursPerShift });
+    scheduleMap.set(s.email, { name: s.name, shift: s.shift });
   }
 
   return { sessions, scheduleMap };
