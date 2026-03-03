@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Copy, Calendar, Globe } from "lucide-react";
+import { RefreshCw, Copy, Calendar, Globe, LayoutGrid, List } from "lucide-react";
 import { SchedulerGrid } from "./SchedulerGrid";
 import { ChatterPalette } from "./ChatterPalette";
 import { ModelFilterBar } from "./ModelFilterBar";
+import { CalendarView } from "./CalendarView";
 
 // Timezone options — UK is source of truth, others are display conversions
 const TIMEZONES = [
@@ -42,6 +43,7 @@ export function ShiftScheduler() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [timezone, setTimezone] = useState<TimezoneOption>(TIMEZONES[0]); // default UK
+  const [view, setView] = useState<"grid" | "calendar">("grid");
 
   // Model filter — which models are visible in the grid
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
@@ -269,6 +271,28 @@ export function ShiftScheduler() {
             </button>
           )}
 
+          {/* View toggle */}
+          <div className="flex items-center gap-0.5 glass-button rounded-xl px-1 py-1">
+            <button
+              onClick={() => setView("grid")}
+              className={`p-1.5 rounded-lg transition ${
+                view === "grid" ? "bg-[#5B9BD5]/20 text-[#5B9BD5]" : "text-white/40 hover:text-white/60"
+              }`}
+              title="Grid view"
+            >
+              <LayoutGrid size={12} />
+            </button>
+            <button
+              onClick={() => setView("calendar")}
+              className={`p-1.5 rounded-lg transition ${
+                view === "calendar" ? "bg-[#5B9BD5]/20 text-[#5B9BD5]" : "text-white/40 hover:text-white/60"
+              }`}
+              title="Calendar view"
+            >
+              <List size={12} />
+            </button>
+          </div>
+
           {/* Timezone selector */}
           <div className="flex items-center gap-1 glass-button rounded-xl px-2 py-1">
             <Globe size={12} className="text-white/40" />
@@ -297,38 +321,41 @@ export function ShiftScheduler() {
         </div>
       </div>
 
-      {/* Model Filter Bar */}
-      <ModelFilterBar
-        creators={creators}
-        selectedModels={selectedModels}
-        showFilter={showModelFilter}
-        onToggleFilter={() => setShowModelFilter(!showModelFilter)}
-        onToggleModel={toggleModel}
-        onClearFilter={() => setSelectedModels(new Set())}
-      />
-
-      {/* Grid + Palette */}
-      <div className="flex gap-4">
-        {/* Main Grid */}
-        <div className="glass-card rounded-3xl p-4 flex-1 overflow-hidden">
-          <SchedulerGrid
-            shifts={shifts}
-            creators={visibleCreators}
-            onAssign={handleAssign}
-            onMove={handleMove}
-            onRemove={handleRemove}
-            onFillWeek={handleFillWeek}
-            timezone={timezone}
+      {view === "grid" ? (
+        <>
+          {/* Model Filter Bar */}
+          <ModelFilterBar
+            creators={creators}
+            selectedModels={selectedModels}
+            showFilter={showModelFilter}
+            onToggleFilter={() => setShowModelFilter(!showModelFilter)}
+            onToggleModel={toggleModel}
+            onClearFilter={() => setSelectedModels(new Set())}
           />
-        </div>
 
-        {/* Chatter Palette (right sidebar — sticky) */}
-        <div className="hidden lg:block w-[220px] flex-shrink-0">
-          <div className="sticky top-4">
-            <ChatterPalette chatters={chatters} shifts={shifts} />
+          {/* Grid + Palette */}
+          <div className="flex gap-4">
+            <div className="glass-card rounded-3xl p-4 flex-1 overflow-hidden">
+              <SchedulerGrid
+                shifts={shifts}
+                creators={visibleCreators}
+                onAssign={handleAssign}
+                onMove={handleMove}
+                onRemove={handleRemove}
+                onFillWeek={handleFillWeek}
+                timezone={timezone}
+              />
+            </div>
+            <div className="hidden lg:block w-[220px] flex-shrink-0">
+              <div className="sticky top-4">
+                <ChatterPalette chatters={chatters} shifts={shifts} />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      ) : (
+        <CalendarView shifts={shifts} creators={creators} />
+      )}
 
       {/* Stats bar */}
       <div className="flex items-center gap-6 px-2">

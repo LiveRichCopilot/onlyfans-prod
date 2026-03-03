@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { X, ChevronsRight } from "lucide-react";
 
 // Warm pastel palette — Apple Reminders inspired
@@ -46,6 +47,7 @@ export function ShiftBlock({
   onFillWeek,
 }: Props) {
   const color = getChatterColor(chatterEmail);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   function handleDragStart(e: React.DragEvent) {
     e.dataTransfer.setData(
@@ -61,6 +63,16 @@ export function ShiftBlock({
       })
     );
     e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (confirmDelete) {
+      onRemove(shiftId);
+    } else {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 2000);
+    }
   }
 
   return (
@@ -79,27 +91,31 @@ export function ShiftBlock({
       >
         {chatterName}
       </span>
-      {onFillWeek && (
+      <div className="flex items-center gap-1.5 ml-1">
+        {onFillWeek && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onFillWeek(creatorId, chatterEmail, chatterName, shiftType);
+            }}
+            title="Fill all days"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-[#5B9BD5]/20"
+          >
+            <ChevronsRight size={10} className="text-[#5B9BD5]/60" />
+          </button>
+        )}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onFillWeek(creatorId, chatterEmail, chatterName, shiftType);
-          }}
-          title="Fill all days"
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/10"
+          onClick={handleDelete}
+          title={confirmDelete ? "Click again to confirm" : "Remove"}
+          className={`opacity-0 group-hover:opacity-100 transition-all p-0.5 rounded ${
+            confirmDelete
+              ? "!opacity-100 bg-red-500/20 ring-1 ring-red-500/40"
+              : "hover:bg-red-500/20"
+          }`}
         >
-          <ChevronsRight size={10} className="text-white/40" />
+          <X size={10} className={confirmDelete ? "text-red-400" : "text-white/40"} />
         </button>
-      )}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove(shiftId);
-        }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-white/10"
-      >
-        <X size={10} className="text-white/40" />
-      </button>
+      </div>
     </div>
   );
 }
