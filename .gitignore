@@ -2,5 +2,10 @@ node_modules
 .next
 .vercel
 .env
+.env.*
 dev.db
-.env*.local
+.DS_Store
+.claude/worktrees
+package-lock.json
+debug-*.ts
+test-*.ts
