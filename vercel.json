@@ -39,6 +39,14 @@
         {
             "path": "/api/cron/sync-messages",
             "schedule": "*/2 * * * *"
+        },
+        {
+            "path": "/api/cron/sync-dm-engagement",
+            "schedule": "*/15 * * * *"
+        },
+        {
+            "path": "/api/cron/sync-mass-message-chart",
+            "schedule": "*/15 * * * *"
         }
     ]
 }

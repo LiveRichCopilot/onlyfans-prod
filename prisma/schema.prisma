@@ -41,6 +41,8 @@ model Creator {
   massMessageReplies   MassMessageReply[]
   dailyReports         CreatorDailyReport[]
   assignmentOverrides  AssignmentOverride[]
+  dmEngagementBuckets  DmEngagementBucket[]
+  massMessageBuckets   MassMessageBucket[]
   organization         Organization?       @relation(fields: [organizationId], references: [id])
 
   createdAt DateTime @default(now())
@@ -786,6 +788,39 @@ model RawChatMessage {
   @@index([chatId, sentAt])
   @@index([creatorId, chatId])
   @@index([isFromCreator, sentAt])
+}
+
+model DmEngagementBucket {
+  id              String   @id @default(cuid())
+  creatorId       String
+  creator         Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  hourBucket      DateTime // UTC timestamp representing UK hour boundary
+  dmsSent         Int      @default(0)
+  ppvsSent        Int      @default(0)
+  purchaseCount   Int      @default(0)
+  purchaseAmount  Float    @default(0)
+  viewedCount     Int      @default(0)
+  characterCount  Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([creatorId, hourBucket])
+  @@index([creatorId, hourBucket])
+}
+
+model MassMessageBucket {
+  id              String   @id @default(cuid())
+  creatorId       String
+  creator         Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  hourBucket      DateTime // UTC timestamp representing UK hour boundary
+  sentCount       Int      @default(0)
+  purchaseCount   Int      @default(0)
+  purchaseAmount  Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([creatorId, hourBucket])
+  @@index([creatorId, hourBucket])
 }
 
 model SyncCursor {
