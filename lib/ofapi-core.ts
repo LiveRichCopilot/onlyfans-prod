@@ -10,7 +10,7 @@ type RequestOptions = {
 };
 
 export async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOptions = {}) {
-    const url = `${OFAPI_BASE}${endpoint}`;
+    const url = endpoint.startsWith("http") ? endpoint : `${OFAPI_BASE}${endpoint}`;
 
     // Resolve abstract database placeholder tokens to actual environment keys
     let resolvedKey = apiKey;
@@ -31,7 +31,8 @@ export async function ofapiRequest(endpoint: string, apiKey: string, options: Re
     const timeoutMs = options.timeoutMs || 5000; // 5s default per-call timeout
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch(options.targetAccountId ? `${url}?accountId=${options.targetAccountId}` : url, {
+    const fetchUrl = options.targetAccountId ? `${url}${url.includes("?") ? "&" : "?"}accountId=${options.targetAccountId}` : url;
+    const response = await fetch(fetchUrl, {
         method: options.method || "GET",
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,

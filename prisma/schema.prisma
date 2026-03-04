@@ -43,6 +43,8 @@ model Creator {
   assignmentOverrides  AssignmentOverride[]
   dmEngagementBuckets  DmEngagementBucket[]
   massMessageBuckets   MassMessageBucket[]
+  massMessageStats     MassMessageStat[]
+  massMessageBuyers    MassMessageBuyer[]
   organization         Organization?       @relation(fields: [organizationId], references: [id])
 
   createdAt DateTime @default(now())
@@ -821,6 +823,42 @@ model MassMessageBucket {
 
   @@unique([creatorId, hourBucket])
   @@index([creatorId, hourBucket])
+}
+
+model MassMessageStat {
+  id             String   @id @default(cuid())
+  creatorId      String
+  creator        Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  messageId      BigInt   // OFAPI mass message ID
+  sentAt         DateTime
+  sentCount      Int      @default(0)
+  viewedCount    Int      @default(0)
+  purchasedCount Int      @default(0)
+  priceCents     Int      @default(0)
+  text           String?
+  mediaCount     Int      @default(0)
+  raw            Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([creatorId, messageId])
+  @@index([creatorId, sentAt])
+}
+
+model MassMessageBuyer {
+  id          String   @id @default(cuid())
+  creatorId   String
+  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  messageId   BigInt   // OFAPI mass message ID
+  buyerUserId String   // Fan/buyer OF user ID
+  purchasedAt DateTime?
+  raw         Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([creatorId, messageId, buyerUserId])
+  @@index([creatorId, messageId])
+  @@index([buyerUserId])
 }
 
 model SyncCursor {
