@@ -760,3 +760,43 @@ model ScheduleShift {
   @@index([creatorId])
   @@index([chatterEmail])
 }
+
+// ─── Raw Data Storage (save EVERYTHING) ─────────────────────────────
+
+model RawChatMessage {
+  id            String   @id @default(cuid())
+  ofMessageId   String   // OFAPI message ID (dedup key with creatorId)
+  creatorId     String   // Which model account
+  chatId        String   // Fan chat ID
+  fromUserId    String   // Who sent it (fan ID or creator account)
+  isFromCreator Boolean  // true = chatter sent it, false = fan sent it
+  text          String?  // Message text (can be long)
+  price         Float    @default(0) // PPV price (0 = free message)
+  isFree        Boolean  @default(true)
+  mediaCount    Int      @default(0)
+  isLiked       Boolean  @default(false)
+  isTip         Boolean  @default(false)
+  tipAmount     Float    @default(0)
+  raw           Json?    // Full OFAPI message payload (save everything)
+  sentAt        DateTime // When the message was sent (from OFAPI createdAt)
+  createdAt     DateTime @default(now()) // When we ingested it
+
+  @@unique([creatorId, ofMessageId])
+  @@index([creatorId, sentAt])
+  @@index([chatId, sentAt])
+  @@index([creatorId, chatId])
+  @@index([isFromCreator, sentAt])
+}
+
+model SyncCursor {
+  id          String   @id @default(cuid())
+  creatorId   String
+  dataType    String   // "chat_messages" | "transactions" | "fans"
+  chatId      String?  // For per-chat cursors (null for non-chat types)
+  lastSeenId  String?  // Last message/transaction ID processed
+  lastSyncAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([creatorId, dataType, chatId])
+  @@index([creatorId, dataType])
+}
