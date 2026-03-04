@@ -8,10 +8,10 @@ export type ChatterRowData = {
   name: string;
   creators: string[];
   revenue: { totalSales: number; netSales: number; messageSales: number; tipSales: number; postSales: number };
-  activity: { txCount: number; messageTxCount: number; fansWhoSpent: number };
-  conversions: { avgPerSpender: number | null };
-  efficiency: { salesPerHour: number | null };
-  time: { scheduledHours: number | null; clockedHours: number };
+  activity: { txCount: number; messageTxCount: number; postTxCount: number; fansWhoSpent: number; dmsSent: number; ppvsSent: number; fansChatted: number; characterCount: number };
+  conversions: { avgPerSpender: number | null; goldenRatio: number | null; unlockRate: number | null; fanCVR: number | null };
+  efficiency: { salesPerHour: number | null; messagesPerHour: number | null; fansPerHour: number | null };
+  time: { scheduledHours: number | null; clockedHours: number; avgResponseTimeSec: number | null };
   attributionBreakdown: { override: number; hubstaff: number; unassigned: number };
 };
 

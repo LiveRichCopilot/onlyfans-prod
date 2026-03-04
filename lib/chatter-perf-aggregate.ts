@@ -1,6 +1,7 @@
 import type { ChatterStats } from "./chatter-perf-attribute";
+import type { HourlyAggregation } from "./chatter-perf-hourly-agg";
 
-/** Final row shape returned to the frontend */
+/** Final row shape returned to the frontend — all 22 stats */
 export type ChatterRow = {
   email: string;
   name: string;
@@ -15,17 +16,28 @@ export type ChatterRow = {
   activity: {
     txCount: number;
     messageTxCount: number;
+    postTxCount: number;      // PPVs unlocked
     fansWhoSpent: number;
+    dmsSent: number;           // from hourly scoring
+    ppvsSent: number;          // from hourly scoring
+    fansChatted: number;       // from hourly scoring
+    characterCount: number;    // from hourly scoring
   };
   conversions: {
     avgPerSpender: number | null;
+    goldenRatio: number | null;  // (ppvsSent / dmsSent) × 100
+    unlockRate: number | null;   // (postTxCount / ppvsSent) × 100
+    fanCVR: number | null;       // (fansWhoSpent / fansChatted) × 100
   };
   efficiency: {
     salesPerHour: number | null;
+    messagesPerHour: number | null;
+    fansPerHour: number | null;
   };
   time: {
     scheduledHours: number | null;
     clockedHours: number;
+    avgResponseTimeSec: number | null;
   };
   attributionBreakdown: {
     override: number;
@@ -34,13 +46,15 @@ export type ChatterRow = {
   };
 };
 
-const OF_FEE = 0.20; // OnlyFans takes 20%
+const OF_FEE = 0.20;
 
-/** Build final rows from accumulated stats */
+/** Build final rows from accumulated stats + hourly activity data */
 export function buildChatterRows(
   chatterMap: Map<string, ChatterStats>,
   scheduleMap: Map<string, { name: string; shift: string }>,
   daysInRange: number,
+  hourlyAgg?: Map<string, HourlyAggregation>,
+  scheduledHoursMap?: Map<string, number>,
 ): ChatterRow[] {
   const rows: ChatterRow[] = [];
 
@@ -50,13 +64,29 @@ export function buildChatterRows(
     const netSales = round2(totalSales * (1 - OF_FEE));
     const fansWhoSpent = stats.uniqueFans.size;
 
-    const avgPerSpender = fansWhoSpent > 0
-      ? round2(totalSales / fansWhoSpent) : null;
+    // Hourly scoring data (DMs, PPVs, fans chatted, chars, response time)
+    const hourly = hourlyAgg?.get(email);
+    const dmsSent = hourly?.dmsSent || 0;
+    const ppvsSent = hourly?.ppvsSent || 0;
+    const fansChatted = hourly?.fansChatted || 0;
+    const characterCount = hourly?.characterCount || 0;
+    const avgResponseTimeSec = hourly?.avgResponseTimeSec ?? null;
 
-    // Only compute if clocked > 30 min to avoid misleading ratios
+    const scheduledHours = scheduledHoursMap?.get(email) ?? null;
+    const postTxCount = stats.postTxCount || 0;
+
+    // Conversions
+    const avgPerSpender = fansWhoSpent > 0 ? round2(totalSales / fansWhoSpent) : null;
+    const goldenRatio = dmsSent > 0 ? round2((ppvsSent / dmsSent) * 100) : null;
+    const unlockRate = ppvsSent > 0 ? round2((postTxCount / ppvsSent) * 100) : null;
+    const fanCVR = fansChatted > 0 ? round2((fansWhoSpent / fansChatted) * 100) : null;
+
+    // Efficiency (only if clocked > 30 min)
     const salesPerHour = clockedHours > 0.5 ? round2(totalSales / clockedHours) : null;
+    const messagesPerHour = clockedHours > 0.5 ? round2(dmsSent / clockedHours) : null;
+    const fansPerHour = clockedHours > 0.5 ? round2(fansChatted / clockedHours) : null;
 
-    // Attribution breakdown percentages
+    // Attribution breakdown
     const attrTotal = stats.overrideHours + stats.hubstaffHours + stats.unassignedHours;
     const attributionBreakdown = attrTotal > 0 ? {
       override: Math.round((stats.overrideHours / attrTotal) * 100),
@@ -68,28 +98,11 @@ export function buildChatterRows(
       email,
       name: stats.name,
       creators: [...stats.creators],
-      revenue: {
-        totalSales: round2(totalSales),
-        netSales,
-        messageSales: round2(stats.messageSales),
-        tipSales: round2(stats.tipSales),
-        postSales: round2(stats.postSales),
-      },
-      activity: {
-        txCount: stats.txCount,
-        messageTxCount: stats.messageTxCount,
-        fansWhoSpent,
-      },
-      conversions: {
-        avgPerSpender,
-      },
-      efficiency: {
-        salesPerHour,
-      },
-      time: {
-        scheduledHours: null,
-        clockedHours: round2(clockedHours),
-      },
+      revenue: { totalSales: round2(totalSales), netSales, messageSales: round2(stats.messageSales), tipSales: round2(stats.tipSales), postSales: round2(stats.postSales) },
+      activity: { txCount: stats.txCount, messageTxCount: stats.messageTxCount, postTxCount, fansWhoSpent, dmsSent, ppvsSent, fansChatted, characterCount },
+      conversions: { avgPerSpender, goldenRatio, unlockRate, fanCVR },
+      efficiency: { salesPerHour, messagesPerHour, fansPerHour },
+      time: { scheduledHours, clockedHours: round2(clockedHours), avgResponseTimeSec },
       attributionBreakdown,
     });
   }

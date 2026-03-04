@@ -15,6 +15,7 @@ export type ChatterStats = {
   // Activity counts from transactions
   txCount: number;
   messageTxCount: number;
+  postTxCount: number;
   uniqueFans: Set<string>;
   // Hours
   clockedSeconds: number;
@@ -71,7 +72,7 @@ export async function loadSessionData(
     }),
     prisma.scheduleShift.findMany({
       where: shiftWhere,
-      select: { chatterEmail: true, chatterName: true, creatorId: true, shiftType: true },
+      select: { chatterEmail: true, chatterName: true, creatorId: true, shiftType: true, dayOfWeek: true },
     }),
   ]);
 
@@ -80,7 +81,20 @@ export async function loadSessionData(
     scheduleMap.set(s.email, { name: s.name, shift: s.shift });
   }
 
-  return { sessions, scheduleMap, scheduleShifts };
+  // Scheduled hours: each unique (email, dayOfWeek, shiftType) = 8h of work.
+  // Covering multiple models in the same shift = still 8h (multitasking).
+  // dayOfWeek uses 0-6 (Sun-Sat), same as JS getDay().
+  const scheduledHoursMap = new Map<string, number>();
+  const seenShifts = new Set<string>();
+  for (const s of scheduleShifts) {
+    const key = `${s.chatterEmail}|${s.dayOfWeek}|${s.shiftType}`;
+    if (seenShifts.has(key)) continue;
+    seenShifts.add(key);
+    const prev = scheduledHoursMap.get(s.chatterEmail) || 0;
+    scheduledHoursMap.set(s.chatterEmail, prev + 8);
+  }
+
+  return { sessions, scheduleMap, scheduleShifts, scheduledHoursMap };
 }
 
 /** Attribute transactions + sessions to chatters */
@@ -117,7 +131,7 @@ export async function attributeToChatter(
         email,
         name: sched?.name || email.split("@")[0],
         creators: new Set(),
-        messageSales: 0, tipSales: 0, postSales: 0,
+        messageSales: 0, tipSales: 0, postSales: 0, postTxCount: 0,
         txCount: 0, messageTxCount: 0,
         uniqueFans: new Set(),
         clockedSeconds: 0,
@@ -163,6 +177,7 @@ export async function attributeToChatter(
         break;
       case "post":
         stats.postSales += tx.amount;
+        stats.postTxCount += 1;
         break;
     }
   }
