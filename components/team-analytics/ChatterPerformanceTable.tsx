@@ -5,22 +5,7 @@ import { RefreshCw, ArrowUpDown, Users, DollarSign, Target, TrendingUp, ChevronD
 import { DateRangePicker, type DateRange } from "./DateRangePicker";
 import { ChatterPerfRow, type ChatterRowData } from "./ChatterPerfRow";
 import { ExportButtons } from "./ExportButtons";
-
-type SortField = "name" | "totalSales" | "netSales" | "messageSales" | "tipSales" | "clockedHours" | "salesPerHour";
-type SortDir = "asc" | "desc";
-
-function getSortValue(row: ChatterRowData, field: SortField): number {
-  switch (field) {
-    case "name": return 0;
-    case "totalSales": return row.revenue.totalSales;
-    case "netSales": return row.revenue.netSales;
-    case "messageSales": return row.revenue.messageSales;
-    case "tipSales": return row.revenue.tipSales;
-    case "clockedHours": return row.time.clockedHours;
-    case "salesPerHour": return row.efficiency.salesPerHour ?? -Infinity;
-    default: return 0;
-  }
-}
+import { ALL_COLUMNS, type ColDef } from "./ChatterPerfColumns";
 
 type Props = {
   creatorFilter?: string;
@@ -45,8 +30,8 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sectionOpen, setSectionOpen] = useState(false);
-  const [sortField, setSortField] = useState<SortField>("totalSales");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortKey, setSortKey] = useState("sales");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     endDate: new Date().toISOString(),
@@ -80,41 +65,22 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
 
   useEffect(() => { load(); }, [load]);
 
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir(d => d === "desc" ? "asc" : "desc");
+    else { setSortKey(key); setSortDir("desc"); }
   };
 
+  const sortCol = ALL_COLUMNS.find(c => c.key === sortKey);
   const sorted = [...data].sort((a, b) => {
-    if (sortField === "name") {
-      return sortDir === "asc"
-        ? a.name.localeCompare(b.name)
-        : b.name.localeCompare(a.name);
-    }
-    const va = getSortValue(a, sortField);
-    const vb = getSortValue(b, sortField);
+    if (sortKey === "name") return sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+    if (!sortCol) return 0;
+    const va = Number(sortCol.getValue(a) ?? -Infinity);
+    const vb = Number(sortCol.getValue(b) ?? -Infinity);
     return sortDir === "asc" ? va - vb : vb - va;
   });
 
-  const HEADER_LABELS = [
-    "", "Employee", "Creators",
-    "Gross", "Net", "Messages", "Tips", "Posts",
-    "Tx", "Msg Tx", "Fans Spent",
-    "$/Spender", "$/Hr", "Hours",
-  ];
-
-  const SORT_FIELDS: (SortField | null)[] = [
-    null, "name", null,
-    "totalSales", "netSales", "messageSales", "tipSales", null,
-    null, null, null,
-    null, "salesPerHour", "clockedHours",
-  ];
-
-  const COL_COUNT = HEADER_LABELS.length;
+  const columns = ALL_COLUMNS;
+  const COL_COUNT = 3 + columns.length;
 
   return (
     <div className="glass-card rounded-3xl overflow-hidden">
@@ -185,57 +151,39 @@ export function ChatterPerformanceTable({ creatorFilter, onChatterClick }: Props
 
       {error && <div className="px-6 py-3 text-red-400 text-xs">Error: {error}</div>}
 
-      {/* Table */}
+      {/* Table — all 23 stat columns, horizontal scroll */}
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-white/10">
-              {HEADER_LABELS.map((label, i) => {
-                const sf = SORT_FIELDS[i];
-                const isActive = sf === sortField;
-                const stickyClass = i === 1 ? "sticky left-0 z-20 bg-[#0a0a0f]"
-                  : i === 2 ? "sticky left-[180px] z-20 bg-[#0a0a0f]" : "";
-                return (
-                  <th
-                    key={i}
-                    className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${stickyClass} ${
-                      isActive ? "text-teal-400" : "text-white/40"
-                    } ${sf ? "cursor-pointer hover:text-white/70" : ""}`}
-                    onClick={() => sf && toggleSort(sf)}
-                  >
-                    <span className="flex items-center gap-0.5">
-                      {label}
-                      {sf && <ArrowUpDown size={9} className="opacity-40" />}
-                    </span>
-                  </th>
-                );
-              })}
+              <th className="px-3 py-2 w-8" />
+              <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/40 sticky left-0 z-20 bg-[#0a0a0f] cursor-pointer hover:text-white/70" onClick={() => toggleSort("name")}>
+                <span className="flex items-center gap-0.5">Employee {sortKey === "name" && <ArrowUpDown size={9} className="text-teal-400" />}</span>
+              </th>
+              <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/40 sticky left-[180px] z-20 bg-[#0a0a0f]">Creators</th>
+              {columns.map(c => (
+                <th key={c.key}
+                  className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer hover:text-white/70 ${sortKey === c.key ? "text-teal-400" : "text-white/40"}`}
+                  onClick={() => toggleSort(c.key)}
+                >
+                  <span className="flex items-center gap-0.5">
+                    {c.label}
+                    <ArrowUpDown size={9} className="opacity-40" />
+                  </span>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {loading && data.length === 0 ? (
-              <tr>
-                <td colSpan={COL_COUNT} className="px-6 py-12 text-center text-white/30 text-sm">
-                  <RefreshCw size={16} className="inline animate-spin mr-2" />
-                  Loading chatter stats...
-                </td>
-              </tr>
+              <tr><td colSpan={COL_COUNT} className="px-6 py-12 text-center text-white/30 text-sm">
+                <RefreshCw size={16} className="inline animate-spin mr-2" />Loading...
+              </td></tr>
             ) : sorted.length === 0 ? (
-              <tr>
-                <td colSpan={COL_COUNT} className="px-6 py-12 text-center text-white/30 text-sm">
-                  No chatter data for this date range.
-                </td>
-              </tr>
-            ) : (
-              sorted.map((row) => (
-                <ChatterPerfRow
-                  key={row.email}
-                  row={row}
-                  colCount={COL_COUNT}
-                  onNameClick={(email) => onChatterClick?.(email)}
-                />
-              ))
-            )}
+              <tr><td colSpan={COL_COUNT} className="px-6 py-12 text-center text-white/30 text-sm">No data for this range.</td></tr>
+            ) : sorted.map(row => (
+              <ChatterPerfRow key={row.email} row={row} columns={columns} colCount={COL_COUNT} onNameClick={(email) => onChatterClick?.(email)} />
+            ))}
           </tbody>
         </table>
       </div>
