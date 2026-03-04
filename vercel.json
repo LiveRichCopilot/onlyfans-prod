@@ -35,6 +35,10 @@
         {
             "path": "/api/cron/creator-report",
             "schedule": "0 6 * * *"
+        },
+        {
+            "path": "/api/cron/sync-messages",
+            "schedule": "*/2 * * * *"
         }
     ]
 }
