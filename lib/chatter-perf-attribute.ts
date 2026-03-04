@@ -184,27 +184,51 @@ export async function attributeToChatter(
 
   console.log(`[chatter-perf] Attribution: ${attributed} attributed, ${unassigned} unassigned, ${skipped} skipped (non-attributable)`);
 
-  // Attribute session hours
+  // Attribute session hours — dedupe overlapping sessions per chatter
+  // (3 models × 8h = 8h worked, not 24h)
+  const sessionsByChatter = new Map<string, { start: number; end: number; creatorId: string }[]>();
   for (const s of sessions) {
-    const sessionStart = Math.max(s.clockIn.getTime(), startDate.getTime());
-    const sessionEnd = Math.min(
-      s.clockOut ? s.clockOut.getTime() : Date.now(),
-      endDate.getTime(),
-    );
-    const hours = Math.max(0, (sessionEnd - sessionStart) / 3600000);
-    const seconds = Math.max(0, (sessionEnd - sessionStart) / 1000);
+    const start = Math.max(s.clockIn.getTime(), startDate.getTime());
+    const end = Math.min(s.clockOut ? s.clockOut.getTime() : Date.now(), endDate.getTime());
+    if (end <= start) continue;
+    const arr = sessionsByChatter.get(s.email) || [];
+    arr.push({ start, end, creatorId: s.creatorId });
+    sessionsByChatter.set(s.email, arr);
 
-    const midpoint = new Date(sessionStart + (sessionEnd - sessionStart) / 2);
-    const resolver = resolvers.get(s.creatorId);
-    const source = resolver ? resolver.resolve(midpoint).source : "hubstaff";
-
+    // Still track creator associations per session
     const stats = getOrCreate(s.email);
     stats.creators.add(creatorNameMap.get(s.creatorId) || "Unknown");
-    stats.clockedSeconds += seconds;
+  }
 
-    if (source === "override") stats.overrideHours += hours;
-    else if (source === "hubstaff") stats.hubstaffHours += hours;
-    else stats.unassignedHours += hours;
+  // Merge overlapping intervals per chatter to get real hours worked
+  for (const [email, intervals] of sessionsByChatter) {
+    intervals.sort((a, b) => a.start - b.start);
+    const merged: { start: number; end: number }[] = [];
+    for (const iv of intervals) {
+      const last = merged[merged.length - 1];
+      if (last && iv.start <= last.end) {
+        last.end = Math.max(last.end, iv.end);
+      } else {
+        merged.push({ start: iv.start, end: iv.end });
+      }
+    }
+
+    const totalSeconds = merged.reduce((sum, iv) => sum + (iv.end - iv.start) / 1000, 0);
+    const totalHours = totalSeconds / 3600;
+    const stats = getOrCreate(email);
+    stats.clockedSeconds += totalSeconds;
+
+    // Attribution breakdown from merged intervals
+    for (const iv of merged) {
+      const midpoint = new Date(iv.start + (iv.end - iv.start) / 2);
+      const matchingSession = intervals.find(s => s.start <= midpoint.getTime() && s.end >= midpoint.getTime());
+      const resolver = matchingSession ? resolvers.get(matchingSession.creatorId) : null;
+      const source = resolver ? resolver.resolve(midpoint).source : "hubstaff";
+      const hours = (iv.end - iv.start) / 3600000;
+      if (source === "override") stats.overrideHours += hours;
+      else if (source === "hubstaff") stats.hubstaffHours += hours;
+      else stats.unassignedHours += hours;
+    }
   }
 
   // Add creator associations from schedule shifts (even if no tx/sessions for that model)
