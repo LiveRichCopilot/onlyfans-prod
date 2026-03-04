@@ -1,4 +1,6 @@
 import { defineConfig } from "@trigger.dev/sdk";
+import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
+import { syncVercelEnvVars } from "@trigger.dev/build/extensions/core";
 
 export default defineConfig({
   project: "proj_divqttopygdsjovoehpm",
@@ -14,4 +16,13 @@ export default defineConfig({
     },
   },
   maxDuration: 3600,
+  build: {
+    extensions: [
+      prismaExtension({
+        mode: "legacy",
+        schema: "prisma/schema.prisma",
+      }),
+      syncVercelEnvVars(),
+    ],
+  },
 });
