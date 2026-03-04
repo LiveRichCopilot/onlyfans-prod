@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     // Get all currently live hubstaff sessions
     const liveSessions = await prisma.chatterSession.findMany({
       where: { isLive: true, source: "hubstaff" },
-      select: { id: true, email: true, creatorId: true },
+      select: { id: true, email: true, creatorId: true, activityUpdatedAt: true, clockIn: true },
     });
     const liveSet = new Set(liveSessions.map(s => `${s.email}|${s.creatorId}`));
     const liveByEmail = new Map<string, string[]>();
@@ -165,9 +165,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Clock out hubstaff sessions where user is no longer online
+    // Clock out hubstaff sessions only if offline for 1+ hour (prevents flapping on breaks)
+    const offlineThreshold = 60 * 60 * 1000; // 1 hour
     for (const session of liveSessions) {
       if (!activeEmails.has(session.email)) {
+        const lastSeen = session.activityUpdatedAt || session.clockIn;
+        const offlineDuration = now.getTime() - new Date(lastSeen).getTime();
+        if (offlineDuration < offlineThreshold) continue;
         await prisma.chatterSession.update({
           where: { id: session.id },
           data: { isLive: false, clockOut: now },
