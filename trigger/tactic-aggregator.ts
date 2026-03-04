@@ -123,7 +123,7 @@ export const tacticAggregatorTask = task({
           tacticTag_creatorId_chatterEmail_period_periodStart: {
             tacticTag: data.tacticTag,
             creatorId: data.creatorId,
-            chatterEmail: data.chatterEmail,
+            chatterEmail: data.chatterEmail ?? "",
             period,
             periodStart,
           },
