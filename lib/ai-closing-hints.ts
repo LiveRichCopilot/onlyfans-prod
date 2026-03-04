@@ -11,6 +11,9 @@
  * Uses GPT-4o-mini (~$0.0005 per call with compressed context).
  */
 
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 
 // --- Result Schema (v1 — stable, all sections always present) ---
@@ -131,6 +134,47 @@ export function computeStrikeZone(intel: {
     return { zone: "yellow", reason: `Moderate intent (${score}) — warm up before pitching` };
 }
 
+// --- Winning Snippets (from mined sales data) ---
+
+export type WinningSnippetHint = {
+  snippet: string;
+  tacticTag: string;
+  confidence: number;
+  saleAmount: number;
+};
+
+/**
+ * Fetch top-performing winning snippets for a creator, optionally filtered by tactic.
+ * Returns real phrases that have previously driven sales.
+ */
+export async function getWinningSnippets(
+  creatorId: string,
+  options?: { tacticTag?: string; limit?: number; chatterEmail?: string }
+): Promise<WinningSnippetHint[]> {
+  try {
+    const where: any = { creatorId, confidence: { gte: 0.5 } };
+    if (options?.tacticTag) where.tacticTag = options.tacticTag;
+    if (options?.chatterEmail) where.chatterEmail = options.chatterEmail;
+
+    const snippets = await prisma.winningSnippet.findMany({
+      where,
+      orderBy: [{ confidence: "desc" }, { saleAmount: "desc" }],
+      take: options?.limit || 5,
+      select: {
+        snippet: true,
+        tacticTag: true,
+        confidence: true,
+        saleAmount: true,
+      },
+    });
+
+    return snippets;
+  } catch (e: any) {
+    console.error("[Winning Snippets] Query failed:", e.message);
+    return [];
+  }
+}
+
 // --- AI Prompt (uses compressed context from bundle) ---
 
 const HINTS_SYSTEM_PROMPT = `You are a closing coach for an OnlyFans chatter. You analyze a fan's context bundle and give real-time selling advice.
@@ -175,6 +219,7 @@ Rules:
  */
 export async function getClosingHints(params: {
     fanName?: string;
+    creatorId?: string;
     intelligence: {
         stage: string | null;
         fanType: string | null;
@@ -213,13 +258,26 @@ export async function getClosingHints(params: {
         ? `Stage=${intel.stage||"?"} Type=${intel.fanType||"?"} Tone=${intel.tonePreference||"?"} Price=${intel.priceRange||"?"} Intent=${intel.intentScore??0}/100 Buyer=${intel.buyerType||"?"} Emotion=${intel.emotionalDrivers||"?"} Format=${intel.formatPreference||"?"}`
         : "No intelligence data (new fan)";
 
+    // Fetch real winning snippets for this creator
+    let snippetBlock = "";
+    if (params.creatorId) {
+      const winningSnippets = await getWinningSnippets(params.creatorId, { limit: 5 });
+      if (winningSnippets.length > 0) {
+        snippetBlock = "\n\nPROVEN WINNING PHRASES (from past sales):\n" +
+          winningSnippets.map((s) =>
+            `- [${s.tacticTag}] "${s.snippet}" (drove $${s.saleAmount}, ${Math.round(s.confidence * 100)}% conf)`
+          ).join("\n") +
+          "\nUse these as inspiration — adapt to this fan's tone and context.";
+      }
+    }
+
     const userPrompt = `Fan: ${params.fanName || "Anonymous"}
 Strike Zone: ${strikeZone.zone.toUpperCase()} — ${strikeZone.reason}
 Context Quality: ${params.contextQuality}
 
 ${intelLine}
 
-${params.compressedContext}`;
+${params.compressedContext}${snippetBlock}`;
 
     try {
         const controller = new AbortController();

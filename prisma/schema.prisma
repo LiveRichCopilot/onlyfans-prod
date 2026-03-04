@@ -36,16 +36,16 @@ model Creator {
   chatterSchedules    ChatterSchedule[]
   scheduleShifts      ScheduleShift[]
   chatterHourlyScores ChatterHourlyScore[]
-  chatterProfiles      ChatterProfile[]
-  hubstaffMappings     HubstaffUserMapping[]
-  massMessageReplies   MassMessageReply[]
-  dailyReports         CreatorDailyReport[]
-  assignmentOverrides  AssignmentOverride[]
-  dmEngagementBuckets  DmEngagementBucket[]
-  massMessageBuckets   MassMessageBucket[]
-  massMessageStats     MassMessageStat[]
-  massMessageBuyers    MassMessageBuyer[]
-  organization         Organization?       @relation(fields: [organizationId], references: [id])
+  chatterProfiles     ChatterProfile[]
+  hubstaffMappings    HubstaffUserMapping[]
+  massMessageReplies  MassMessageReply[]
+  dailyReports        CreatorDailyReport[]
+  assignmentOverrides AssignmentOverride[]
+  dmEngagementBuckets DmEngagementBucket[]
+  massMessageBuckets  MassMessageBucket[]
+  massMessageStats    MassMessageStat[]
+  massMessageBuyers   MassMessageBuyer[]
+  organization        Organization?         @relation(fields: [organizationId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -358,23 +358,23 @@ model CreatorDailyReport {
   // Earnings breakdown (gross $) — matches HistoricalSalesUTC0 spreadsheet
   totalGross         Float  @default(0)
   totalNet           Float?
-  subsGross          Float  @default(0)   // Subscription Gross (total)
-  newSubsGross       Float  @default(0)   // New subscriptions Gross
-  recurringSubsGross Float  @default(0)   // Recurring subscriptions Gross
+  subsGross          Float  @default(0) // Subscription Gross (total)
+  newSubsGross       Float  @default(0) // New subscriptions Gross
+  recurringSubsGross Float  @default(0) // Recurring subscriptions Gross
   tipsGross          Float  @default(0)
-  messagesGross      Float  @default(0)   // Message Gross
-  postsGross         Float  @default(0)   // Posts Gross
-  streamsGross       Float  @default(0)   // Streams Gross
-  refundGross        Float  @default(0)   // Refund Gross
+  messagesGross      Float  @default(0) // Message Gross
+  postsGross         Float  @default(0) // Posts Gross
+  streamsGross       Float  @default(0) // Streams Gross
+  refundGross        Float  @default(0) // Refund Gross
 
   // Audience metrics
-  subscribersCount Int    @default(0)     // Total fans/subscribers
-  followingCount   Int    @default(0)     // Following count
-  topPercentage    Float?                 // OF ranking (top X%)
-  newSubs          Int    @default(0)     // New fans count
-  activeFans       Int    @default(0)     // Active fans count
-  fansRenewOn      Int    @default(0)     // Fans with renew on
-  expiredFanChange Int    @default(0)     // Change in expired fan count (day-over-day)
+  subscribersCount Int    @default(0) // Total fans/subscribers
+  followingCount   Int    @default(0) // Following count
+  topPercentage    Float? // OF ranking (top X%)
+  newSubs          Int    @default(0) // New fans count
+  activeFans       Int    @default(0) // Active fans count
+  fansRenewOn      Int    @default(0) // Fans with renew on
+  expiredFanChange Int    @default(0) // Change in expired fan count (day-over-day)
 
   // Averages
   avgSpendPerSpender     Float @default(0) // Avg spend per spender Gross
@@ -457,15 +457,15 @@ model ChatterHourlyScore {
   creativePhraseCount   Int      @default(0)
   aiNotes               String?
   notableQuotes         Json?
-  conversationData      Json?     // [{text, isChatter, createdAt, chatId, fanName}]
-  copyPasteBlasts       Json?     // [{message, fanCount}]
+  conversationData      Json? // [{text, isChatter, createdAt, chatId, fanName}]
+  copyPasteBlasts       Json? // [{message, fanCount}]
   mistakeTags           String[]
   strengthTags          String[]
-  dmsSent              Int      @default(0)
-  ppvsSent             Int      @default(0)
-  fansChatted          Int      @default(0)
-  characterCount       Int      @default(0)
-  avgResponseTimeSec   Float?
+  dmsSent               Int      @default(0)
+  ppvsSent              Int      @default(0)
+  fansChatted           Int      @default(0)
+  characterCount        Int      @default(0)
+  avgResponseTimeSec    Float?
   createdAt             DateTime @default(now())
 
   @@unique([chatterEmail, creatorId, windowStart])
@@ -503,18 +503,18 @@ model ChatterProfile {
 }
 
 model ChatterSession {
-  id              String    @id @default(cuid())
-  email           String
-  creatorId       String
-  creator         Creator   @relation(fields: [creatorId], references: [id])
-  clockIn         DateTime  @default(now())
-  clockOut        DateTime?
-  isLive          Boolean   @default(true)
-  source          String    @default("manual") // "manual" | "schedule" | "hubstaff"
+  id                String    @id @default(cuid())
+  email             String
+  creatorId         String
+  creator           Creator   @relation(fields: [creatorId], references: [id])
+  clockIn           DateTime  @default(now())
+  clockOut          DateTime?
+  isLive            Boolean   @default(true)
+  source            String    @default("manual") // "manual" | "schedule" | "hubstaff"
   // Hubstaff activity data (updated every sync cycle)
-  keyboardPct     Int?      // 0-100 keyboard activity
-  mousePct        Int?      // 0-100 mouse activity
-  overallActivity Int?      // 0-100 combined activity score
+  keyboardPct       Int? // 0-100 keyboard activity
+  mousePct          Int? // 0-100 mouse activity
+  overallActivity   Int? // 0-100 combined activity score
   activityUpdatedAt DateTime? // last time activity data was refreshed
 
   @@unique([email, creatorId, clockIn])
@@ -590,22 +590,22 @@ model HubstaffConfig {
 }
 
 model MassMessageReply {
-  id                  String   @id @default(cuid())
-  creatorId           String
-  massMessageId       String
-  sentAt              DateTime
-  sentCount           Int      @default(0)
-  uniqueRepliers30m   Int      @default(0)
-  uniqueRepliers1h    Int      @default(0)
-  uniqueRepliers6h    Int      @default(0)
-  uniqueRepliers24h   Int      @default(0)
-  inboundCount30m     Int      @default(0)
-  inboundCount1h      Int      @default(0)
-  inboundCount6h      Int      @default(0)
-  inboundCount24h     Int      @default(0)
-  replyRate24h        Float    @default(0)
-  computedAt          DateTime @default(now())
-  creator             Creator  @relation(fields: [creatorId], references: [id])
+  id                String   @id @default(cuid())
+  creatorId         String
+  massMessageId     String
+  sentAt            DateTime
+  sentCount         Int      @default(0)
+  uniqueRepliers30m Int      @default(0)
+  uniqueRepliers1h  Int      @default(0)
+  uniqueRepliers6h  Int      @default(0)
+  uniqueRepliers24h Int      @default(0)
+  inboundCount30m   Int      @default(0)
+  inboundCount1h    Int      @default(0)
+  inboundCount6h    Int      @default(0)
+  inboundCount24h   Int      @default(0)
+  replyRate24h      Float    @default(0)
+  computedAt        DateTime @default(now())
+  creator           Creator  @relation(fields: [creatorId], references: [id])
 
   @@unique([creatorId, massMessageId])
   @@index([creatorId])
@@ -615,9 +615,9 @@ model MassMessageReply {
 // ─── Agency + Creator Auth System ───────────────────────────────────
 
 model Organization {
-  id                    String                        @id @default(cuid())
+  id                    String                         @id @default(cuid())
   name                  String
-  slug                  String                        @unique
+  slug                  String                         @unique
   users                 User[]
   members               OrgMember[]
   creators              Creator[]
@@ -627,8 +627,8 @@ model Organization {
   managerResponsibility ManagerAccountResponsibility[]
   auditLogs             AuditLog[]
   invites               Invite[]
-  createdAt             DateTime                      @default(now())
-  updatedAt             DateTime                      @updatedAt
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
 }
 
 model OrgMember {
@@ -724,8 +724,8 @@ model Invite {
 model ChatterAlias {
   id             String   @id @default(cuid())
   aliasEmail     String   @unique // alternate email from Hubstaff/Infloww/etc
-  canonicalEmail String   // the email we use everywhere internally
-  name           String?  // display name
+  canonicalEmail String // the email we use everywhere internally
+  name           String? // display name
   createdAt      DateTime @default(now())
 
   @@index([canonicalEmail])
@@ -733,12 +733,12 @@ model ChatterAlias {
 
 model AssignmentOverride {
   id           String   @id @default(cuid())
-  creatorId    String   // The model/creator account being worked
-  chatterEmail String   // The chatter getting ALL credit for this window
+  creatorId    String // The model/creator account being worked
+  chatterEmail String // The chatter getting ALL credit for this window
   startAt      DateTime // Override begins
   endAt        DateTime // Override ends (auto-reverts after)
-  reason       String?  // "sick", "coverage", "shift swap"
-  createdBy    String   // Admin email who created it
+  reason       String? // "sick", "coverage", "shift swap"
+  createdBy    String // Admin email who created it
   createdAt    DateTime @default(now())
   creator      Creator  @relation(fields: [creatorId], references: [id])
 
@@ -752,10 +752,10 @@ model AssignmentOverride {
 model ScheduleShift {
   id           String   @id @default(cuid())
   creatorId    String
-  chatterEmail String   // stable key — canonical email
-  chatterName  String?  // cached display name (resolved from Hubstaff/schedule)
-  dayOfWeek    Int      // 0=Sun, 1=Mon, 2=Tue, ..., 6=Sat
-  shiftType    String   // "morning" | "afternoon" | "night"
+  chatterEmail String // stable key — canonical email
+  chatterName  String? // cached display name (resolved from Hubstaff/schedule)
+  dayOfWeek    Int // 0=Sun, 1=Mon, 2=Tue, ..., 6=Sat
+  shiftType    String // "morning" | "afternoon" | "night"
   creator      Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -769,19 +769,19 @@ model ScheduleShift {
 
 model RawChatMessage {
   id            String   @id @default(cuid())
-  ofMessageId   String   // OFAPI message ID (dedup key with creatorId)
-  creatorId     String   // Which model account
-  chatId        String   // Fan chat ID
-  fromUserId    String   // Who sent it (fan ID or creator account)
-  isFromCreator Boolean  // true = chatter sent it, false = fan sent it
-  text          String?  // Message text (can be long)
+  ofMessageId   String // OFAPI message ID (dedup key with creatorId)
+  creatorId     String // Which model account
+  chatId        String // Fan chat ID
+  fromUserId    String // Who sent it (fan ID or creator account)
+  isFromCreator Boolean // true = chatter sent it, false = fan sent it
+  text          String? // Message text (can be long)
   price         Float    @default(0) // PPV price (0 = free message)
   isFree        Boolean  @default(true)
   mediaCount    Int      @default(0)
   isLiked       Boolean  @default(false)
   isTip         Boolean  @default(false)
   tipAmount     Float    @default(0)
-  raw           Json?    // Full OFAPI message payload (save everything)
+  raw           Json? // Full OFAPI message payload (save everything)
   sentAt        DateTime // When the message was sent (from OFAPI createdAt)
   createdAt     DateTime @default(now()) // When we ingested it
 
@@ -793,33 +793,33 @@ model RawChatMessage {
 }
 
 model DmEngagementBucket {
-  id              String   @id @default(cuid())
-  creatorId       String
-  creator         Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  hourBucket      DateTime // UTC timestamp representing UK hour boundary
-  dmsSent         Int      @default(0)
-  ppvsSent        Int      @default(0)
-  purchaseCount   Int      @default(0)
-  purchaseAmount  Float    @default(0)
-  viewedCount     Int      @default(0)
-  characterCount  Int      @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  creatorId      String
+  creator        Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  hourBucket     DateTime // UTC timestamp representing UK hour boundary
+  dmsSent        Int      @default(0)
+  ppvsSent       Int      @default(0)
+  purchaseCount  Int      @default(0)
+  purchaseAmount Float    @default(0)
+  viewedCount    Int      @default(0)
+  characterCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([creatorId, hourBucket])
   @@index([creatorId, hourBucket])
 }
 
 model MassMessageBucket {
-  id              String   @id @default(cuid())
-  creatorId       String
-  creator         Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  hourBucket      DateTime // UTC timestamp representing UK hour boundary
-  sentCount       Int      @default(0)
-  purchaseCount   Int      @default(0)
-  purchaseAmount  Float    @default(0)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  creatorId      String
+  creator        Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  hourBucket     DateTime // UTC timestamp representing UK hour boundary
+  sentCount      Int      @default(0)
+  purchaseCount  Int      @default(0)
+  purchaseAmount Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([creatorId, hourBucket])
   @@index([creatorId, hourBucket])
@@ -829,7 +829,7 @@ model MassMessageStat {
   id             String   @id @default(cuid())
   creatorId      String
   creator        Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  messageId      BigInt   // OFAPI mass message ID
+  messageId      BigInt // OFAPI mass message ID
   sentAt         DateTime
   sentCount      Int      @default(0)
   viewedCount    Int      @default(0)
@@ -846,15 +846,15 @@ model MassMessageStat {
 }
 
 model MassMessageBuyer {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   creatorId   String
-  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  messageId   BigInt   // OFAPI mass message ID
-  buyerUserId String   // Fan/buyer OF user ID
+  creator     Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  messageId   BigInt // OFAPI mass message ID
+  buyerUserId String // Fan/buyer OF user ID
   purchasedAt DateTime?
   raw         Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([creatorId, messageId, buyerUserId])
   @@index([creatorId, messageId])
@@ -862,14 +862,104 @@ model MassMessageBuyer {
 }
 
 model SyncCursor {
-  id          String   @id @default(cuid())
-  creatorId   String
-  dataType    String   // "chat_messages" | "transactions" | "fans"
-  chatId      String?  // For per-chat cursors (null for non-chat types)
-  lastSeenId  String?  // Last message/transaction ID processed
-  lastSyncAt  DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  creatorId  String
+  dataType   String // "chat_messages" | "transactions" | "fans"
+  chatId     String? // For per-chat cursors (null for non-chat types)
+  lastSeenId String? // Last message/transaction ID processed
+  lastSyncAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([creatorId, dataType, chatId])
   @@index([creatorId, dataType])
+}
+
+// ─── Agent Infrastructure (Kimi stateless workers) ──────────────────
+
+model AgentThread {
+  id        String     @id @default(cuid())
+  threadKey String     @unique // "{creatorId}:{fanId}:{agentType}"
+  summary   String? // Rolling conversation summary
+  runs      AgentRun[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model AgentRun {
+  id        String      @id @default(cuid())
+  threadId  String
+  thread    AgentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  agentType String // "sale-attribution" | "phrase-mining" | "tactic-aggregator"
+  status    String      @default("pending") // pending | running | completed | failed
+  tokensIn  Int         @default(0)
+  tokensOut Int         @default(0)
+  error     String?
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime    @default(now())
+
+  @@index([threadId])
+  @@index([agentType, status])
+  @@index([createdAt])
+}
+
+// ─── Sales Analysis Output ──────────────────────────────────────────
+
+model SaleContext {
+  id              String           @id @default(cuid())
+  transactionId   String           @unique // FK to Transaction.id
+  creatorId       String
+  fanId           String
+  chatId          String
+  saleType        String // ppv_purchase | tip | renewal | message | post
+  saleAmount      Float
+  saleTimestamp   DateTime
+  contextMessages Json // Array of preceding messages [{text, isFromCreator, sentAt}]
+  windowMinutes   Int              @default(30) // How many minutes of context captured
+  processed       Boolean          @default(false) // Has phrase-mining run on this?
+  snippets        WinningSnippet[]
+  createdAt       DateTime         @default(now())
+
+  @@index([creatorId])
+  @@index([processed])
+  @@index([saleTimestamp])
+  @@index([creatorId, saleTimestamp])
+}
+
+model WinningSnippet {
+  id            String      @id @default(cuid())
+  saleContextId String
+  saleContext   SaleContext @relation(fields: [saleContextId], references: [id], onDelete: Cascade)
+  creatorId     String
+  chatterEmail  String? // Attributed chatter (from ScheduleShift)
+  snippet       String // The winning phrase/message
+  tacticTag     String // urgency | exclusivity | personalization | scarcity | rapport | tease | etc
+  confidence    Float       @default(0.5) // 0-1
+  saleAmount    Float // Duplicated for fast queries
+  createdAt     DateTime    @default(now())
+
+  @@index([creatorId])
+  @@index([tacticTag])
+  @@index([chatterEmail])
+  @@index([creatorId, tacticTag])
+}
+
+model TacticPerformance {
+  id             String   @id @default(cuid())
+  tacticTag      String
+  creatorId      String
+  chatterEmail   String? // null = aggregate across all chatters
+  useCount       Int      @default(0)
+  conversionRate Float    @default(0)
+  avgRevenue     Float    @default(0)
+  totalRevenue   Float    @default(0)
+  period         String // "daily" | "weekly" | "monthly"
+  periodStart    DateTime
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@unique([tacticTag, creatorId, chatterEmail, period, periodStart])
+  @@index([creatorId, period])
+  @@index([tacticTag, period])
+  @@index([chatterEmail, period])
 }
