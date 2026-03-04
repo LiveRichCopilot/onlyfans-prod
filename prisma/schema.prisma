@@ -963,3 +963,48 @@ model TacticPerformance {
   @@index([tacticTag, period])
   @@index([chatterEmail, period])
 }
+
+// ─── Outbound Content Tracking (Phase 1: Mass Messages) ────────────
+
+model OutboundCreative {
+  id         String          @id @default(cuid())
+  creatorId  String
+  externalId String          // OFAPI message ID
+  source     String          // "mass_message"
+  sentAt     DateTime        // UTC canonical
+  textHtml   String?         // text field
+  textPlain  String?         // rawText field
+  isFree     Boolean         @default(true)
+  priceCents Int?            // Nullable — only parse if present
+  mediaCount Int             @default(0)
+  sentCount  Int             @default(0)
+  viewedCount Int            @default(0)
+  isCanceled Boolean         @default(false)
+  canUnsend  Boolean         @default(false)
+  raw        Json?           // Full OFAPI response
+  processed  Boolean         @default(false)
+  media      OutboundMedia[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([creatorId, source, externalId])
+  @@index([creatorId, sentAt])
+  @@index([source, sentAt])
+  @@index([processed])
+}
+
+model OutboundMedia {
+  id         String           @id @default(cuid())
+  creativeId String
+  creative   OutboundCreative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  mediaType  String           // "photo" | "video" | "audio"
+  fullUrl    String?
+  previewUrl String?
+  thumbUrl   String?
+  duration   Int?
+  width      Int?
+  height     Int?
+  createdAt  DateTime         @default(now())
+
+  @@index([creativeId])
+}

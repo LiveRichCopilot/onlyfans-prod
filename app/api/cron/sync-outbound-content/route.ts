@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getAllMassMessageStats } from "@/lib/ofapi-engagement";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 55;
+
+/**
+ * GET /api/cron/sync-outbound-content
+ * Phase 1: mass messages only.
+ * Calls GET /api/{account}/engagement/messages/mass-messages
+ * 24h lookback + dedup via @@unique([creatorId, source, externalId]).
+ * Media: delete+recreate when API returns non-empty media array.
+ * Price: nullable, not expected on this endpoint per docs.
+ */
+export async function GET(req: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    const auth = req.headers.get("Authorization");
+    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+  }
+
+  try {
+    const creators = await prisma.creator.findMany({
+      where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
+      select: { id: true, ofapiCreatorId: true },
+    });
+
+    const apiKey = process.env.OFAPI_API_KEY || "";
+    const now = new Date();
+    const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    let totalUpserted = 0;
+    let totalMedia = 0;
+
+    for (const creator of creators.slice(0, 5)) {
+      const acctId = creator.ofapiCreatorId!;
+
+      try {
+        const messages = await getAllMassMessageStats(acctId, apiKey, {
+          startDate,
+          endDate: now,
+        });
+
+        for (const m of messages) {
+          const externalId = String(m.id || "");
+          if (!externalId) continue;
+
+          let priceCents: number | null = null;
+          if (m.price != null) {
+            const p = typeof m.price === "string" ? parseFloat(m.price) : Number(m.price);
+            if (!isNaN(p) && p > 0) priceCents = Math.round(p * 100);
+          }
+
+          const shared = {
+            sentAt: m.date ? new Date(m.date) : now,
+            textHtml: m.text ?? null,
+            textPlain: m.rawText ?? m.text ?? null,
+            isFree: m.isFree !== false,
+            priceCents,
+            mediaCount: m.mediaCount ?? 0,
+            sentCount: m.sentCount ?? 0,
+            viewedCount: m.viewedCount ?? 0,
+            isCanceled: m.isCanceled === true,
+            canUnsend: m.canUnsend === true,
+            raw: m,
+          };
+
+          const row = await prisma.outboundCreative.upsert({
+            where: {
+              creatorId_source_externalId: {
+                creatorId: creator.id,
+                source: "mass_message",
+                externalId,
+              },
+            },
+            create: {
+              creatorId: creator.id,
+              externalId,
+              source: "mass_message",
+              ...shared,
+            },
+            update: {
+              sentAt: shared.sentAt,
+              textHtml: shared.textHtml,
+              textPlain: shared.textPlain,
+              isFree: shared.isFree,
+              priceCents: shared.priceCents,
+              mediaCount: shared.mediaCount,
+              sentCount: shared.sentCount,
+              viewedCount: shared.viewedCount,
+              isCanceled: shared.isCanceled,
+              canUnsend: shared.canUnsend,
+              raw: shared.raw,
+            },
+          });
+          totalUpserted++;
+
+          totalMedia += await syncMedia(row.id, m);
+        }
+      } catch (e: any) {
+        console.error(`[sync-outbound] ${acctId}:`, e.message);
+      }
+    }
+
+    return NextResponse.json({ ok: true, upserted: totalUpserted, media: totalMedia });
+  } catch (err: any) {
+    console.error("[sync-outbound]", err.message);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+async function syncMedia(creativeId: string, item: any): Promise<number> {
+  if (!Array.isArray(item.media) || item.media.length === 0) return 0;
+
+  // Only delete+recreate when API returns non-empty media array
+  await prisma.outboundMedia.deleteMany({ where: { creativeId } });
+
+  let created = 0;
+  for (const m of item.media) {
+    const f = m?.files;
+    if (!f) continue;
+    const fullUrl = f?.full?.url ?? null;
+    const previewUrl = f?.preview?.url ?? null;
+    const thumbUrl = f?.thumb?.url ?? null;
+    if (!fullUrl && !previewUrl && !thumbUrl) continue;
+
+    await prisma.outboundMedia.create({
+      data: {
+        creativeId,
+        mediaType: m.type || "photo",
+        fullUrl,
+        previewUrl,
+        thumbUrl,
+        duration: m.duration ?? null,
+        width: m.width ?? null,
+        height: m.height ?? null,
+      },
+    });
+    created++;
+  }
+  return created;
+}
