@@ -102,7 +102,7 @@ export async function buildScoringWindows(
  */
 export async function fetchAndAttributeMessages(
     window: ScoringWindow,
-    maxChats: number = 3,
+    maxChats: number = 20,
 ): Promise<{
     chatterMessages: string[];
     fanMessages: string[];
@@ -132,7 +132,7 @@ export async function fetchAndAttributeMessages(
             if (!chatId) continue;
 
             try {
-                const msgData = await getChatMessages(window.ofapiCreatorId, chatId, window.ofapiToken, 20);
+                const msgData = await getChatMessages(window.ofapiCreatorId, chatId, window.ofapiToken, 50);
                 const rawMsgs = msgData?.data?.list || msgData?.list || (Array.isArray(msgData?.data) ? msgData.data : []);
 
                 const sorted = rawMsgs.sort(
