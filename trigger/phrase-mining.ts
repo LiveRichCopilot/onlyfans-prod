@@ -162,7 +162,13 @@ Extract the winning phrases that drove this $${ctx.saleAmount} ${ctx.saleType}.`
         let snippets: ExtractedSnippet[] = [];
         try {
           const parsed = JSON.parse(content);
-          snippets = Array.isArray(parsed) ? parsed : parsed.snippets || parsed.phrases || [];
+          // Kimi may wrap in any key — find the first array in the response
+          if (Array.isArray(parsed)) {
+            snippets = parsed;
+          } else {
+            const arrayVal = Object.values(parsed).find((v) => Array.isArray(v));
+            snippets = (arrayVal as ExtractedSnippet[]) || [];
+          }
         } catch {
           console.error(`[Phrase Mining] JSON parse error for ${ctx.id}`);
           errors++;
