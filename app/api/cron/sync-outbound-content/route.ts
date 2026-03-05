@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const { searchParams } = new URL(req.url);
     const creators = await prisma.creator.findMany({
       where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
       select: { id: true, ofapiCreatorId: true },
@@ -29,11 +30,12 @@ export async function GET(req: NextRequest) {
 
     const apiKey = process.env.OFAPI_API_KEY || "";
     const now = new Date();
-    const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const daysBack = parseInt(searchParams?.get("days") || "1");
+    const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
     let totalUpserted = 0;
     let totalMedia = 0;
 
-    for (const creator of creators.slice(0, 5)) {
+    for (const creator of creators) {
       const acctId = creator.ofapiCreatorId!;
 
       try {
