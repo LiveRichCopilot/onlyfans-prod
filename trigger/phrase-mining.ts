@@ -138,7 +138,7 @@ Extract the winning phrases that drove this $${ctx.saleAmount} ${ctx.saleType}.`
               { role: "system", content: SYSTEM_PROMPT },
               { role: "user", content: userPrompt },
             ],
-            temperature: 0.3,
+            temperature: 0.6,
             max_tokens: 800,
             response_format: { type: "json_object" },
             thinking: { type: "disabled" },
