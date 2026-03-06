@@ -248,7 +248,37 @@ export async function GET(req: NextRequest) {
 async function syncMedia(creativeId: string, item: any): Promise<number> {
   if (!Array.isArray(item.media) || item.media.length === 0) return 0;
 
-  // Only delete+recreate when API returns non-empty media array
+  // Check if we already have persisted media — don't wipe permanentUrls
+  const existing = await prisma.outboundMedia.findMany({
+    where: { creativeId },
+    select: { id: true, permanentUrl: true },
+  });
+  const hasPersisted = existing.some((m) => m.permanentUrl);
+
+  // If we already have persisted media, just update CDN URLs (they refresh)
+  // Don't delete — that destroys permanentUrl
+  if (hasPersisted) {
+    // Update CDN URLs on existing records for proxy freshness
+    for (const m of item.media) {
+      const f = m?.files;
+      if (!f) continue;
+      const fullUrl = f?.full?.url ?? null;
+      const previewUrl = f?.preview?.url ?? null;
+      const thumbUrl = f?.thumb?.url ?? null;
+      if (!fullUrl && !previewUrl && !thumbUrl) continue;
+      // Update first matching record by type (best effort refresh)
+      const match = existing.shift();
+      if (match) {
+        await prisma.outboundMedia.update({
+          where: { id: match.id },
+          data: { fullUrl, previewUrl, thumbUrl },
+        });
+      }
+    }
+    return 0; // No new records created
+  }
+
+  // No persisted media yet — safe to recreate
   await prisma.outboundMedia.deleteMany({ where: { creativeId } });
 
   let created = 0;
