@@ -40,7 +40,7 @@ export default function ContentFeedPage() {
   const [creators, setCreators] = useState<CreatorOption[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "content" | "bump">("all");
+  const [filter, setFilter] = useState<string>("all");
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [days, setDays] = useState(1);
 
@@ -59,7 +59,10 @@ export default function ContentFeedPage() {
 
   const filtered = useMemo(() => {
     let result = items;
-    if (filter !== "all") result = result.filter((i) => i.type === filter);
+    if (filter === "mass") result = result.filter((i) => i.source === "mass_message" && i.mediaCount > 0);
+    else if (filter === "dm") result = result.filter((i) => i.source === "direct_message");
+    else if (filter === "wall") result = result.filter((i) => i.source === "wall_post");
+    else if (filter === "bump") result = result.filter((i) => i.mediaCount === 0);
     if (creatorFilter !== "all") result = result.filter((i) => i.creatorId === creatorFilter);
 
     // Dedup DMs: same creator + same caption = same content sent to multiple fans
@@ -141,10 +144,10 @@ export default function ContentFeedPage() {
 
           {/* Type filter */}
           <div className="flex gap-1 glass-panel rounded-xl p-1">
-            {(["all", "content", "bump"] as const).map((f) => (
-              <button key={f} onClick={() => setFilter(f)}
+            {(["all", "mass", "dm", "wall", "bump"] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f as any)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filter === f ? "bg-teal-500/20 text-teal-400" : "text-white/50 hover:text-white/80"}`}>
-                {f === "all" ? "All" : f === "content" ? "With Media" : "Bumps"}
+                {f === "all" ? "All" : f === "mass" ? "Mass Msgs" : f === "dm" ? "DMs" : f === "wall" ? "Wall Posts" : "Bumps"}
               </button>
             ))}
           </div>
@@ -305,7 +308,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           </div>
         )}
 
-        {/* Activity after mass message */}
+        {/* Activity — only show full graph on mass messages and wall posts */}
         <div className="mt-3 pt-3 border-t border-white/[0.06]">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -315,24 +318,27 @@ function ContentCard({ item }: { item: ContentItem }) {
                   <span className="text-xs text-green-400 font-semibold">{item.purchasedCount} bought</span>
                 </div>
               )}
-              {item.wakeUp?.chatterDMs && Number(item.wakeUp.chatterDMs["60"] || 0) > 0 && (
+              {/* Only show DMs sent on mass messages */}
+              {item.source !== "direct_message" && item.wakeUp?.chatterDMs && Number(item.wakeUp.chatterDMs["60"] || 0) > 0 && (
                 <div className="flex items-center gap-1">
                   <MessageSquare size={10} className="text-blue-400" />
-                  <span className="text-[10px] text-blue-400">{formatNum(Number(item.wakeUp.chatterDMs["60"]))} DMs sent</span>
+                  <span className="text-[10px] text-blue-400">{formatNum(Number(item.wakeUp.chatterDMs["60"]))} DMs followed up</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Fans woke up — every 30 min */}
-          {item.wakeUp?.buckets ? (
-            <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} />
-          ) : item.wakeUp ? (
-            <div className="text-[10px] text-white/30">0 fans woke up &middot; {item.wakeUp.totalReplied} total replied</div>
-          ) : (
-            <div className="text-[10px] text-white/30 italic">
-              {ageHours < 0.25 ? "Just posted" : "Computing..."}
-            </div>
+          {/* Wake-up graph — only on mass messages and wall posts */}
+          {item.source !== "direct_message" && (
+            item.wakeUp?.buckets ? (
+              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} />
+            ) : item.wakeUp ? (
+              <div className="text-[10px] text-white/50">{item.wakeUp.totalReplied} fans replied</div>
+            ) : (
+              <div className="text-[10px] text-white/50 italic">
+                {ageHours < 0.25 ? "Just posted" : "Computing..."}
+              </div>
+            )
           )}
         </div>
       </div>
