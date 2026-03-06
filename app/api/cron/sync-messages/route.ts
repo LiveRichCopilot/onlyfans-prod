@@ -7,9 +7,11 @@ export const maxDuration = 55;
 
 /**
  * GET /api/cron/sync-messages
- * Runs every 2 min. Ingests ALL new chat messages for every active creator.
+ * Runs every 2 min. Ingests new chat messages for active creators in rotation.
+ * Picks the 8 creators most overdue for sync (oldest lastSyncAt first).
  * Stores raw messages in RawChatMessage with dedup by (creatorId, ofMessageId).
  * Uses SyncCursor to track last-seen message per chat to avoid re-processing.
+ * Pass ?forceAll=true to process ALL creators (for backfill).
  */
 export async function GET(req: NextRequest) {
   if (process.env.NODE_ENV === "production") {
@@ -19,18 +21,39 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const forceAll = req.nextUrl.searchParams.get("forceAll") === "true";
+
   try {
     const creators = await prisma.creator.findMany({
       where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
       select: { id: true, ofapiCreatorId: true, ofapiToken: true },
     });
 
+    // Find the most recent lastSyncAt per creator from SyncCursor
+    const latestSyncs = await prisma.syncCursor.groupBy({
+      by: ["creatorId"],
+      where: { dataType: "chat_messages" },
+      _max: { lastSyncAt: true },
+    });
+    const syncMap = new Map(latestSyncs.map((s) => [s.creatorId, s._max.lastSyncAt]));
+
+    // Sort creators by oldest sync first (never-synced creators come first)
+    const sorted = [...creators].sort((a, b) => {
+      const aSync = syncMap.get(a.id)?.getTime() ?? 0;
+      const bSync = syncMap.get(b.id)?.getTime() ?? 0;
+      return aSync - bSync;
+    });
+
     const apiKey = process.env.OFAPI_API_KEY || "";
     let totalIngested = 0;
     let totalChats = 0;
 
-    // Process max 5 creators per run to avoid timeout
-    const batch = creators.slice(0, 5);
+    // Process 8 creators per run (rotation), or ALL if forceAll
+    const batch = forceAll ? sorted : sorted.slice(0, 8);
+
+    if (forceAll) {
+      console.log(`[sync-messages] forceAll=true — processing all ${batch.length} creators (maxDuration=${maxDuration}s)`);
+    }
 
     for (const creator of batch) {
       const acctId = creator.ofapiCreatorId!;
