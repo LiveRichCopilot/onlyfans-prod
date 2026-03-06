@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users } from "lucide-react";
+import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type WakeUp = { dormantBefore: number; w1h: number; w3h: number; w6h: number; w24h: number };
@@ -90,6 +90,15 @@ export default function ContentFeedPage() {
           </div>
         )}
 
+        {/* Info banner */}
+        <div className="glass-panel rounded-xl p-3 mb-6 flex items-start gap-2">
+          <Info size={14} className="text-teal-400 mt-0.5 shrink-0" />
+          <div className="text-[11px] text-white/60 leading-relaxed">
+            <span className="text-white/80 font-medium">Mass Messages</span> = broadcasts sent from the creator account to many fans at once. Not 1-on-1 chatter DMs.
+            <br />Revenue updates as fans purchase. Wake-up rate needs 24h to fully compute.
+          </div>
+        </div>
+
         {/* Filters row */}
         <div className="flex gap-2 mb-6 flex-wrap items-center">
           {/* Creator picker */}
@@ -146,6 +155,12 @@ export default function ContentFeedPage() {
   );
 }
 
+function getPostAgeHours(sentAt: string): number {
+  const t = new Date(sentAt).getTime();
+  if (Number.isNaN(t)) return 999;
+  return (Date.now() - t) / (1000 * 60 * 60);
+}
+
 function ContentCard({ item }: { item: ContentItem }) {
   const firstMedia = item.media[0];
   const permanentUrl = firstMedia?.permanentUrl;
@@ -156,6 +171,8 @@ function ContentCard({ item }: { item: ContentItem }) {
       ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
       : null;
   const isVideo = firstMedia?.mediaType === "video";
+  const ageHours = getPostAgeHours(item.sentAt);
+  const revenuePending = !item.isFree && ageHours < 1 && item.revenue === 0;
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden">
@@ -201,20 +218,23 @@ function ContentCard({ item }: { item: ContentItem }) {
           </span>
         </div>
 
-        {/* Revenue row */}
-        {!item.isFree && (
-          <div className="flex items-center gap-3 mt-2 text-xs">
-            <span className="text-white/40 flex items-center gap-1">
-              <DollarSign size={12} /> ${(item.priceCents / 100).toFixed(0)} PPV
-            </span>
-            {item.purchasedCount > 0 && (
-              <>
-                <span className="text-white/40 flex items-center gap-1">
-                  <Users size={12} /> {item.purchasedCount} bought
-                </span>
-                <span className="text-green-400 font-semibold ml-auto">${item.revenue.toFixed(0)}</span>
-              </>
-            )}
+        {/* Revenue — hero number */}
+        {!item.isFree ? (
+          <div className="mt-2 flex items-center justify-between">
+            <div>
+              <span className={`text-lg font-bold ${revenuePending ? "text-white/40 italic" : item.revenue > 0 ? "text-green-400" : "text-red-400/60"}`}>
+                {revenuePending ? "Pending" : `$${item.revenue > 0 ? item.revenue.toFixed(0) : "0"}`}
+              </span>
+              {!revenuePending && <span className="text-[10px] text-white/30 ml-1">earned</span>}
+            </div>
+            <div className="text-right text-[10px] text-white/40">
+              <div>${(item.priceCents / 100).toFixed(0)} PPV</div>
+              <div>{item.purchasedCount > 0 ? `${item.purchasedCount} bought` : "No purchases yet"}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2">
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-white/40">Free</span>
           </div>
         )}
 
@@ -230,7 +250,7 @@ function ContentCard({ item }: { item: ContentItem }) {
         )}
 
         {/* Wake-up rate */}
-        {item.wakeUp && item.wakeUp.dormantBefore > 0 && (
+        {item.wakeUp && item.wakeUp.dormantBefore > 0 ? (
           <div className="mt-3 pt-3 border-t border-white/[0.06]">
             <div className="flex items-center gap-1.5 text-[10px] text-white/40 mb-1.5">
               <span className="text-amber-400">Wake-up Rate</span>
@@ -248,7 +268,13 @@ function ContentCard({ item }: { item: ContentItem }) {
               })}
             </div>
           </div>
-        )}
+        ) : !item.wakeUp ? (
+          <div className="mt-3 pt-3 border-t border-white/[0.06]">
+            <div className="text-[10px] text-white/30 italic">
+              {ageHours < 24 ? "Wake-up: Pending (needs 24h)" : "Wake-up: Computing..."}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
