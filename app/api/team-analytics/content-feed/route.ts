@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     const items = creatives.map((c) => {
       const sentAtUk = new Date(c.sentAt).toLocaleString("en-GB", { timeZone: "Europe/London" });
-      const sentDate = new Date(c.sentAt).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "2-digit", month: "short", year: "numeric" });
+      const sentDate = new Date(c.sentAt).toLocaleDateString("en-US", { timeZone: "Europe/London", month: "short", day: "numeric", year: "numeric" });
       const viewRate = c.sentCount > 0 ? ((c.viewedCount / c.sentCount) * 100).toFixed(1) : "0.0";
       const revenue = c.priceCents && c.purchasedCount ? ((c.priceCents / 100) * c.purchasedCount) : 0;
       return {
