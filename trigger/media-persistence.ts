@@ -4,7 +4,7 @@
  * Downloads media from OF CDN (before URLs expire) and uploads to
  * Supabase Storage. Stores permanent URL on OutboundMedia row.
  */
-import { task } from "@trigger.dev/sdk";
+import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 
@@ -129,5 +129,15 @@ export const mediaPersistence = task({
     }
 
     return { persisted, errors, total: media.length };
+  },
+});
+
+// Run every 15 minutes to persist any new un-persisted media
+export const mediaPersistenceScheduled = schedules.task({
+  id: "media-persistence-scheduled",
+  cron: "*/15 * * * *",
+  run: async () => {
+    const result = await mediaPersistence.triggerAndWait({ limit: 10 });
+    return result;
   },
 });
