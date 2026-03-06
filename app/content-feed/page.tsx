@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Eye, Send, Image as ImageIcon, MessageSquare, Filter } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type WakeUp = { dormantBefore: number; w1h: number; w3h: number; w6h: number; w24h: number };
+type CreatorOption = { id: string; name: string };
 type ContentItem = {
   id: string;
   externalId: string;
+  creatorId: string;
   creator: { name: string; ofUsername: string };
   sentAt: string;
   sentAtUk: string;
+  sentDate: string;
   caption: string;
   isFree: boolean;
+  priceCents: number;
+  purchasedCount: number;
+  revenue: number;
   mediaCount: number;
   sentCount: number;
   viewedCount: number;
@@ -26,21 +32,43 @@ type Summary = { total: number; withMedia: number; bumps: number; totalViews: nu
 
 export default function ContentFeedPage() {
   const [items, setItems] = useState<ContentItem[]>([]);
+  const [creators, setCreators] = useState<CreatorOption[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "content" | "bump">("all");
+  const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [days, setDays] = useState(7);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/team-analytics/content-feed?days=${days}`)
       .then((r) => r.json())
-      .then((data) => { setItems(data.items || []); setSummary(data.summary || null); })
+      .then((data) => {
+        setItems(data.items || []);
+        setSummary(data.summary || null);
+        setCreators(data.creators || []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [days]);
 
-  const filtered = filter === "all" ? items : items.filter((i) => i.type === filter);
+  const filtered = useMemo(() => {
+    let result = items;
+    if (filter !== "all") result = result.filter((i) => i.type === filter);
+    if (creatorFilter !== "all") result = result.filter((i) => i.creatorId === creatorFilter);
+    return result;
+  }, [items, filter, creatorFilter]);
+
+  // Group by date
+  const grouped = useMemo(() => {
+    const map = new Map<string, ContentItem[]>();
+    for (const item of filtered) {
+      const date = item.sentDate;
+      if (!map.has(date)) map.set(date, []);
+      map.get(date)!.push(item);
+    }
+    return Array.from(map.entries());
+  }, [filtered]);
 
   return (
     <div className="min-h-screen bg-[#050508] overflow-y-auto">
@@ -62,7 +90,21 @@ export default function ContentFeedPage() {
           </div>
         )}
 
+        {/* Filters row */}
         <div className="flex gap-2 mb-6 flex-wrap items-center">
+          {/* Creator picker */}
+          <select
+            value={creatorFilter}
+            onChange={(e) => setCreatorFilter(e.target.value)}
+            className="glass-panel rounded-xl px-3 py-1.5 text-xs font-medium bg-transparent text-white/80 border-none outline-none cursor-pointer"
+          >
+            <option value="all" className="bg-[#111]">All Creators</option>
+            {creators.map((c) => (
+              <option key={c.id} value={c.id} className="bg-[#111]">{c.name}</option>
+            ))}
+          </select>
+
+          {/* Type filter */}
           <div className="flex gap-1 glass-panel rounded-xl p-1">
             {(["all", "content", "bump"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)}
@@ -71,8 +113,10 @@ export default function ContentFeedPage() {
               </button>
             ))}
           </div>
+
+          {/* Day range */}
           <div className="flex gap-1 glass-panel rounded-xl p-1 ml-auto">
-            {[1, 3, 7, 14].map((d) => (
+            {[1, 3, 7, 14, 30].map((d) => (
               <button key={d} onClick={() => setDays(d)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${days === d ? "bg-teal-500/20 text-teal-400" : "text-white/50 hover:text-white/80"}`}>
                 {d}d
@@ -86,11 +130,16 @@ export default function ContentFeedPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center text-white/40 py-20">No content found for this period</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map((item) => (
-              <ContentCard key={item.id} item={item} />
-            ))}
-          </div>
+          grouped.map(([date, dateItems]) => (
+            <div key={date} className="mb-8">
+              <h2 className="text-sm font-semibold text-white/60 mb-3 sticky top-0 bg-[#050508]/80 backdrop-blur-sm py-2 z-10">{date}</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {dateItems.map((item) => (
+                  <ContentCard key={item.id} item={item} />
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>
@@ -99,21 +148,27 @@ export default function ContentFeedPage() {
 
 function ContentCard({ item }: { item: ContentItem }) {
   const firstMedia = item.media[0];
-  // Prefer permanentUrl (Supabase — never expires) over OF CDN URLs
   const permanentUrl = firstMedia?.permanentUrl;
   const cdnUrl = firstMedia?.previewUrl || firstMedia?.thumbUrl || firstMedia?.fullUrl;
-  // If we have a permanent Supabase URL, use it directly. Otherwise proxy the CDN URL.
   const imgSrc = permanentUrl
     ? permanentUrl
     : cdnUrl
       ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
       : null;
+  const isVideo = firstMedia?.mediaType === "video";
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden">
       {imgSrc ? (
         <div className="relative aspect-[4/3] bg-black/40">
           <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+          {isVideo && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center">
+                <Play size={20} className="text-white ml-0.5" fill="white" />
+              </div>
+            </div>
+          )}
           {item.media.length > 1 && (
             <span className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
               +{item.media.length - 1}
@@ -137,29 +192,49 @@ function ContentCard({ item }: { item: ContentItem }) {
 
         <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
 
-        <div className="flex items-center gap-4 text-xs text-white/40">
+        {/* Stats row */}
+        <div className="flex items-center gap-3 text-xs text-white/40">
           <span className="flex items-center gap-1"><Send size={12} /> {formatNum(item.sentCount)}</span>
           <span className="flex items-center gap-1"><Eye size={12} /> {formatNum(item.viewedCount)}</span>
-          <span className={`ml-auto font-medium ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>
-            {item.viewRate}% view rate
+          <span className={`font-medium ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>
+            {item.viewRate}%
           </span>
         </div>
 
+        {/* Revenue row */}
+        {!item.isFree && (
+          <div className="flex items-center gap-3 mt-2 text-xs">
+            <span className="text-white/40 flex items-center gap-1">
+              <DollarSign size={12} /> ${(item.priceCents / 100).toFixed(0)} PPV
+            </span>
+            {item.purchasedCount > 0 && (
+              <>
+                <span className="text-white/40 flex items-center gap-1">
+                  <Users size={12} /> {item.purchasedCount} bought
+                </span>
+                <span className="text-green-400 font-semibold ml-auto">${item.revenue.toFixed(0)}</span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Media type tags */}
         {item.mediaCount > 0 && (
           <div className="mt-2 flex gap-1">
             {item.media.map((m, i) => (
-              <span key={i} className="text-[10px] bg-white/[0.06] px-1.5 py-0.5 rounded text-white/40">
+              <span key={i} className={`text-[10px] px-1.5 py-0.5 rounded ${m.mediaType === "video" ? "bg-purple-500/10 text-purple-400" : "bg-white/[0.06] text-white/40"}`}>
                 {m.mediaType}
               </span>
             ))}
           </div>
         )}
 
+        {/* Wake-up rate */}
         {item.wakeUp && item.wakeUp.dormantBefore > 0 && (
           <div className="mt-3 pt-3 border-t border-white/[0.06]">
             <div className="flex items-center gap-1.5 text-[10px] text-white/40 mb-1.5">
               <span className="text-amber-400">Wake-up Rate</span>
-              <span>{item.wakeUp.dormantBefore} dormant fans</span>
+              <span>{formatNum(item.wakeUp.dormantBefore)} dormant</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
               {([["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h], ["24h", item.wakeUp.w24h]] as const).map(([label, count]) => {

@@ -46,15 +46,22 @@ export async function GET(req: NextRequest) {
 
     const items = creatives.map((c) => {
       const sentAtUk = new Date(c.sentAt).toLocaleString("en-GB", { timeZone: "Europe/London" });
+      const sentDate = new Date(c.sentAt).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "2-digit", month: "short", year: "numeric" });
       const viewRate = c.sentCount > 0 ? ((c.viewedCount / c.sentCount) * 100).toFixed(1) : "0.0";
+      const revenue = c.priceCents && c.purchasedCount ? ((c.priceCents / 100) * c.purchasedCount) : 0;
       return {
         id: c.id,
         externalId: c.externalId,
-        creator: creatorMap[c.creatorId] || { name: "Unknown" },
+        creatorId: c.creatorId,
+        creator: creatorMap[c.creatorId] || { name: "Unknown", ofUsername: "" },
         sentAt: c.sentAt,
         sentAtUk,
+        sentDate,
         caption: c.textPlain || c.textHtml || "",
         isFree: c.isFree,
+        priceCents: c.priceCents ?? 0,
+        purchasedCount: c.purchasedCount ?? 0,
+        revenue,
         mediaCount: c.mediaCount,
         sentCount: c.sentCount,
         viewedCount: c.viewedCount,
@@ -62,7 +69,6 @@ export async function GET(req: NextRequest) {
         isCanceled: c.isCanceled,
         type: c.mediaCount > 0 ? "content" : "bump",
         media: c.media,
-        // Wake-up rate data
         wakeUp: c.wakeUpComputed ? {
           dormantBefore: c.dormantBefore ?? 0,
           w1h: c.wakeUp1h ?? 0,
@@ -75,6 +81,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       items,
+      creators: creators.map((c) => ({ id: c.id, name: c.name || c.ofUsername || "Unknown" })),
       summary: {
         total: creatives.length,
         withMedia: totalWithMedia,
