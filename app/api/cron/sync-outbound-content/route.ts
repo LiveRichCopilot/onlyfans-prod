@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAllMassMessageStats } from "@/lib/ofapi-engagement";
+import { getAllMassMessageStats, getAllDirectMessageStats } from "@/lib/ofapi-engagement";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
 /**
  * GET /api/cron/sync-outbound-content
- * Phase 1: mass messages only.
- * Calls GET /api/{account}/engagement/messages/mass-messages
+ * Syncs mass messages AND chatter DMs (with media) from OFAPI.
  * 24h lookback + dedup via @@unique([creatorId, source, externalId]).
- * Media: delete+recreate when API returns non-empty media array.
- * Price: nullable, not expected on this endpoint per docs.
  */
 export async function GET(req: NextRequest) {
   if (process.env.NODE_ENV === "production") {
@@ -109,7 +106,74 @@ export async function GET(req: NextRequest) {
           totalMedia += await syncMedia(row.id, m);
         }
       } catch (e: any) {
-        console.error(`[sync-outbound] ${acctId}:`, e.message);
+        console.error(`[sync-outbound] mass ${acctId}:`, e.message);
+      }
+
+      // Chatter DMs with media
+      try {
+        const dms = await getAllDirectMessageStats(acctId, apiKey, {
+          startDate,
+          endDate: now,
+        });
+
+        for (const m of dms) {
+          // Only sync DMs that have media
+          if (!m.mediaCount && (!m.media || m.media.length === 0)) continue;
+
+          const externalId = String(m.id || "");
+          if (!externalId) continue;
+
+          let priceCents: number | null = null;
+          if (m.price != null) {
+            const p = typeof m.price === "string" ? parseFloat(m.price) : Number(m.price);
+            if (!isNaN(p) && p > 0) priceCents = Math.round(p * 100);
+          }
+
+          let purchasedCount: number | null = null;
+          if (m.purchasedCount != null) {
+            const pc = typeof m.purchasedCount === "string" ? parseInt(m.purchasedCount) : Number(m.purchasedCount);
+            if (!isNaN(pc)) purchasedCount = pc;
+          }
+
+          const shared = {
+            sentAt: m.date ? new Date(m.date) : now,
+            textHtml: m.text ?? null,
+            textPlain: m.rawText ?? m.text ?? null,
+            isFree: m.isFree !== false,
+            priceCents,
+            purchasedCount,
+            mediaCount: m.mediaCount ?? m.media?.length ?? 0,
+            sentCount: 1,
+            viewedCount: m.isOpened ? 1 : 0,
+            isCanceled: false,
+            canUnsend: false,
+            raw: m,
+          };
+
+          const row = await prisma.outboundCreative.upsert({
+            where: {
+              creatorId_source_externalId: {
+                creatorId: creator.id,
+                source: "direct_message",
+                externalId,
+              },
+            },
+            create: {
+              creatorId: creator.id,
+              externalId,
+              source: "direct_message",
+              ...shared,
+            },
+            update: {
+              ...shared,
+            },
+          });
+          totalUpserted++;
+
+          totalMedia += await syncMedia(row.id, m);
+        }
+      } catch (e: any) {
+        console.error(`[sync-outbound] dm ${acctId}:`, e.message);
       }
     }
 

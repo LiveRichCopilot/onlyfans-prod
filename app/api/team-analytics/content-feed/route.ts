@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
         viewedCount: c.viewedCount,
         viewRate: parseFloat(viewRate),
         isCanceled: c.isCanceled,
+        source: c.source,
         type: c.mediaCount > 0 ? "content" : "bump",
         media: c.media,
         wakeUp: c.wakeUpComputed ? {

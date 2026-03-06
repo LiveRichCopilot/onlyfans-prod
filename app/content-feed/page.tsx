@@ -28,6 +28,7 @@ type ContentItem = {
   viewedCount: number;
   viewRate: number;
   isCanceled: boolean;
+  source: string;
   type: "content" | "bump";
   media: MediaItem[];
   wakeUp: WakeUp | null;
