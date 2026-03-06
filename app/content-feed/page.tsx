@@ -401,20 +401,44 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { bu
   const labelAt = new Set(["30","60","120","180","240","360","480","720","1440"]);
   const showLabel = (k: string) => labelAt.has(k);
 
+  // Spread purchases evenly across visible buckets as green markers
+  const purchasePerBucket: number[] = keys.map(() => 0);
+  if (purchasedCount > 0) {
+    const nonZeroBuckets = keys.map((k, i) => ({ i, count: incremental[i] })).filter(b => b.count > 0);
+    if (nonZeroBuckets.length > 0) {
+      const perBucket = Math.floor(purchasedCount / nonZeroBuckets.length);
+      const remainder = purchasedCount % nonZeroBuckets.length;
+      nonZeroBuckets.forEach((b, idx) => {
+        purchasePerBucket[b.i] = perBucket + (idx < remainder ? 1 : 0);
+      });
+    } else {
+      purchasePerBucket[0] = purchasedCount;
+    }
+  }
+
   return (
     <div>
       <div className="flex gap-px items-end" style={{ height: 32 }}>
         {keys.map((k, i) => {
           const count = incremental[i];
+          const pCount = purchasePerBucket[i];
           const maxC = Math.max(...incremental, 1);
           const hPct = Math.max((count / maxC) * 100, count > 0 ? 15 : 3);
+          const greenHPct = pCount > 0 ? Math.max((pCount / maxC) * 100, 12) : 0;
           return (
             <div key={k} className="flex-1 flex flex-col items-center min-w-0">
               {count > 0 && <span className="text-[8px] text-white font-bold mb-px">{count}</span>}
-              <div
-                className={`w-full rounded-t-sm ${count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
-                style={{ height: `${hPct}%`, minHeight: 1 }}
-              />
+              <div className="w-full relative" style={{ height: `${hPct}%`, minHeight: 1 }}>
+                <div
+                  className={`w-full h-full rounded-t-sm ${count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
+                />
+                {pCount > 0 && (
+                  <div
+                    className="absolute bottom-0 left-0 w-full rounded-t-sm bg-green-400/60"
+                    style={{ height: `${Math.min(greenHPct / hPct * 100, 100)}%`, minHeight: 2 }}
+                  />
+                )}
+              </div>
             </div>
           );
         })}
@@ -424,9 +448,28 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { bu
           showLabel(k) ? <span key={k} className="text-[7px] text-white/50">{BUCKET_LABELS[k]}</span> : <span key={k} />
         ))}
       </div>
-      <div className="text-[8px] text-white/60 mt-0.5">
-        {formatNum(totalReplied)} fans replied
+      <div className="flex items-center gap-2 mt-1">
+        <span className="text-[10px] text-white/80 font-semibold">
+          {formatNum(totalReplied)} fans replied
+        </span>
+        {purchasedCount > 0 && (
+          <span className="text-[10px] text-green-400 font-semibold">
+            {formatNum(purchasedCount)} purchased
+          </span>
+        )}
       </div>
+      {purchasedCount > 0 && (
+        <div className="flex items-center gap-3 mt-0.5">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm bg-yellow-500/50" />
+            <span className="text-[7px] text-white/40">Replies</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm bg-green-400/60" />
+            <span className="text-[7px] text-white/40">Purchases</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
