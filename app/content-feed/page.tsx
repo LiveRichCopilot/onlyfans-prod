@@ -238,14 +238,16 @@ function ContentCard({ item }: { item: ContentItem }) {
 
         <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
 
-        {/* Stats row */}
-        <div className="flex items-center gap-3 text-xs text-white/70">
-          <span className="flex items-center gap-1"><Send size={12} /> {formatNum(item.sentCount)}</span>
-          <span className="flex items-center gap-1"><Eye size={12} /> {formatNum(item.viewedCount)}</span>
-          <span className={`font-medium ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>
-            {item.viewRate}%
-          </span>
-        </div>
+        {/* Stats row — only show sent/viewed for mass messages and wall posts */}
+        {item.source !== "direct_message" && (
+          <div className="flex items-center gap-3 text-xs text-white/70">
+            <span className="flex items-center gap-1"><Send size={12} /> {formatNum(item.sentCount)}</span>
+            <span className="flex items-center gap-1"><Eye size={12} /> {formatNum(item.viewedCount)}</span>
+            <span className={`font-medium ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>
+              {item.viewRate}%
+            </span>
+          </div>
+        )}
 
         {/* Revenue — hero number */}
         {!item.isFree ? (
@@ -327,42 +329,39 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<st
   const ageMins = ageHours * 60;
   const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
   const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
-  // Incremental per bucket
   const incremental = keys.map((k, i) => {
     const cum = Number(buckets[k] || 0);
     const prev = i > 0 ? Number(buckets[keys[i - 1]] || 0) : 0;
     return Math.max(cum - prev, 0);
   });
-  const maxCount = Math.max(...incremental, 1);
   // Show label at key intervals
   const labelAt = new Set(["30","60","120","180","240","360","480","720","1440"]);
-
-  // SVG line graph
-  const w = 100;
-  const h = 24;
-  const points = keys.map((k, i) => {
-    const x = keys.length > 1 ? (i / (keys.length - 1)) * w : w / 2;
-    const y = h - (incremental[i] / maxCount) * (h - 2) - 1;
-    return `${x},${y}`;
-  });
+  const showLabel = (k: string) => labelAt.has(k);
 
   return (
     <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-6" preserveAspectRatio="none">
-        <polyline points={points.join(" ")} fill="none" stroke="rgb(202 138 4 / 0.5)" strokeWidth="0.8" />
-        {incremental.map((count, i) => {
-          if (count === 0) return null;
-          const x = keys.length > 1 ? (i / (keys.length - 1)) * w : w / 2;
-          const y = h - (count / maxCount) * (h - 2) - 1;
-          return <circle key={i} cx={x} cy={y} r="1.2" fill="rgb(234 179 8)" />;
+      <div className="flex gap-px items-end" style={{ height: 32 }}>
+        {keys.map((k, i) => {
+          const count = incremental[i];
+          const maxC = Math.max(...incremental, 1);
+          const hPct = Math.max((count / maxC) * 100, count > 0 ? 15 : 3);
+          return (
+            <div key={k} className="flex-1 flex flex-col items-center min-w-0">
+              {count > 0 && <span className="text-[8px] text-white font-bold mb-px">{count}</span>}
+              <div
+                className={`w-full rounded-t-sm ${count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
+                style={{ height: `${hPct}%`, minHeight: 1 }}
+              />
+            </div>
+          );
         })}
-      </svg>
-      <div className="flex justify-between mt-0.5">
-        {keys.map((k, i) => (
-          labelAt.has(k) ? <span key={k} className="text-[6px] text-white/20">{BUCKET_LABELS[k]}</span> : null
-        )).filter(Boolean)}
       </div>
-      <div className="text-[7px] text-white/25 mt-0.5">
+      <div className="flex justify-between mt-1">
+        {keys.map((k) => (
+          showLabel(k) ? <span key={k} className="text-[7px] text-white/50">{BUCKET_LABELS[k]}</span> : <span key={k} />
+        ))}
+      </div>
+      <div className="text-[8px] text-white/60 mt-0.5">
         {formatNum(totalReplied)} fans replied
       </div>
     </div>
