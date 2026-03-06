@@ -225,7 +225,15 @@ function ContentCard({ item }: { item: ContentItem }) {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-teal-400 font-medium">{item.creator.name || item.creator.ofUsername}</span>
-          <span className="text-xs text-white">{item.sentAtUk}</span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+            item.source === "wall_post" ? "bg-purple-500/20 text-purple-400" :
+            item.source === "direct_message" ? "bg-blue-500/20 text-blue-400" :
+            "bg-teal-500/20 text-teal-400"
+          }`}>
+            {item.source === "wall_post" ? "Wall Post" : item.source === "direct_message" ? "DM" : "Mass Msg"}
+          </span>
+          {!item.isFree && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">PPV</span>}
+          <span className="text-xs text-white ml-auto">{item.sentAtUk}</span>
         </div>
 
         <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>

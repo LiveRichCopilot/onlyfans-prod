@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAllMassMessageStats, getAllDirectMessageStats } from "@/lib/ofapi-engagement";
+import { ofapiRequest } from "@/lib/ofapi-core";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
@@ -174,6 +175,66 @@ export async function GET(req: NextRequest) {
         }
       } catch (e: any) {
         console.error(`[sync-outbound] dm ${acctId}:`, e.message);
+      }
+
+      // Wall posts
+      try {
+        const minDate = startDate.toISOString().replace("T", " ").replace(/\.\d+Z$/, "");
+        let offset = 0;
+        let hasMore = true;
+        while (hasMore && offset < 200) {
+          const res = await ofapiRequest(
+            `/api/${acctId}/posts?minimumPublishDate=${encodeURIComponent(minDate)}&limit=50&offset=${offset}&counters=true&order=publish_date&sort=desc`,
+            apiKey, { timeoutMs: 15000 },
+          );
+          const posts = res?.data?.list ?? res?.data ?? (Array.isArray(res) ? res : []);
+          if (!Array.isArray(posts) || posts.length === 0) break;
+
+          for (const p of posts) {
+            const externalId = String(p.id || "");
+            if (!externalId) continue;
+
+            let priceCents: number | null = null;
+            if (p.price != null) {
+              const pr = typeof p.price === "string" ? parseFloat(p.price) : Number(p.price);
+              if (!isNaN(pr) && pr > 0) priceCents = Math.round(pr * 100);
+            }
+
+            const shared = {
+              sentAt: p.postedAt || p.publishedAt || p.createdAt ? new Date(p.postedAt || p.publishedAt || p.createdAt) : now,
+              textHtml: p.text ?? null,
+              textPlain: p.rawText ?? p.text ?? null,
+              isFree: priceCents == null || priceCents === 0,
+              priceCents,
+              purchasedCount: null,
+              mediaCount: p.mediaCount ?? p.media?.length ?? 0,
+              sentCount: p.counters?.subscribesCount ?? p.counters?.likesCount ?? 0,
+              viewedCount: p.counters?.viewsCount ?? 0,
+              isCanceled: false,
+              canUnsend: false,
+              raw: p,
+            };
+
+            const row = await prisma.outboundCreative.upsert({
+              where: {
+                creatorId_source_externalId: {
+                  creatorId: creator.id,
+                  source: "wall_post",
+                  externalId,
+                },
+              },
+              create: { creatorId: creator.id, externalId, source: "wall_post", ...shared },
+              update: { ...shared },
+            });
+            totalUpserted++;
+            totalMedia += await syncMedia(row.id, p);
+          }
+
+          offset += posts.length;
+          hasMore = posts.length === 50;
+        }
+      } catch (e: any) {
+        console.error(`[sync-outbound] posts ${acctId}:`, e.message);
       }
     }
 
