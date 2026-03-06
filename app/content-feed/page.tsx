@@ -85,6 +85,38 @@ export default function ContentFeedPage() {
       }
       deduped.push(item);
     }
+
+    // When showing "all" creators, interleave by creator so one active creator
+    // doesn't flood the feed with 20 consecutive cards
+    if (filter === "all" && creatorFilter === "all") {
+      const byCreator = new Map<string, ContentItem[]>();
+      for (const item of deduped) {
+        if (!byCreator.has(item.creatorId)) byCreator.set(item.creatorId, []);
+        byCreator.get(item.creatorId)!.push(item);
+      }
+      // Each creator's items are already in sentAt desc order from the API;
+      // sort within each group to guarantee it
+      for (const group of byCreator.values()) {
+        group.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
+      }
+      // Round-robin: take 1 from each creator, repeat
+      const creatorQueues = Array.from(byCreator.values());
+      const interleaved: ContentItem[] = [];
+      let remaining = true;
+      let idx = 0;
+      while (remaining) {
+        remaining = false;
+        for (const queue of creatorQueues) {
+          if (idx < queue.length) {
+            interleaved.push(queue[idx]);
+            if (idx + 1 < queue.length) remaining = true;
+          }
+        }
+        idx++;
+      }
+      return interleaved;
+    }
+
     return deduped;
   }, [items, filter, creatorFilter]);
 
@@ -331,7 +363,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           {/* Wake-up graph — only on mass messages and wall posts */}
           {item.source !== "direct_message" && (
             item.wakeUp?.buckets ? (
-              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} />
+              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} purchasedCount={item.purchasedCount ?? 0} />
             ) : item.wakeUp ? (
               <div className="text-[10px] text-white/50">{item.wakeUp.totalReplied} fans replied</div>
             ) : (
@@ -356,7 +388,7 @@ const BUCKET_LABELS: Record<string, string> = {
   "1080": "18h", "1200": "20h", "1320": "22h", "1440": "24h",
 };
 
-function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
+function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { buckets: Record<string, number>; totalReplied: number; ageHours: number; purchasedCount: number }) {
   const ageMins = ageHours * 60;
   const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
   const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
