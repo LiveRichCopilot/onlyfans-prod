@@ -187,9 +187,9 @@ function ContentCard({ item }: { item: ContentItem }) {
   const revenuePending = !item.isFree && ageHours < 1 && item.revenue === 0;
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden">
+    <div className="glass-card rounded-xl overflow-hidden">
       {imgSrc ? (
-        <div className="relative aspect-[4/3] bg-black/40">
+        <div className="relative aspect-video bg-black/40">
           <img src={imgSrc} alt="" className="w-full h-full object-cover" />
           {/* Live meter — how long this has been live */}
           <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
@@ -213,7 +213,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           )}
         </div>
       ) : (
-        <div className="aspect-[4/3] bg-white/[0.02] flex items-center justify-center relative">
+        <div className="aspect-video bg-white/[0.02] flex items-center justify-center relative">
           <MessageSquare size={32} className="text-white/20" />
           <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
             <Clock size={11} className="text-teal-400" />
@@ -222,7 +222,7 @@ function ContentCard({ item }: { item: ContentItem }) {
         </div>
       )}
 
-      <div className="p-4">
+      <div className="p-3">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-teal-400 font-medium">{item.creator.name || item.creator.ofUsername}</span>
           <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
@@ -313,50 +313,57 @@ function ContentCard({ item }: { item: ContentItem }) {
   );
 }
 
-// Every 30 min for 6h, then hourly to 8h
-const ALL_BUCKETS = ["30","60","90","120","150","180","210","240","270","300","330","360","420","480"];
+// Every 30 min to 6h, then hourly to 24h
+const ALL_BUCKETS = ["30","60","90","120","150","180","210","240","270","300","330","360","420","480","540","600","660","720","840","960","1080","1200","1320","1440"];
 const BUCKET_LABELS: Record<string, string> = {
   "30": "30m", "60": "1h", "90": "1:30", "120": "2h", "150": "2:30",
   "180": "3h", "210": "3:30", "240": "4h", "270": "4:30", "300": "5h",
-  "330": "5:30", "360": "6h", "420": "7h", "480": "8h",
+  "330": "5:30", "360": "6h", "420": "7h", "480": "8h", "540": "9h",
+  "600": "10h", "660": "11h", "720": "12h", "840": "14h", "960": "16h",
+  "1080": "18h", "1200": "20h", "1320": "22h", "1440": "24h",
 };
 
 function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
   const ageMins = ageHours * 60;
   const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
   const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
-  // Convert cumulative to per-bucket (incremental) — shows WHEN fans replied
+  // Incremental per bucket
   const incremental = keys.map((k, i) => {
     const cum = Number(buckets[k] || 0);
     const prev = i > 0 ? Number(buckets[keys[i - 1]] || 0) : 0;
     return Math.max(cum - prev, 0);
   });
   const maxCount = Math.max(...incremental, 1);
-  const showLabel = (i: number) => keys.length <= 8 || i % 2 === 0 || i === keys.length - 1;
+  // Show label at key intervals
+  const labelAt = new Set(["30","60","120","180","240","360","480","720","1440"]);
+
+  // SVG line graph
+  const w = 100;
+  const h = 24;
+  const points = keys.map((k, i) => {
+    const x = keys.length > 1 ? (i / (keys.length - 1)) * w : w / 2;
+    const y = h - (incremental[i] / maxCount) * (h - 2) - 1;
+    return `${x},${y}`;
+  });
 
   return (
     <div>
-      <div className="flex gap-px">
-        {keys.map((k, i) => {
-          const count = incremental[i];
-          const barPct = Math.max((count / maxCount) * 100, 3);
-          const isFuture = Number(k) > ageMins + 15;
-          return (
-            <div key={k} className="flex-1 text-center min-w-0">
-              <div className="h-8 flex items-end justify-center">
-                <div
-                  className={`w-full rounded-sm ${isFuture ? "bg-white/[0.03]" : count > 0 ? "bg-yellow-500/40" : "bg-white/[0.06]"}`}
-                  style={{ height: `${barPct}%`, minHeight: 1 }}
-                />
-              </div>
-              <div className={`text-[8px] font-bold leading-tight mt-0.5 ${count > 0 ? "text-yellow-500" : "text-white/15"}`}>{count || ""}</div>
-              {showLabel(i) && <div className="text-[7px] text-white/25 leading-tight">{BUCKET_LABELS[k]}</div>}
-            </div>
-          );
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-6" preserveAspectRatio="none">
+        <polyline points={points.join(" ")} fill="none" stroke="rgb(202 138 4 / 0.5)" strokeWidth="0.8" />
+        {incremental.map((count, i) => {
+          if (count === 0) return null;
+          const x = keys.length > 1 ? (i / (keys.length - 1)) * w : w / 2;
+          const y = h - (count / maxCount) * (h - 2) - 1;
+          return <circle key={i} cx={x} cy={y} r="1.2" fill="rgb(234 179 8)" />;
         })}
+      </svg>
+      <div className="flex justify-between mt-0.5">
+        {keys.map((k, i) => (
+          labelAt.has(k) ? <span key={k} className="text-[6px] text-white/20">{BUCKET_LABELS[k]}</span> : null
+        )).filter(Boolean)}
       </div>
-      <div className="text-[8px] text-white/25 mt-1">
-        cold fans replied (no chat 3+ days) &middot; {formatNum(totalReplied)} total
+      <div className="text-[7px] text-white/25 mt-0.5">
+        {formatNum(totalReplied)} fans replied
       </div>
     </div>
   );

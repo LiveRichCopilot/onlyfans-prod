@@ -14,8 +14,8 @@ const prisma = new PrismaClient({
 
 const DORMANT_DAYS = 3;
 
-// Every 30 min for first 6h, then hourly to 8h — all in minutes
-const BUCKETS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 420, 480];
+// Every 30 min to 6h, then hourly to 24h — all in minutes
+const BUCKETS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 420, 480, 540, 600, 660, 720, 840, 960, 1080, 1200, 1320, 1440];
 
 function clampToNow(d: Date, now: Date) {
   return d.getTime() > now.getTime() ? now : d;
