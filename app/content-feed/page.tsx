@@ -251,43 +251,43 @@ function ContentCard({ item }: { item: ContentItem }) {
 
         {/* Activity after mass message */}
         <div className="mt-3 pt-3 border-t border-white/[0.06]">
-          {/* Purchases = strongest wake-up signal */}
-          {!item.isFree && item.purchasedCount > 0 && (
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign size={12} className="text-green-400" />
-              <span className="text-xs text-green-400 font-semibold">{item.purchasedCount} purchased</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              {/* Purchases */}
+              {!item.isFree && item.purchasedCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <DollarSign size={12} className="text-green-400" />
+                  <span className="text-xs text-green-400 font-semibold">{item.purchasedCount} bought</span>
+                </div>
+              )}
+              {/* Chatter DMs sent */}
+              {item.wakeUp && item.wakeUp.chatterDMs1h > 0 && (
+                <div className="flex items-center gap-1">
+                  <MessageSquare size={10} className="text-blue-400" />
+                  <span className="text-[10px] text-blue-400">{formatNum(item.wakeUp.chatterDMs1h)} DMs sent</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cold fans who woke up — hadn't chatted in 3+ days */}
+          {item.wakeUp ? (
+            <div className="grid grid-cols-4 gap-1.5">
+              {([["30m", item.wakeUp.w30m], ["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h]] as [string, number][]).map(([label, count]) => (
+                <div key={label} className="text-center bg-white/[0.04] rounded-lg py-1.5">
+                  <div className={`text-sm font-bold ${count > 0 ? "text-amber-400" : "text-white/20"}`}>{count}</div>
+                  <div className="text-[9px] text-white/30">{label}</div>
+                </div>
+              ))}
+              <div className="col-span-4 text-[9px] text-white/30 mt-0.5">
+                fans woke up (hadn't chatted in 3+ days) &middot; {formatNum(item.wakeUp.dormantBefore)} total replied
+              </div>
+            </div>
+          ) : (
+            <div className="text-[10px] text-white/30 italic">
+              {ageHours < 0.25 ? "Just posted" : "Computing..."}
             </div>
           )}
-
-          {/* Chat wake-ups */}
-          {item.wakeUp && item.wakeUp.dormantBefore > 0 ? (
-            <>
-              <div className="flex items-center justify-between text-[10px] text-white/40 mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-amber-400">Fans replied</span>
-                  <span>{formatNum(item.wakeUp.dormantBefore)} sent to</span>
-                </div>
-                {(item.wakeUp.chatterDMs1h > 0 || item.wakeUp.chatterDMs3h > 0) && (
-                  <div className="flex items-center gap-1">
-                    <MessageSquare size={10} className="text-blue-400" />
-                    <span className="text-blue-400">{formatNum(item.wakeUp.chatterDMs1h)} DMs out</span>
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {([["30m", item.wakeUp.w30m], ["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h]] as [string, number][]).map(([label, count]) => (
-                  <div key={label} className="text-center bg-white/[0.04] rounded-lg py-1.5">
-                    <div className={`text-xs font-semibold ${count > 0 ? "text-amber-400" : "text-white/30"}`}>{count > 0 ? count : "0"}</div>
-                    <div className="text-[9px] text-white/30">{label}</div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : !item.wakeUp ? (
-            <div className="text-[10px] text-white/30 italic">
-              {ageHours < 0.25 ? "Just posted" : "Computing replies..."}
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
