@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     const creatives = await prisma.outboundCreative.findMany({
       where,
       orderBy: { sentAt: "desc" },
-      take: 500,
+      // No limit — return all messages for the selected period
       include: {
         media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true, permanentUrl: true } },
       },
