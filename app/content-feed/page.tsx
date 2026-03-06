@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock } from "lucide-react";
+import WakeUpBuckets from "./WakeUpBuckets";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type WakeUp = {
   totalReplied: number;
   buckets: Record<string, number> | null; // {"30":5,"60":12,"90":18,...}
   chatterDMs: Record<string, number> | null;
+  purchaseBuckets: Record<string, number> | null; // {"60":2,"120":5,...}
 };
 type CreatorOption = { id: string; name: string };
 type ContentItem = {
@@ -357,7 +359,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           {/* Wake-up graph — only on mass messages and wall posts */}
           {item.source !== "direct_message" && (
             item.wakeUp?.buckets ? (
-              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} purchasedCount={item.purchasedCount} />
+              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} purchasedCount={item.purchasedCount} purchaseBuckets={item.wakeUp.purchaseBuckets} />
             ) : item.wakeUp ? (
               <div className="text-[10px] text-white/50">{item.wakeUp.totalReplied} fans replied</div>
             ) : (
@@ -372,68 +374,6 @@ function ContentCard({ item }: { item: ContentItem }) {
   );
 }
 
-// Every 30 min to 6h, then hourly to 24h
-const ALL_BUCKETS = ["30","60","90","120","150","180","210","240","270","300","330","360","420","480","540","600","660","720","840","960","1080","1200","1320","1440"];
-const BUCKET_LABELS: Record<string, string> = {
-  "30": "30m", "60": "1h", "90": "1:30", "120": "2h", "150": "2:30",
-  "180": "3h", "210": "3:30", "240": "4h", "270": "4:30", "300": "5h",
-  "330": "5:30", "360": "6h", "420": "7h", "480": "8h", "540": "9h",
-  "600": "10h", "660": "11h", "720": "12h", "840": "14h", "960": "16h",
-  "1080": "18h", "1200": "20h", "1320": "22h", "1440": "24h",
-};
-
-function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { buckets: Record<string, number>; totalReplied: number; ageHours: number; purchasedCount: number }) {
-  const ageMins = ageHours * 60;
-  const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
-  const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
-  const incremental = keys.map((k, i) => {
-    const cum = Number(buckets[k] || 0);
-    const prev = i > 0 ? Number(buckets[keys[i - 1]] || 0) : 0;
-    return Math.max(cum - prev, 0);
-  });
-  // Cold fans replied = highest cumulative bucket value (buckets are cold-fan only)
-  const coldReplied = Math.max(...keys.map((k) => Number(buckets[k] || 0)), 0);
-  // First bucket index with activity — used to mark green for purchases
-  const firstNonZeroIdx = purchasedCount > 0 ? incremental.findIndex((c) => c > 0) : -1;
-  // Show label at key intervals
-  const labelAt = new Set(["30","60","120","180","240","360","480","720","1440"]);
-  const showLabel = (k: string) => labelAt.has(k);
-
-  return (
-    <div>
-      <div className="flex gap-px items-end" style={{ height: 32 }}>
-        {keys.map((k, i) => {
-          const count = incremental[i];
-          const maxC = Math.max(...incremental, 1);
-          const hPct = Math.max((count / maxC) * 100, count > 0 ? 15 : 3);
-          const isGreen = i === firstNonZeroIdx;
-          return (
-            <div key={k} className="flex-1 flex flex-col items-center min-w-0">
-              {count > 0 && <span className={`text-[8px] font-bold mb-px ${isGreen ? "text-green-400" : "text-white"}`}>{count}</span>}
-              <div
-                className={`w-full rounded-t-sm ${isGreen ? "bg-green-500/60" : count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
-                style={{ height: `${hPct}%`, minHeight: 1 }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex justify-between mt-1">
-        {keys.map((k) => (
-          showLabel(k) ? <span key={k} className="text-[7px] text-white/50">{BUCKET_LABELS[k]}</span> : <span key={k} />
-        ))}
-      </div>
-      {purchasedCount > 0 && (
-        <div className="text-[8px] text-green-400 font-semibold mt-0.5">
-          $ {formatNum(purchasedCount)} bought
-        </div>
-      )}
-      <div className="text-[8px] text-white/60 mt-0.5">
-        {formatNum(coldReplied)} cold fans replied · {formatNum(totalReplied)} total
-      </div>
-    </div>
-  );
-}
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
   return (

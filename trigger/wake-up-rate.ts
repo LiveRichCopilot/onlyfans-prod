@@ -21,6 +21,48 @@ function clampToNow(d: Date, now: Date) {
   return d.getTime() > now.getTime() ? now : d;
 }
 
+async function computePurchaseBuckets(creatorId: string, T0: Date, creativeId: string, isFree: boolean, now: Date): Promise<Record<string, number>> {
+  const empty: Record<string, number> = {};
+  for (const mins of BUCKETS) empty[String(mins)] = 0;
+  if (isFree) return empty;
+
+  // Find the NEXT PPV mass message for this creator — transactions between T0 and nextT0 belong to this message
+  const nextPPV = await prisma.outboundCreative.findFirst({
+    where: {
+      creatorId,
+      isFree: false,
+      sentAt: { gt: T0 },
+      id: { not: creativeId },
+    },
+    orderBy: { sentAt: "asc" },
+    select: { sentAt: true },
+  });
+
+  const maxWindow24h = new Date(T0.getTime() + 1440 * 60_000);
+  const upperBound = nextPPV ? new Date(Math.min(nextPPV.sentAt.getTime(), maxWindow24h.getTime())) : maxWindow24h;
+  const maxWindow = clampToNow(upperBound, now);
+
+  // Find "message" transactions for this creator in the window
+  const txDates = await prisma.transaction.findMany({
+    where: {
+      creatorId,
+      type: { contains: "message" },
+      amount: { gt: 0 },
+      date: { gt: T0, lte: maxWindow },
+    },
+    select: { date: true },
+  });
+
+  if (txDates.length === 0) return empty;
+
+  const buckets: Record<string, number> = {};
+  for (const mins of BUCKETS) {
+    const cutoff = clampToNow(new Date(T0.getTime() + mins * 60_000), now);
+    buckets[String(mins)] = txDates.filter((t) => t.date <= cutoff).length;
+  }
+  return buckets;
+}
+
 async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   const dormantCutoff = new Date(T0.getTime() - DORMANT_DAYS * 24 * 3600_000);
   const maxWindow = clampToNow(new Date(T0.getTime() + 360 * 60_000), now);
@@ -106,7 +148,7 @@ export const wakeUpRate = task({
       where,
       orderBy: { sentAt: "desc" },
       take: limit,
-      select: { id: true, creatorId: true, sentAt: true, sentCount: true },
+      select: { id: true, creatorId: true, sentAt: true, sentCount: true, isFree: true },
     });
 
     if (pushEvents.length === 0) {
@@ -119,6 +161,7 @@ export const wakeUpRate = task({
       try {
         const T0 = new Date(push.sentAt);
         const result = await computeWakeUps(push.creatorId, T0, now);
+        const purchases = await computePurchaseBuckets(push.creatorId, T0, push.id, push.isFree, now);
 
         await prisma.outboundCreative.update({
           where: { id: push.id },
@@ -126,6 +169,7 @@ export const wakeUpRate = task({
             dormantBefore: result.totalReplied,
             wakeUpBuckets: result.wakeUpBuckets,
             chatterDMs: result.chatterDMs,
+            purchaseBuckets: purchases,
             // Legacy columns
             wakeUp30m: result.wakeUpBuckets["30"] ?? 0,
             wakeUp1h: result.wakeUpBuckets["60"] ?? 0,
@@ -140,7 +184,8 @@ export const wakeUpRate = task({
         });
 
         const b = result.wakeUpBuckets;
-        console.log(`[WakeUp] ${push.id}: 30m=${b["30"]} 1h=${b["60"]} 1h30=${b["90"]} 2h=${b["120"]} 3h=${b["180"]} (${result.totalReplied} total replied)`);
+        const totalPurchases = purchases["1440"] || 0;
+        console.log(`[WakeUp] ${push.id}: 30m=${b["30"]} 1h=${b["60"]} 3h=${b["180"]} (${result.totalReplied} replied, ${totalPurchases} purchases)`);
         computed++;
       } catch (e: any) {
         console.error(`[WakeUp] ${push.id}: ${e.message}`);

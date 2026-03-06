@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
           totalReplied: c.dormantBefore ?? 0,
           buckets: (c as any).wakeUpBuckets ?? null,
           chatterDMs: (c as any).chatterDMs ?? null,
+          purchaseBuckets: (c as any).purchaseBuckets ?? null,
         } : null,
       };
     });
