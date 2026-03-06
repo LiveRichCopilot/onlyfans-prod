@@ -17,9 +17,9 @@ export async function GET(req: NextRequest) {
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const where: any = { sentAt: { gte: since } };
+    // Only return posts that have actual media records with images
+    const where: any = { sentAt: { gte: since }, mediaCount: { gt: 0 } };
     if (creatorId) where.creatorId = creatorId;
-    if (mediaOnly) where.mediaCount = { gt: 0 };
 
     const creatives = await prisma.outboundCreative.findMany({
       where,
@@ -83,8 +83,11 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // Only return items that have actual media records — no empty chat placeholders
+    const itemsWithMedia = items.filter((i) => i.media.length > 0);
+
     return NextResponse.json({
-      items,
+      items: itemsWithMedia,
       creators: creators.map((c) => ({ id: c.id, name: c.name || c.ofUsername || "Unknown" })),
       summary: {
         total: creatives.length,

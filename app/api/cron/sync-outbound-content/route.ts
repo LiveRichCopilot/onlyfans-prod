@@ -317,10 +317,11 @@ async function syncMedia(creativeId: string, creatorId: string, accountId: strin
     const thumbUrl = f?.thumb?.url ?? null;
     if (!fullUrl && !previewUrl && !thumbUrl) continue;
 
-    // Download to Supabase right now while CDN URL is fresh (skip videos — too large)
+    // Download to Supabase right now while CDN URL is fresh
+    // For videos: grab the thumbnail/preview image (not the full video)
     let permanentUrl: string | null = null;
-    if (m.type !== "video") {
-      const sourceUrl = previewUrl || thumbUrl || fullUrl;
+    {
+      const sourceUrl = m.type === "video" ? (thumbUrl || previewUrl) : (previewUrl || thumbUrl || fullUrl);
       if (sourceUrl) {
         permanentUrl = await downloadAndPersist(accountId, creatorId, creativeId, sourceUrl, String(m.id || `m${created}`));
       }

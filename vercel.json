@@ -54,11 +54,11 @@
         },
         {
             "path": "/api/cron/sync-outbound-content",
-            "schedule": "*/45 * * * *"
+            "schedule": "*/10 * * * *"
         },
         {
             "path": "/api/cron/sync-dm-content",
-            "schedule": "*/30 * * * *"
+            "schedule": "*/10 * * * *"
         }
     ]
 }

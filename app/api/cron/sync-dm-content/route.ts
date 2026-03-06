@@ -127,8 +127,8 @@ export async function GET(req: NextRequest) {
               for (const mi of m.media) {
                 const f = mi?.files;
                 if (!f) continue;
-                const srcUrl = f?.preview?.url || f?.thumb?.url || f?.full?.url;
-                if (!srcUrl || mi.type === "video") continue;
+                const srcUrl = mi.type === "video" ? (f?.thumb?.url || f?.preview?.url) : (f?.preview?.url || f?.thumb?.url || f?.full?.url);
+                if (!srcUrl) continue;
                 const permUrl = await persistImage(acctId, creator.id, row.id, srcUrl, String(mi.id || `dm${Date.now()}`));
                 await prisma.outboundMedia.create({
                   data: {
