@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Eye, Send, Image as ImageIcon, MessageSquare, Filter } from "lucide-react";
 
-type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null };
+type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
+type WakeUp = { dormantBefore: number; w1h: number; w3h: number; w6h: number; w24h: number };
 type ContentItem = {
   id: string;
   externalId: string;
@@ -19,6 +20,7 @@ type ContentItem = {
   isCanceled: boolean;
   type: "content" | "bump";
   media: MediaItem[];
+  wakeUp: WakeUp | null;
 };
 type Summary = { total: number; withMedia: number; bumps: number; totalViews: number; totalSent: number; avgViewRate: string };
 
@@ -96,13 +98,22 @@ export default function ContentFeedPage() {
 }
 
 function ContentCard({ item }: { item: ContentItem }) {
-  const previewUrl = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
+  const firstMedia = item.media[0];
+  // Prefer permanentUrl (Supabase — never expires) over OF CDN URLs
+  const permanentUrl = firstMedia?.permanentUrl;
+  const cdnUrl = firstMedia?.previewUrl || firstMedia?.thumbUrl || firstMedia?.fullUrl;
+  // If we have a permanent Supabase URL, use it directly. Otherwise proxy the CDN URL.
+  const imgSrc = permanentUrl
+    ? permanentUrl
+    : cdnUrl
+      ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
+      : null;
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden">
-      {previewUrl ? (
+      {imgSrc ? (
         <div className="relative aspect-[4/3] bg-black/40">
-          <img src={`/api/proxy-media?url=${encodeURIComponent(previewUrl)}`} alt="" className="w-full h-full object-cover" />
+          <img src={imgSrc} alt="" className="w-full h-full object-cover" />
           {item.media.length > 1 && (
             <span className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
               +{item.media.length - 1}
@@ -141,6 +152,26 @@ function ContentCard({ item }: { item: ContentItem }) {
                 {m.mediaType}
               </span>
             ))}
+          </div>
+        )}
+
+        {item.wakeUp && item.wakeUp.dormantBefore > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/[0.06]">
+            <div className="flex items-center gap-1.5 text-[10px] text-white/40 mb-1.5">
+              <span className="text-amber-400">Wake-up Rate</span>
+              <span>{item.wakeUp.dormantBefore} dormant fans</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {([["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h], ["24h", item.wakeUp.w24h]] as const).map(([label, count]) => {
+                const pct = item.wakeUp!.dormantBefore > 0 ? ((count / item.wakeUp!.dormantBefore) * 100).toFixed(1) : "0";
+                return (
+                  <div key={label} className="text-center bg-white/[0.04] rounded-lg py-1.5">
+                    <div className={`text-xs font-semibold ${Number(pct) > 0 ? "text-amber-400" : "text-white/30"}`}>{pct}%</div>
+                    <div className="text-[9px] text-white/30">{label}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

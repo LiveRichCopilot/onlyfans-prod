@@ -112,10 +112,10 @@ export function ShiftBlock({
         <button
           onClick={handleDelete}
           title={confirmDelete ? "Click again to confirm" : "Remove"}
-          className={`opacity-0 group-hover:opacity-100 transition-all p-0.5 rounded ${
+          className={`transition-all p-0.5 rounded ${
             confirmDelete
-              ? "!opacity-100 bg-red-500/20 ring-1 ring-red-500/40"
-              : "hover:bg-red-500/20"
+              ? "bg-red-500/20 ring-1 ring-red-500/40"
+              : "opacity-40 hover:opacity-100 hover:bg-red-500/20"
           }`}
         >
           <X size={10} className={confirmDelete ? "text-red-400" : "text-white/40"} />

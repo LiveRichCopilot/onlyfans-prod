@@ -18,6 +18,29 @@ export async function GET(request: NextRequest) {
         return new NextResponse("Missing url parameter", { status: 400 });
     }
 
+    // Supabase Storage URLs are permanent — fetch directly, no OFAPI needed
+    const isSupabaseUrl = targetUrl.includes(".supabase.co/storage/");
+    if (isSupabaseUrl) {
+        try {
+            const response = await fetch(targetUrl, {
+                headers: { "Accept": "image/*, video/*, audio/*, */*" },
+            });
+            if (response.ok) {
+                const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+                const contentLength = response.headers.get("Content-Length");
+                const headers: HeadersInit = {
+                    "Content-Type": contentType,
+                    "Cache-Control": "public, max-age=31536000, immutable",
+                    "Access-Control-Allow-Origin": "*",
+                };
+                if (contentLength) headers["Content-Length"] = contentLength;
+                return new NextResponse(response.body as any, { status: 200, headers });
+            }
+        } catch (e: any) {
+            console.warn("[proxy] Supabase fetch error:", e.message);
+        }
+    }
+
     const apiKey = process.env.OFAPI_API_KEY;
     const isOfUrl = targetUrl.includes("onlyfans.com");
 

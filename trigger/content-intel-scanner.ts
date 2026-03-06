@@ -1,9 +1,9 @@
 /**
  * Content Intel Scanner — Kimi K2.5 Powered
  *
- * Scans unprocessed OutboundCreative rows with engagement.
+ * Scans unprocessed OutboundCreative rows (mediaCount > 0) with engagement.
  * Analyzes hook quality, tactic tags, what works vs doesn't.
- * Writes insights to WinningSnippet. Stateless.
+ * Writes insights to ContentInsight (keyed by creativeId). Stateless.
  */
 import { task } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -14,6 +14,7 @@ const KIMI_BASE = "https://api.moonshot.ai/v1/chat/completions";
 const SYSTEM_PROMPT = `You are a content performance analyst for an OnlyFans agency. You analyze mass messages and evaluate what makes hooks effective.
 
 For each message, assign:
+- id: the EXACT id string provided (copy it verbatim)
 - tacticTag: primary tactic (tease, urgency, curiosity, personal, value_frame, exclusivity, scarcity, emotional, social_proof, direct_offer)
 - hookQuality: 0-100 score
 - insight: one sentence on why this hook works or doesn't
@@ -21,12 +22,13 @@ For each message, assign:
 Return JSON:
 {
   "results": [
-    { "externalId": "id", "tacticTag": "tease", "hookQuality": 75, "insight": "Strong curiosity opener but weak CTA" }
+    { "id": "abc123", "tacticTag": "tease", "hookQuality": 75, "insight": "Strong curiosity opener but weak CTA" }
   ],
   "patterns": "2-3 sentence summary of overall patterns"
 }
 
-Be specific. "Good hook" is useless. "Opens with question creating information gap" is useful.`;
+Be specific. "Good hook" is useless. "Opens with question creating information gap" is useful.
+CRITICAL: The "id" field must be copied EXACTLY from the input — do not modify, truncate, or reformat it.`;
 
 export const contentIntelScanner = task({
   id: "content-intel-scanner",
@@ -38,6 +40,7 @@ export const contentIntelScanner = task({
     const where: any = {
       processed: false,
       source: "mass_message",
+      mediaCount: { gt: 0 },
       OR: [{ viewedCount: { gt: 0 } }, { sentCount: { gt: 10 } }],
     };
     if (payload.creatorId) where.creatorId = payload.creatorId;
@@ -54,12 +57,13 @@ export const contentIntelScanner = task({
     });
 
     if (creatives.length === 0) {
-      return { processed: 0, message: "No unprocessed creatives with engagement" };
+      return { processed: 0, message: "No unprocessed creatives with media + engagement" };
     }
 
+    // Use internal cuid as the ID sent to Kimi (avoids externalId mismatch)
     const messagesText = creatives.map((c) => {
       const vr = c.sentCount > 0 ? ((c.viewedCount / c.sentCount) * 100).toFixed(1) : "0.0";
-      return `ID: ${c.externalId}\nCaption: ${c.textPlain || c.textHtml || "(no text)"}\nFree: ${c.isFree} | Media: ${c.mediaCount} | Sent: ${c.sentCount} | Viewed: ${c.viewedCount} | ViewRate: ${vr}%`;
+      return `ID: ${c.id}\nCaption: ${c.textPlain || c.textHtml || "(no text)"}\nFree: ${c.isFree} | Media: ${c.mediaCount} | Sent: ${c.sentCount} | Viewed: ${c.viewedCount} | ViewRate: ${vr}%`;
     }).join("\n---\n");
 
     try {
@@ -101,32 +105,60 @@ export const contentIntelScanner = task({
         analyzed = (arrayVal as any[]) || [];
       }
 
-      let snippetsCreated = 0;
+      // Build a lookup by internal ID for fast matching
+      const creativeMap = new Map(creatives.map((c) => [c.id, c]));
+
+      let insightsCreated = 0;
       for (const a of analyzed) {
-        if (!a.externalId || !a.tacticTag) continue;
-        const creative = creatives.find((c) => c.externalId === String(a.externalId));
+        if (!a.id || !a.tacticTag) continue;
+        const creative = creativeMap.get(String(a.id));
         if (!creative) continue;
+
+        const viewRate = creative.sentCount > 0
+          ? (creative.viewedCount / creative.sentCount) * 100
+          : 0;
+
         try {
-          await prisma.winningSnippet.create({
-            data: {
-              saleContextId: creative.id,
+          await prisma.contentInsight.upsert({
+            where: { creativeId: creative.id },
+            create: {
+              creativeId: creative.id,
               creatorId: creative.creatorId,
-              snippet: a.insight || "",
               tacticTag: a.tacticTag.toLowerCase().replace(/\s+/g, "_"),
-              confidence: Math.min(1, Math.max(0, (a.hookQuality || 50) / 100)),
-              saleAmount: 0,
+              hookScore: Math.min(100, Math.max(0, a.hookQuality || 50)),
+              insight: (a.insight || "").slice(0, 500),
+              sentCount: creative.sentCount,
+              viewedCount: creative.viewedCount,
+              viewRate: Math.round(viewRate * 10) / 10,
+            },
+            update: {
+              tacticTag: a.tacticTag.toLowerCase().replace(/\s+/g, "_"),
+              hookScore: Math.min(100, Math.max(0, a.hookQuality || 50)),
+              insight: (a.insight || "").slice(0, 500),
+              sentCount: creative.sentCount,
+              viewedCount: creative.viewedCount,
+              viewRate: Math.round(viewRate * 10) / 10,
             },
           });
-          snippetsCreated++;
+          insightsCreated++;
         } catch (e: any) {
-          if (e.code !== "P2002") console.error("[Content Intel]", e.message);
+          console.error("[Content Intel] upsert error:", e.message);
         }
       }
 
       await markProcessed(creatives.map((c) => c.id));
+
+      // Log token usage
+      const usage = data.usage;
+      if (usage) {
+        console.log(
+          `[Content Intel] ${usage.prompt_tokens}in/${usage.completion_tokens}out, ${insightsCreated} insights`
+        );
+      }
+
       return {
         processed: creatives.length,
-        snippetsCreated,
+        insightsCreated,
         patterns: result.patterns || null,
       };
     } catch (e: any) {

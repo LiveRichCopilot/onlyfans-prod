@@ -242,7 +242,7 @@ export function SchedulerGrid({ shifts, creators, onAssign, onMove, onRemove, on
                                   shiftType={s.shiftType}
                                   onRemove={onRemove}
                                   onFillWeek={onFillWeek}
-                                  isLive={liveEmails?.has(s.chatterEmail) ?? false}
+                                  isLive={dow === todayDow && (liveEmails?.has(s.chatterEmail) ?? false)}
                                 />
                               ))}
                             </div>

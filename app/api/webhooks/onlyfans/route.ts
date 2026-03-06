@@ -26,6 +26,11 @@ export async function POST(request: NextRequest) {
         const payload = JSON.parse(rawBody);
         console.log("Received Webhook Event:", payload.event);
 
+        // Handle inbound messages — update lastInboundAt for wake-up rate tracking
+        if (payload.event === "messages.received") {
+            await handleInboundMessage(payload);
+        }
+
         // Handle purchase events — update Fan + insights + send Telegram alert
         const purchaseEvents = ["subscriptions.new", "messages.ppv.unlocked", "tips.received", "transactions.new"];
         if (purchaseEvents.includes(payload.event)) {
@@ -325,5 +330,29 @@ async function sendPurchaseNotification(creator: any, fan: any, purchaseType: st
         await bot.api.sendMessage(chatId, msg);
     } catch (e) {
         console.error("Failed to send purchase notification:", e);
+    }
+}
+
+/**
+ * Handle inbound messages (fan→creator) for wake-up rate tracking.
+ * Updates Fan.lastInboundAt — the core signal for "raise the dead" metric.
+ */
+async function handleInboundMessage(payload: any) {
+    const accountId = payload.account_id;
+    const fanId = payload.payload?.fromUser?.id || payload.data?.sender?.id;
+    if (!accountId || !fanId) return;
+
+    const creator = await prisma.creator.findFirst({
+        where: { ofapiCreatorId: String(accountId) },
+    });
+    if (!creator) return;
+
+    try {
+        await prisma.fan.updateMany({
+            where: { ofapiFanId: String(fanId), creatorId: creator.id },
+            data: { lastInboundAt: new Date(), lastMessageAt: new Date() },
+        });
+    } catch (e: any) {
+        console.error("Failed to update lastInboundAt:", e.message);
     }
 }

@@ -171,6 +171,8 @@ model Fan {
   avgReplyTimeSec Int? // Rolling average reply time in seconds
   activeHours     String? // JSON array of top active hours e.g. "[22,23,0,1]"
   lastMessageAt   DateTime? // Last time this fan sent a message
+  lastInboundAt   DateTime? // Last INBOUND message from fan (fan→creator only)
+  subscribedAt    DateTime? // When fan first subscribed
   followUpDueAt   DateTime? // Next scheduled follow-up
   followUpType    String?
   followUpMessage String?
@@ -979,11 +981,20 @@ model OutboundCreative {
   mediaCount Int             @default(0)
   sentCount  Int             @default(0)
   viewedCount Int            @default(0)
+  purchasedCount Int?        // From /engagement/messages/{id}/buyers
+  dormantBefore  Int?        // Fans dormant (7d+ no message) at send time
+  wakeUp1h       Int?        // Dormant fans who sent inbound msg within 1h
+  wakeUp3h       Int?        // Dormant fans who sent inbound msg within 3h
+  wakeUp6h       Int?        // Dormant fans who sent inbound msg within 6h
+  wakeUp24h      Int?        // Dormant fans who sent inbound msg within 24h
+  wakeUpComputed Boolean     @default(false)
+  wakeUpComputedAt DateTime? // When wake-up was last computed
   isCanceled Boolean         @default(false)
   canUnsend  Boolean         @default(false)
   raw        Json?           // Full OFAPI response
   processed  Boolean         @default(false)
   media      OutboundMedia[]
+  insight    ContentInsight?
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
@@ -1000,11 +1011,30 @@ model OutboundMedia {
   mediaType  String           // "photo" | "video" | "audio"
   fullUrl    String?
   previewUrl String?
-  thumbUrl   String?
+  thumbUrl      String?
+  permanentUrl  String?          // Supabase Storage — never expires
   duration   Int?
   width      Int?
   height     Int?
   createdAt  DateTime         @default(now())
 
   @@index([creativeId])
+}
+
+model ContentInsight {
+  id          String           @id @default(cuid())
+  creativeId  String           @unique
+  creative    OutboundCreative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  creatorId   String
+  tacticTag   String
+  hookScore   Int              @default(50)
+  insight     String
+  sentCount   Int              @default(0)
+  viewedCount Int              @default(0)
+  viewRate    Float            @default(0)
+  createdAt   DateTime         @default(now())
+
+  @@index([creatorId])
+  @@index([tacticTag])
+  @@index([creatorId, tacticTag])
 }

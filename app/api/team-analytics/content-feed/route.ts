@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       orderBy: { sentAt: "desc" },
       take: 100,
       include: {
-        media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true } },
+        media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true, permanentUrl: true } },
       },
     });
 
@@ -62,6 +62,14 @@ export async function GET(req: NextRequest) {
         isCanceled: c.isCanceled,
         type: c.mediaCount > 0 ? "content" : "bump",
         media: c.media,
+        // Wake-up rate data
+        wakeUp: c.wakeUpComputed ? {
+          dormantBefore: c.dormantBefore ?? 0,
+          w1h: c.wakeUp1h ?? 0,
+          w3h: c.wakeUp3h ?? 0,
+          w6h: c.wakeUp6h ?? 0,
+          w24h: c.wakeUp24h ?? 0,
+        } : null,
       };
     });
 
