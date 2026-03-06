@@ -249,40 +249,46 @@ function ContentCard({ item }: { item: ContentItem }) {
           </div>
         )}
 
-        {/* Wake-up rate + Chatter DMs */}
-        {item.wakeUp && item.wakeUp.dormantBefore > 0 ? (
-          <div className="mt-3 pt-3 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between text-[10px] text-white/40 mb-1.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-amber-400">Fan Wake-ups</span>
-                <span>{formatNum(item.wakeUp.dormantBefore)} sent to</span>
-              </div>
-              {(item.wakeUp.chatterDMs1h > 0 || item.wakeUp.chatterDMs3h > 0) && (
-                <div className="flex items-center gap-1">
-                  <MessageSquare size={10} className="text-blue-400" />
-                  <span className="text-blue-400">{formatNum(item.wakeUp.chatterDMs1h)} DMs sent</span>
-                </div>
-              )}
+        {/* Activity after mass message */}
+        <div className="mt-3 pt-3 border-t border-white/[0.06]">
+          {/* Purchases = strongest wake-up signal */}
+          {!item.isFree && item.purchasedCount > 0 && (
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign size={12} className="text-green-400" />
+              <span className="text-xs text-green-400 font-semibold">{item.purchasedCount} purchased</span>
             </div>
-            <div className="grid grid-cols-4 gap-1.5">
-              {([["30m", item.wakeUp.w30m], ["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h]] as [string, number][]).map(([label, count]) => {
-                const pct = item.wakeUp!.dormantBefore > 0 ? ((count / item.wakeUp!.dormantBefore) * 100).toFixed(1) : "0";
-                return (
+          )}
+
+          {/* Chat wake-ups */}
+          {item.wakeUp && item.wakeUp.dormantBefore > 0 ? (
+            <>
+              <div className="flex items-center justify-between text-[10px] text-white/40 mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-amber-400">Fans replied</span>
+                  <span>{formatNum(item.wakeUp.dormantBefore)} sent to</span>
+                </div>
+                {(item.wakeUp.chatterDMs1h > 0 || item.wakeUp.chatterDMs3h > 0) && (
+                  <div className="flex items-center gap-1">
+                    <MessageSquare size={10} className="text-blue-400" />
+                    <span className="text-blue-400">{formatNum(item.wakeUp.chatterDMs1h)} DMs out</span>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {([["30m", item.wakeUp.w30m], ["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h]] as [string, number][]).map(([label, count]) => (
                   <div key={label} className="text-center bg-white/[0.04] rounded-lg py-1.5">
-                    <div className={`text-xs font-semibold ${count > 0 ? "text-amber-400" : "text-white/30"}`}>{count > 0 ? count : pct + "%"}</div>
+                    <div className={`text-xs font-semibold ${count > 0 ? "text-amber-400" : "text-white/30"}`}>{count > 0 ? count : "0"}</div>
                     <div className="text-[9px] text-white/30">{label}</div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : !item.wakeUp ? (
-          <div className="mt-3 pt-3 border-t border-white/[0.06]">
+                ))}
+              </div>
+            </>
+          ) : !item.wakeUp ? (
             <div className="text-[10px] text-white/30 italic">
-              {ageHours < 0.25 ? "Wake-up: Just posted" : "Wake-up: Computing..."}
+              {ageHours < 0.25 ? "Just posted" : "Computing replies..."}
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   );
