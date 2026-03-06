@@ -1,7 +1,7 @@
 /**
  * Wake Up Rate — "How many cold fans started chatting after this post?"
  *
- * Computes at 30-minute intervals: 30m, 1h, 1h30, 2h, 2h30, 3h, 4h, 5h, 6h
+ * Every 30 min for first 6h, then hourly to 8h: 30m,1h,1h30,2h,...,5h30,6h,7h,8h
  * A "cold fan" = hadn't chatted in 3+ days before the mass message.
  * Result: simple counts like "50 fans woke up at 30m, 120 at 1h, 180 at 1h30..."
  */
@@ -14,8 +14,8 @@ const prisma = new PrismaClient({
 
 const DORMANT_DAYS = 3;
 
-// Every 30 min up to 3h, then hourly to 6h — all in minutes
-const BUCKETS = [30, 60, 90, 120, 150, 180, 240, 300, 360];
+// Every 30 min for first 6h, then hourly to 8h — all in minutes
+const BUCKETS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 420, 480];
 
 function clampToNow(d: Date, now: Date) {
   return d.getTime() > now.getTime() ? now : d;

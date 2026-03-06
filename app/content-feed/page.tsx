@@ -288,42 +288,46 @@ function ContentCard({ item }: { item: ContentItem }) {
   );
 }
 
+// Every 30 min for 6h, then hourly to 8h
+const ALL_BUCKETS = ["30","60","90","120","150","180","210","240","270","300","330","360","420","480"];
 const BUCKET_LABELS: Record<string, string> = {
-  "30": "30m", "60": "1h", "90": "1h30", "120": "2h", "150": "2h30",
-  "180": "3h", "240": "4h", "300": "5h", "360": "6h",
+  "30": "30m", "60": "1h", "90": "1:30", "120": "2h", "150": "2:30",
+  "180": "3h", "210": "3:30", "240": "4h", "270": "4:30", "300": "5h",
+  "330": "5:30", "360": "6h", "420": "7h", "480": "8h",
 };
 
 function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
-  // Only show buckets up to the post's age (don't show future buckets)
   const ageMins = ageHours * 60;
-  const visibleKeys = Object.keys(BUCKET_LABELS).filter((k) => Number(k) <= ageMins + 15);
-  // Show at least the first 4 buckets, max 6 on the card
-  const keys = visibleKeys.length < 4 ? Object.keys(BUCKET_LABELS).slice(0, 4) : visibleKeys.slice(0, 6);
+  // Show buckets up to post age + one ahead, minimum first 4
+  const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
+  const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
   const maxCount = Math.max(...keys.map((k) => Number(buckets[k] || 0)), 1);
+  // Show label every other bucket to keep it readable
+  const showLabel = (i: number) => keys.length <= 8 || i % 2 === 0 || i === keys.length - 1;
 
   return (
     <div>
-      <div className="flex gap-1">
-        {keys.map((k) => {
+      <div className="flex gap-px">
+        {keys.map((k, i) => {
           const count = Number(buckets[k] || 0);
-          const barPct = Math.max((count / maxCount) * 100, 4);
+          const barPct = Math.max((count / maxCount) * 100, 3);
           const isFuture = Number(k) > ageMins + 15;
           return (
-            <div key={k} className="flex-1 text-center">
-              <div className="h-10 flex items-end justify-center mb-1">
+            <div key={k} className="flex-1 text-center min-w-0">
+              <div className="h-8 flex items-end justify-center">
                 <div
-                  className={`w-full rounded-t ${isFuture ? "bg-white/[0.04]" : count > 0 ? "bg-amber-400/30" : "bg-white/[0.06]"}`}
-                  style={{ height: `${barPct}%`, minHeight: 2 }}
+                  className={`w-full rounded-sm ${isFuture ? "bg-white/[0.03]" : count > 0 ? "bg-amber-400/40" : "bg-white/[0.06]"}`}
+                  style={{ height: `${barPct}%`, minHeight: 1 }}
                 />
               </div>
-              <div className={`text-[11px] font-bold ${count > 0 ? "text-amber-400" : "text-white/20"}`}>{count}</div>
-              <div className="text-[8px] text-white/30">{BUCKET_LABELS[k]}</div>
+              <div className={`text-[8px] font-bold leading-tight mt-0.5 ${count > 0 ? "text-amber-400" : "text-white/15"}`}>{count || ""}</div>
+              {showLabel(i) && <div className="text-[7px] text-white/25 leading-tight">{BUCKET_LABELS[k]}</div>}
             </div>
           );
         })}
       </div>
-      <div className="text-[9px] text-white/30 mt-1">
-        fans woke up (no chat in 3+ days) &middot; {formatNum(totalReplied)} total replied
+      <div className="text-[8px] text-white/25 mt-1">
+        cold fans replied (no chat 3+ days) &middot; {formatNum(totalReplied)} total
       </div>
     </div>
   );
