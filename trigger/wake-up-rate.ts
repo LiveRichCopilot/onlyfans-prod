@@ -11,7 +11,7 @@
  * - Excludes new subscribers (subscribedAt > pushTime)
  * - Uses lastInboundAt (inbound-only), NOT lastMessageAt (ambiguous)
  */
-import { task } from "@trigger.dev/sdk";
+import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient({
@@ -26,11 +26,11 @@ export const wakeUpRate = task({
   run: async (payload: { limit?: number; creatorId?: string; recompute?: boolean }) => {
     const limit = payload.limit || 50;
 
-    // Find push events not yet computed (or all if recompute=true), at least 24h old
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Compute wake-up for any post at least 30 min old — no 24h wait
+    const minAge = new Date(Date.now() - 30 * 60 * 1000);
     const where: any = {
       mediaCount: { gt: 0 },
-      sentAt: { lt: cutoff },
+      sentAt: { lt: minAge },
     };
     if (!payload.recompute) where.wakeUpComputed = false;
     if (payload.creatorId) where.creatorId = payload.creatorId;
@@ -135,5 +135,15 @@ export const wakeUpRate = task({
     }
 
     return { computed, total: pushEvents.length };
+  },
+});
+
+// Run every 30 minutes to keep wake-up data fresh
+export const wakeUpRateScheduled = schedules.task({
+  id: "wake-up-rate-scheduled",
+  cron: "*/30 * * * *",
+  run: async () => {
+    const result = await wakeUpRate.triggerAndWait({ limit: 50 });
+    return result;
   },
 });

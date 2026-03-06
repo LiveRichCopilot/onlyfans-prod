@@ -95,7 +95,7 @@ export default function ContentFeedPage() {
           <Info size={14} className="text-teal-400 mt-0.5 shrink-0" />
           <div className="text-[11px] text-white/60 leading-relaxed">
             <span className="text-white/80 font-medium">Mass Messages</span> = broadcasts sent from the creator account to many fans at once. Not 1-on-1 chatter DMs.
-            <br />Revenue updates as fans purchase. Wake-up rate needs 24h to fully compute.
+            <br />Revenue updates as fans purchase. Wake-up rate updates every 30 min.
           </div>
         </div>
 
@@ -271,7 +271,7 @@ function ContentCard({ item }: { item: ContentItem }) {
         ) : !item.wakeUp ? (
           <div className="mt-3 pt-3 border-t border-white/[0.06]">
             <div className="text-[10px] text-white/30 italic">
-              {ageHours < 24 ? "Wake-up: Pending (needs 24h)" : "Wake-up: Computing..."}
+              {ageHours < 0.5 ? "Wake-up: Just posted" : "Wake-up: Computing..."}
             </div>
           </div>
         ) : null}
