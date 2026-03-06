@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock, Sparkles } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type WakeUp = {
@@ -372,8 +372,57 @@ function ContentCard({ item }: { item: ContentItem }) {
               </div>
             )
           )}
+
+          {/* Rewrite button for PPV with no sales */}
+          {!item.isFree && item.purchasedCount === 0 && ageHours > 1 && (
+            <RewriteButton postId={item.id} caption={item.caption} />
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function RewriteButton({ postId, caption }: { postId: string; caption: string }) {
+  const [suggestions, setSuggestions] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleRewrite = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/team-analytics/caption-rewrite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId }),
+      });
+      const data = await res.json();
+      setSuggestions(data.suggestions || []);
+    } catch {
+      setSuggestions(["Error generating suggestions"]);
+    } finally {
+      setLoading(false);
+    }
+  }, [postId]);
+
+  return (
+    <div className="mt-2">
+      {!suggestions ? (
+        <button
+          onClick={handleRewrite}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+        >
+          <Sparkles size={10} />
+          {loading ? "Generating..." : "Rewrite caption (AI)"}
+        </button>
+      ) : (
+        <div className="mt-1 space-y-1">
+          <div className="text-[9px] text-purple-400 font-medium mb-1">AI Suggestions:</div>
+          {suggestions.map((s, i) => (
+            <div key={i} className="text-[10px] text-white/70 bg-white/[0.03] rounded px-2 py-1">{s}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
