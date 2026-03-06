@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     const creatives = await prisma.outboundCreative.findMany({
       where,
       orderBy: { sentAt: "desc" },
-      take: 100,
+      take: 500,
       include: {
         media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true, permanentUrl: true } },
       },
