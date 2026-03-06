@@ -27,7 +27,7 @@ export const mediaPersistence = task({
   machine: "small-2x",
   run: async (payload: { limit?: number }) => {
     const supabase = getSupabase();
-    const limit = payload.limit || 10;
+    const limit = payload.limit || 50;
 
     // Find PHOTO media without permanentUrl (skip videos — too large, OOM risk)
     const media = await prisma.outboundMedia.findMany({
@@ -120,8 +120,7 @@ export const mediaPersistence = task({
         persisted++;
         console.log(`[Media] ${m.id}: saved to ${path}`);
 
-        // Small delay between downloads
-        await new Promise((r) => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 100));
       } catch (e: any) {
         console.error(`[Media] ${m.id}: ${e.message}`);
         errors++;
@@ -132,12 +131,12 @@ export const mediaPersistence = task({
   },
 });
 
-// Run every 15 minutes to persist any new un-persisted media
+// Run every 5 minutes to persist new media ASAP before CDN URLs expire (~30 min)
 export const mediaPersistenceScheduled = schedules.task({
   id: "media-persistence-scheduled",
-  cron: "*/15 * * * *",
+  cron: "*/5 * * * *",
   run: async () => {
-    const result = await mediaPersistence.triggerAndWait({ limit: 10 });
+    const result = await mediaPersistence.triggerAndWait({ limit: 50 });
     return result;
   },
 });

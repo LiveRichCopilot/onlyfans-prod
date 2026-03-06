@@ -48,7 +48,11 @@ export async function GET(req: NextRequest) {
       const sentAtUk = new Date(c.sentAt).toLocaleString("en-GB", { timeZone: "Europe/London" });
       const sentDate = new Date(c.sentAt).toLocaleDateString("en-US", { timeZone: "Europe/London", month: "short", day: "numeric", year: "numeric" });
       const viewRate = c.sentCount > 0 ? ((c.viewedCount / c.sentCount) * 100).toFixed(1) : "0.0";
-      const revenue = c.priceCents && c.purchasedCount ? ((c.priceCents / 100) * c.purchasedCount) : 0;
+      // Use purchaseBuckets as source of truth for purchase count when available
+      const pb = (c as any).purchaseBuckets as Record<string, number> | null;
+      const bucketPurchases = pb ? Math.max(...Object.values(pb), 0) : 0;
+      const bestPurchasedCount = Math.max(c.purchasedCount ?? 0, bucketPurchases);
+      const revenue = c.priceCents && bestPurchasedCount ? ((c.priceCents / 100) * bestPurchasedCount) : 0;
       return {
         id: c.id,
         externalId: c.externalId,
@@ -60,7 +64,7 @@ export async function GET(req: NextRequest) {
         caption: c.textPlain || c.textHtml || "",
         isFree: c.isFree,
         priceCents: c.priceCents ?? 0,
-        purchasedCount: c.purchasedCount ?? 0,
+        purchasedCount: bestPurchasedCount,
         revenue,
         mediaCount: c.mediaCount,
         sentCount: c.sentCount,
