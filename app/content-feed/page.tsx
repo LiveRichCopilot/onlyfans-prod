@@ -314,29 +314,33 @@ const BUCKET_LABELS: Record<string, string> = {
 
 function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
   const ageMins = ageHours * 60;
-  // Show buckets up to post age + one ahead, minimum first 4
   const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
   const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
-  const maxCount = Math.max(...keys.map((k) => Number(buckets[k] || 0)), 1);
-  // Show label every other bucket to keep it readable
+  // Convert cumulative to per-bucket (incremental) — shows WHEN fans replied
+  const incremental = keys.map((k, i) => {
+    const cum = Number(buckets[k] || 0);
+    const prev = i > 0 ? Number(buckets[keys[i - 1]] || 0) : 0;
+    return Math.max(cum - prev, 0);
+  });
+  const maxCount = Math.max(...incremental, 1);
   const showLabel = (i: number) => keys.length <= 8 || i % 2 === 0 || i === keys.length - 1;
 
   return (
     <div>
       <div className="flex gap-px">
         {keys.map((k, i) => {
-          const count = Number(buckets[k] || 0);
+          const count = incremental[i];
           const barPct = Math.max((count / maxCount) * 100, 3);
           const isFuture = Number(k) > ageMins + 15;
           return (
             <div key={k} className="flex-1 text-center min-w-0">
               <div className="h-8 flex items-end justify-center">
                 <div
-                  className={`w-full rounded-sm ${isFuture ? "bg-white/[0.03]" : count > 0 ? "bg-orange-400/40" : "bg-white/[0.06]"}`}
+                  className={`w-full rounded-sm ${isFuture ? "bg-white/[0.03]" : count > 0 ? "bg-yellow-500/40" : "bg-white/[0.06]"}`}
                   style={{ height: `${barPct}%`, minHeight: 1 }}
                 />
               </div>
-              <div className={`text-[8px] font-bold leading-tight mt-0.5 ${count > 0 ? "text-orange-400" : "text-white/15"}`}>{count || ""}</div>
+              <div className={`text-[8px] font-bold leading-tight mt-0.5 ${count > 0 ? "text-yellow-500" : "text-white/15"}`}>{count || ""}</div>
               {showLabel(i) && <div className="text-[7px] text-white/25 leading-tight">{BUCKET_LABELS[k]}</div>}
             </div>
           );
