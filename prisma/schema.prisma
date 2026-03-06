@@ -1012,20 +1012,25 @@ model OutboundCreative {
 }
 
 model OutboundMedia {
-  id         String           @id @default(cuid())
-  creativeId String
-  creative   OutboundCreative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
-  mediaType  String           // "photo" | "video" | "audio"
-  fullUrl    String?
-  previewUrl String?
-  thumbUrl      String?
-  permanentUrl  String?          // Supabase Storage — never expires
-  duration   Int?
-  width      Int?
-  height     Int?
-  createdAt  DateTime         @default(now())
+  id              String           @id @default(cuid())
+  creativeId      String
+  creative        OutboundCreative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  onlyfansMediaId String?          // Stable OF media ID (e.g. 4316998043) — survives URL expiry
+  mediaType       String           // "photo" | "video" | "audio"
+  fullUrl         String?
+  previewUrl      String?
+  thumbUrl        String?
+  permanentUrl    String?          // Supabase Storage — never expires
+  persistStatus   String           @default("pending") // "pending" | "ok" | "failed"
+  persistedAt     DateTime?
+  lastError       String?
+  duration        Int?
+  width           Int?
+  height          Int?
+  createdAt       DateTime         @default(now())
 
   @@index([creativeId])
+  @@index([persistStatus])
 }
 
 model ContentInsight {
