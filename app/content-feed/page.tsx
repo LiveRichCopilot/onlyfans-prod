@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock, Sparkles } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type WakeUp = {
@@ -86,33 +86,27 @@ export default function ContentFeedPage() {
       deduped.push(item);
     }
 
-    // When showing "all" creators, interleave by creator so one active creator
-    // doesn't flood the feed with 20 consecutive cards
-    if (filter === "all" && creatorFilter === "all") {
+    // When showing "all", interleave by creator so no single creator floods the feed.
+    // Round-robin: take one item from each creator, then the second from each, etc.
+    if (filter === "all") {
       const byCreator = new Map<string, ContentItem[]>();
       for (const item of deduped) {
         if (!byCreator.has(item.creatorId)) byCreator.set(item.creatorId, []);
         byCreator.get(item.creatorId)!.push(item);
       }
-      // Each creator's items are already in sentAt desc order from the API;
-      // sort within each group to guarantee it
-      for (const group of byCreator.values()) {
-        group.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
-      }
-      // Round-robin: take 1 from each creator, repeat
-      const creatorQueues = Array.from(byCreator.values());
+      const queues = Array.from(byCreator.values());
       const interleaved: ContentItem[] = [];
-      let remaining = true;
-      let idx = 0;
-      while (remaining) {
-        remaining = false;
-        for (const queue of creatorQueues) {
-          if (idx < queue.length) {
-            interleaved.push(queue[idx]);
-            if (idx + 1 < queue.length) remaining = true;
+      let round = 0;
+      let added = true;
+      while (added) {
+        added = false;
+        for (const queue of queues) {
+          if (round < queue.length) {
+            interleaved.push(queue[round]);
+            added = true;
           }
         }
-        idx++;
+        round++;
       }
       return interleaved;
     }
@@ -203,7 +197,7 @@ export default function ContentFeedPage() {
           grouped.map(([date, dateItems]) => (
             <div key={date} className="mb-8">
               <h2 className="text-sm font-semibold text-white/60 mb-3 sticky top-0 bg-[#050508]/80 backdrop-blur-sm py-2 z-10">{date}</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {dateItems.map((item) => (
                   <ContentCard key={item.id} item={item} />
                 ))}
@@ -243,9 +237,9 @@ function ContentCard({ item }: { item: ContentItem }) {
   const revenuePending = !item.isFree && ageHours < 1 && item.revenue === 0;
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
+    <div className="glass-card rounded-2xl overflow-hidden">
       {imgSrc ? (
-        <div className="relative aspect-[3/2] bg-black/40">
+        <div className="relative aspect-[4/3] bg-black/40">
           <img src={imgSrc} alt="" className="w-full h-full object-cover" />
           {/* Live meter — how long this has been live */}
           <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
@@ -269,7 +263,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           )}
         </div>
       ) : (
-        <div className="aspect-[3/2] bg-white/[0.02] flex items-center justify-center relative">
+        <div className="aspect-[4/3] bg-white/[0.02] flex items-center justify-center relative">
           <MessageSquare size={32} className="text-white/20" />
           <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
             <Clock size={11} className="text-teal-400" />
@@ -278,7 +272,7 @@ function ContentCard({ item }: { item: ContentItem }) {
         </div>
       )}
 
-      <div className="p-3">
+      <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-teal-400 font-medium">{item.creator.name || item.creator.ofUsername}</span>
           <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
@@ -292,17 +286,17 @@ function ContentCard({ item }: { item: ContentItem }) {
           <span className="text-xs text-white ml-auto">{item.sentAtUk}</span>
         </div>
 
-        <p className="text-xs text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
+        <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
 
         {/* Stats row */}
         {item.source === "direct_message" ? (
-          <div className="flex items-center gap-3 text-[10px] text-white/70">
-            <span className="flex items-center gap-1"><Send size={11} /> sent to {item.sentCount} fans</span>
+          <div className="flex items-center gap-3 text-xs text-white/70">
+            <span className="flex items-center gap-1"><Send size={12} /> sent to {item.sentCount} fans</span>
           </div>
         ) : (
-          <div className="flex items-center gap-3 text-[10px] text-white/70">
-            <span className="flex items-center gap-1"><Send size={11} /> {formatNum(item.sentCount)}</span>
-            <span className="flex items-center gap-1"><Eye size={11} /> {formatNum(item.viewedCount)}</span>
+          <div className="flex items-center gap-3 text-xs text-white/70">
+            <span className="flex items-center gap-1"><Send size={12} /> {formatNum(item.sentCount)}</span>
+            <span className="flex items-center gap-1"><Eye size={12} /> {formatNum(item.viewedCount)}</span>
             <span className={`font-medium ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>
               {item.viewRate}%
             </span>
@@ -363,7 +357,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           {/* Wake-up graph — only on mass messages and wall posts */}
           {item.source !== "direct_message" && (
             item.wakeUp?.buckets ? (
-              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} purchasedCount={item.purchasedCount ?? 0} />
+              <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} purchasedCount={item.purchasedCount} />
             ) : item.wakeUp ? (
               <div className="text-[10px] text-white/50">{item.wakeUp.totalReplied} fans replied</div>
             ) : (
@@ -372,57 +366,8 @@ function ContentCard({ item }: { item: ContentItem }) {
               </div>
             )
           )}
-
-          {/* Rewrite button for PPV with no sales */}
-          {!item.isFree && item.purchasedCount === 0 && ageHours > 1 && (
-            <RewriteButton postId={item.id} caption={item.caption} />
-          )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function RewriteButton({ postId, caption }: { postId: string; caption: string }) {
-  const [suggestions, setSuggestions] = useState<string[] | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleRewrite = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/team-analytics/caption-rewrite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId }),
-      });
-      const data = await res.json();
-      setSuggestions(data.suggestions || []);
-    } catch {
-      setSuggestions(["Error generating suggestions"]);
-    } finally {
-      setLoading(false);
-    }
-  }, [postId]);
-
-  return (
-    <div className="mt-2">
-      {!suggestions ? (
-        <button
-          onClick={handleRewrite}
-          disabled={loading}
-          className="flex items-center gap-1.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
-        >
-          <Sparkles size={10} />
-          {loading ? "Generating..." : "Rewrite caption (AI)"}
-        </button>
-      ) : (
-        <div className="mt-1 space-y-1">
-          <div className="text-[9px] text-purple-400 font-medium mb-1">AI Suggestions:</div>
-          {suggestions.map((s, i) => (
-            <div key={i} className="text-[10px] text-white/70 bg-white/[0.03] rounded px-2 py-1">{s}</div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -437,7 +382,7 @@ const BUCKET_LABELS: Record<string, string> = {
   "1080": "18h", "1200": "20h", "1320": "22h", "1440": "24h",
 };
 
-function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { buckets: Record<string, number>; totalReplied: number; ageHours: number; purchasedCount: number }) {
+function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
   const ageMins = ageHours * 60;
   const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
   const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
@@ -450,44 +395,20 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { bu
   const labelAt = new Set(["30","60","120","180","240","360","480","720","1440"]);
   const showLabel = (k: string) => labelAt.has(k);
 
-  // Spread purchases evenly across visible buckets as green markers
-  const purchasePerBucket: number[] = keys.map(() => 0);
-  if (purchasedCount > 0) {
-    const nonZeroBuckets = keys.map((k, i) => ({ i, count: incremental[i] })).filter(b => b.count > 0);
-    if (nonZeroBuckets.length > 0) {
-      const perBucket = Math.floor(purchasedCount / nonZeroBuckets.length);
-      const remainder = purchasedCount % nonZeroBuckets.length;
-      nonZeroBuckets.forEach((b, idx) => {
-        purchasePerBucket[b.i] = perBucket + (idx < remainder ? 1 : 0);
-      });
-    } else {
-      purchasePerBucket[0] = purchasedCount;
-    }
-  }
-
   return (
     <div>
       <div className="flex gap-px items-end" style={{ height: 32 }}>
         {keys.map((k, i) => {
           const count = incremental[i];
-          const pCount = purchasePerBucket[i];
           const maxC = Math.max(...incremental, 1);
           const hPct = Math.max((count / maxC) * 100, count > 0 ? 15 : 3);
-          const greenHPct = pCount > 0 ? Math.max((pCount / maxC) * 100, 12) : 0;
           return (
             <div key={k} className="flex-1 flex flex-col items-center min-w-0">
               {count > 0 && <span className="text-[8px] text-white font-bold mb-px">{count}</span>}
-              <div className="w-full relative" style={{ height: `${hPct}%`, minHeight: 1 }}>
-                <div
-                  className={`w-full h-full rounded-t-sm ${count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
-                />
-                {pCount > 0 && (
-                  <div
-                    className="absolute bottom-0 left-0 w-full rounded-t-sm bg-green-400/60"
-                    style={{ height: `${Math.min(greenHPct / hPct * 100, 100)}%`, minHeight: 2 }}
-                  />
-                )}
-              </div>
+              <div
+                className={`w-full rounded-t-sm ${count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
+                style={{ height: `${hPct}%`, minHeight: 1 }}
+              />
             </div>
           );
         })}
@@ -497,28 +418,9 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { bu
           showLabel(k) ? <span key={k} className="text-[7px] text-white/50">{BUCKET_LABELS[k]}</span> : <span key={k} />
         ))}
       </div>
-      <div className="flex items-center gap-2 mt-1">
-        <span className="text-[10px] text-white/80 font-semibold">
-          {formatNum(totalReplied)} fans replied
-        </span>
-        {purchasedCount > 0 && (
-          <span className="text-[10px] text-green-400 font-semibold">
-            {formatNum(purchasedCount)} purchased
-          </span>
-        )}
+      <div className="text-[8px] text-white/60 mt-0.5">
+        {formatNum(totalReplied)} fans replied
       </div>
-      {purchasedCount > 0 && (
-        <div className="flex items-center gap-3 mt-0.5">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm bg-yellow-500/50" />
-            <span className="text-[7px] text-white/40">Replies</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm bg-green-400/60" />
-            <span className="text-[7px] text-white/40">Purchases</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
