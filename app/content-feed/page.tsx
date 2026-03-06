@@ -211,9 +211,9 @@ function ContentCard({ item }: { item: ContentItem }) {
   const revenuePending = !item.isFree && ageHours < 1 && item.revenue === 0;
 
   return (
-    <div className="glass-card rounded-xl overflow-hidden">
+    <div className="glass-card rounded-2xl overflow-hidden">
       {imgSrc ? (
-        <div className="relative aspect-video bg-black/40">
+        <div className="relative aspect-[4/3] bg-black/40">
           <img src={imgSrc} alt="" className="w-full h-full object-cover" />
           {/* Live meter — how long this has been live */}
           <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
@@ -237,7 +237,7 @@ function ContentCard({ item }: { item: ContentItem }) {
           )}
         </div>
       ) : (
-        <div className="aspect-video bg-white/[0.02] flex items-center justify-center relative">
+        <div className="aspect-[4/3] bg-white/[0.02] flex items-center justify-center relative">
           <MessageSquare size={32} className="text-white/20" />
           <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
             <Clock size={11} className="text-teal-400" />
@@ -246,7 +246,7 @@ function ContentCard({ item }: { item: ContentItem }) {
         </div>
       )}
 
-      <div className="p-3">
+      <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-teal-400 font-medium">{item.creator.name || item.creator.ofUsername}</span>
           <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
