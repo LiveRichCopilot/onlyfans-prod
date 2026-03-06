@@ -24,16 +24,17 @@ function getSupabase() {
 export const mediaPersistence = task({
   id: "media-persistence",
   retry: { maxAttempts: 2 },
+  machine: "small-2x",
   run: async (payload: { limit?: number }) => {
     const supabase = getSupabase();
-    const limit = payload.limit || 30;
+    const limit = payload.limit || 10;
 
-    // Find media without permanentUrl that has a CDN URL
+    // Find PHOTO media without permanentUrl (skip videos — too large, OOM risk)
     const media = await prisma.outboundMedia.findMany({
       where: {
         permanentUrl: null,
+        mediaType: "photo",
         OR: [
-          { fullUrl: { not: null } },
           { previewUrl: { not: null } },
           { thumbUrl: { not: null } },
         ],
@@ -54,8 +55,8 @@ export const mediaPersistence = task({
     let errors = 0;
 
     for (const m of media) {
-      // Pick best available URL: full > preview > thumb
-      const sourceUrl = m.fullUrl || m.previewUrl || m.thumbUrl;
+      // Pick smallest safe URL: preview > thumb > full (avoid OOM on large files)
+      const sourceUrl = m.previewUrl || m.thumbUrl || m.fullUrl;
       if (!sourceUrl) continue;
 
       try {
