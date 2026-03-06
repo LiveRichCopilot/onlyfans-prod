@@ -37,7 +37,7 @@ export default function ContentFeedPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "content" | "bump">("all");
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useState(1);
 
   useEffect(() => {
     setLoading(true);

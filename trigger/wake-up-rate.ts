@@ -1,15 +1,9 @@
 /**
- * Wake Up Rate Task — "Can a post raise the dead?"
+ * Wake Up Rate — "Did this post make people chat?"
  *
- * For each push event (OutboundCreative), computes:
- * - How many fans were dormant (no INBOUND message in 7+ days) at push time
- * - How many of those dormant fans sent an inbound message within 1h, 3h, 6h, 24h
- *
- * Rules:
- * - Wake-up = INBOUND message only (fan→creator). NOT transactions/purchases.
- * - Dormant = lastInboundAt is null OR < pushTime - 7 days
- * - Excludes new subscribers (subscribedAt > pushTime)
- * - Uses lastInboundAt (inbound-only), NOT lastMessageAt (ambiguous)
+ * For each mass message, counts unique fans who started chatting AFTER it,
+ * excluding fans already in active conversation (any direction) 10 min before.
+ * Uses RawChatMessage.chatId as the stable fan identifier.
  */
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -18,19 +12,76 @@ const prisma = new PrismaClient({
   datasources: { db: { url: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "" } },
 });
 
-const DORMANT_DAYS = 7;
+const ACTIVE_LOOKBACK_MIN = 10;
+
+function clampToNow(d: Date, now: Date) {
+  return d.getTime() > now.getTime() ? now : d;
+}
+
+async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
+  const activeStart = new Date(T0.getTime() - ACTIVE_LOOKBACK_MIN * 60_000);
+
+  const w1h = clampToNow(new Date(T0.getTime() + 1 * 3600_000), now);
+  const w3h = clampToNow(new Date(T0.getTime() + 3 * 3600_000), now);
+  const w6h = clampToNow(new Date(T0.getTime() + 6 * 3600_000), now);
+  const w24h = clampToNow(new Date(T0.getTime() + 24 * 3600_000), now);
+
+  // 1) First inbound message per fan (chatId) after the post, up to 24h
+  const firstInboundByChat = await prisma.rawChatMessage.groupBy({
+    by: ["chatId"],
+    where: {
+      creatorId,
+      isFromCreator: false,
+      sentAt: { gt: T0, lte: w24h },
+    },
+    _min: { sentAt: true },
+  });
+
+  if (firstInboundByChat.length === 0) {
+    return { wake1h: 0, wake3h: 0, wake6h: 0, wake24h: 0 };
+  }
+
+  const responderChatIds = firstInboundByChat.map((r) => r.chatId);
+
+  // 2) Exclude fans already active in 10 min before the post (any direction)
+  const activeBefore = await prisma.rawChatMessage.groupBy({
+    by: ["chatId"],
+    where: {
+      creatorId,
+      chatId: { in: responderChatIds },
+      sentAt: { gte: activeStart, lte: T0 },
+    },
+  });
+
+  const activeSet = new Set(activeBefore.map((a) => a.chatId));
+
+  // 3) Wake-ups = responders minus already-active, counted by first inbound time
+  const wakeTimes = firstInboundByChat
+    .filter((r) => !activeSet.has(r.chatId))
+    .map((r) => r._min.sentAt!)
+    .filter(Boolean);
+
+  return {
+    wake1h: wakeTimes.filter((t) => t <= w1h).length,
+    wake3h: wakeTimes.filter((t) => t <= w3h).length,
+    wake6h: wakeTimes.filter((t) => t <= w6h).length,
+    wake24h: wakeTimes.filter((t) => t <= w24h).length,
+  };
+}
 
 export const wakeUpRate = task({
   id: "wake-up-rate",
   retry: { maxAttempts: 1 },
   run: async (payload: { limit?: number; creatorId?: string; recompute?: boolean }) => {
     const limit = payload.limit || 50;
+    const now = new Date();
 
-    // Compute wake-up for any post at least 30 min old — no 24h wait
-    const minAge = new Date(Date.now() - 30 * 60 * 1000);
+    // Process posts 30 min to 48h old
+    const minAge = new Date(now.getTime() - 30 * 60 * 1000);
+    const maxAge = new Date(now.getTime() - 48 * 60 * 60 * 1000);
     const where: any = {
       mediaCount: { gt: 0 },
-      sentAt: { lt: minAge },
+      sentAt: { lt: minAge, gt: maxAge },
     };
     if (!payload.recompute) where.wakeUpComputed = false;
     if (payload.creatorId) where.creatorId = payload.creatorId;
@@ -39,94 +90,35 @@ export const wakeUpRate = task({
       where,
       orderBy: { sentAt: "desc" },
       take: limit,
-      select: { id: true, creatorId: true, sentAt: true },
+      select: { id: true, creatorId: true, sentAt: true, sentCount: true },
     });
 
     if (pushEvents.length === 0) {
-      return { computed: 0, message: "No push events needing wake-up computation" };
+      return { computed: 0, message: "No posts needing wake-up computation" };
     }
 
     let computed = 0;
 
     for (const push of pushEvents) {
       try {
-        const pushTime = new Date(push.sentAt);
-        const dormantCutoff = new Date(pushTime.getTime() - DORMANT_DAYS * 24 * 60 * 60 * 1000);
-
-        // Dormant fans: lastInboundAt is null OR older than 7 days before push
-        // Exclude: subscribedAt > pushTime (new subs after the push)
-        // Exclude: createdAt > pushTime (fan record didn't exist yet)
-        const dormantFans = await prisma.fan.findMany({
-          where: {
-            creatorId: push.creatorId,
-            createdAt: { lt: pushTime },
-            OR: [
-              { subscribedAt: null },
-              { subscribedAt: { lt: pushTime } },
-            ],
-            AND: {
-              OR: [
-                { lastInboundAt: null },
-                { lastInboundAt: { lt: dormantCutoff } },
-              ],
-            },
-          },
-          select: { id: true },
-        });
-
-        const dormantCount = dormantFans.length;
-        if (dormantCount === 0) {
-          await prisma.outboundCreative.update({
-            where: { id: push.id },
-            data: {
-              dormantBefore: 0, wakeUp1h: 0, wakeUp3h: 0, wakeUp6h: 0, wakeUp24h: 0,
-              wakeUpComputed: true, wakeUpComputedAt: new Date(),
-            },
-          });
-          computed++;
-          continue;
-        }
-
-        const dormantIds = dormantFans.map((f) => f.id);
-
-        // Check which dormant fans had an INBOUND message (lastInboundAt moved into window)
-        const window1h = new Date(pushTime.getTime() + 1 * 60 * 60 * 1000);
-        const window3h = new Date(pushTime.getTime() + 3 * 60 * 60 * 1000);
-        const window6h = new Date(pushTime.getTime() + 6 * 60 * 60 * 1000);
-        const window24h = new Date(pushTime.getTime() + 24 * 60 * 60 * 1000);
-
-        // Fans whose lastInboundAt is within [pushTime, window]
-        // This means they sent a message AFTER the push
-        const wake1h = await prisma.fan.count({
-          where: { id: { in: dormantIds }, lastInboundAt: { gte: pushTime, lte: window1h } },
-        });
-        const wake3h = await prisma.fan.count({
-          where: { id: { in: dormantIds }, lastInboundAt: { gte: pushTime, lte: window3h } },
-        });
-        const wake6h = await prisma.fan.count({
-          where: { id: { in: dormantIds }, lastInboundAt: { gte: pushTime, lte: window6h } },
-        });
-        const wake24h = await prisma.fan.count({
-          where: { id: { in: dormantIds }, lastInboundAt: { gte: pushTime, lte: window24h } },
-        });
+        const T0 = new Date(push.sentAt);
+        const result = await computeWakeUps(push.creatorId, T0, now);
 
         await prisma.outboundCreative.update({
           where: { id: push.id },
           data: {
-            dormantBefore: dormantCount,
-            wakeUp1h: wake1h,
-            wakeUp3h: wake3h,
-            wakeUp6h: wake6h,
-            wakeUp24h: wake24h,
+            dormantBefore: push.sentCount || 0,
+            wakeUp1h: result.wake1h,
+            wakeUp3h: result.wake3h,
+            wakeUp6h: result.wake6h,
+            wakeUp24h: result.wake24h,
             wakeUpComputed: true,
-            wakeUpComputedAt: new Date(),
+            wakeUpComputedAt: now,
           },
         });
 
-        if (wake24h > 0) {
-          console.log(
-            `[WakeUp] ${push.id}: ${dormantCount} dormant → woke ${wake1h}/${wake3h}/${wake6h}/${wake24h} (1h/3h/6h/24h)`
-          );
+        if (result.wake1h > 0) {
+          console.log(`[WakeUp] ${push.id}: ${result.wake1h}/${result.wake3h}/${result.wake6h}/${result.wake24h} woke up`);
         }
         computed++;
       } catch (e: any) {
@@ -138,12 +130,12 @@ export const wakeUpRate = task({
   },
 });
 
-// Run every 30 minutes to keep wake-up data fresh
+// Run every 30 minutes
 export const wakeUpRateScheduled = schedules.task({
   id: "wake-up-rate-scheduled",
   cron: "*/30 * * * *",
   run: async () => {
-    const result = await wakeUpRate.triggerAndWait({ limit: 50 });
+    const result = await wakeUpRate.triggerAndWait({ limit: 50, recompute: true });
     return result;
   },
 });
