@@ -61,7 +61,28 @@ export default function ContentFeedPage() {
     let result = items;
     if (filter !== "all") result = result.filter((i) => i.type === filter);
     if (creatorFilter !== "all") result = result.filter((i) => i.creatorId === creatorFilter);
-    return result;
+
+    // Dedup DMs: same creator + same caption = same content sent to multiple fans
+    // Show once with count instead of N identical cards
+    const seen = new Map<string, number>();
+    const deduped: ContentItem[] = [];
+    for (const item of result) {
+      if (item.source === "direct_message" && item.caption) {
+        const key = `${item.creatorId}|${item.caption.slice(0, 80)}`;
+        const existing = seen.get(key);
+        if (existing !== undefined) {
+          // Merge: increment sentCount on the first one
+          deduped[existing].sentCount += 1;
+          if (item.purchasedCount > 0) deduped[existing].purchasedCount += item.purchasedCount;
+          if (item.revenue > 0) deduped[existing].revenue += item.revenue;
+          continue;
+        }
+        seen.set(key, deduped.length);
+        item.sentCount = 1; // Start counting
+      }
+      deduped.push(item);
+    }
+    return deduped;
   }, [items, filter, creatorFilter]);
 
   // Group by date
@@ -238,8 +259,12 @@ function ContentCard({ item }: { item: ContentItem }) {
 
         <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
 
-        {/* Stats row — only show sent/viewed for mass messages and wall posts */}
-        {item.source !== "direct_message" && (
+        {/* Stats row */}
+        {item.source === "direct_message" ? (
+          <div className="flex items-center gap-3 text-xs text-white/70">
+            <span className="flex items-center gap-1"><Send size={12} /> sent to {item.sentCount} fans</span>
+          </div>
+        ) : (
           <div className="flex items-center gap-3 text-xs text-white/70">
             <span className="flex items-center gap-1"><Send size={12} /> {formatNum(item.sentCount)}</span>
             <span className="flex items-center gap-1"><Eye size={12} /> {formatNum(item.viewedCount)}</span>
