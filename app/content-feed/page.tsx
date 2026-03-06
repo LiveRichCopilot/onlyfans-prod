@@ -382,7 +382,7 @@ const BUCKET_LABELS: Record<string, string> = {
   "1080": "18h", "1200": "20h", "1320": "22h", "1440": "24h",
 };
 
-function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
+function WakeUpBuckets({ buckets, totalReplied, ageHours, purchasedCount }: { buckets: Record<string, number>; totalReplied: number; ageHours: number; purchasedCount: number }) {
   const ageMins = ageHours * 60;
   const visible = ALL_BUCKETS.filter((k) => Number(k) <= ageMins + 30);
   const keys = visible.length < 4 ? ALL_BUCKETS.slice(0, 4) : visible;
@@ -391,6 +391,10 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<st
     const prev = i > 0 ? Number(buckets[keys[i - 1]] || 0) : 0;
     return Math.max(cum - prev, 0);
   });
+  // Cold fans replied = highest cumulative bucket value (buckets are cold-fan only)
+  const coldReplied = Math.max(...keys.map((k) => Number(buckets[k] || 0)), 0);
+  // First bucket index with activity — used to mark green for purchases
+  const firstNonZeroIdx = purchasedCount > 0 ? incremental.findIndex((c) => c > 0) : -1;
   // Show label at key intervals
   const labelAt = new Set(["30","60","120","180","240","360","480","720","1440"]);
   const showLabel = (k: string) => labelAt.has(k);
@@ -402,11 +406,12 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<st
           const count = incremental[i];
           const maxC = Math.max(...incremental, 1);
           const hPct = Math.max((count / maxC) * 100, count > 0 ? 15 : 3);
+          const isGreen = i === firstNonZeroIdx;
           return (
             <div key={k} className="flex-1 flex flex-col items-center min-w-0">
-              {count > 0 && <span className="text-[8px] text-white font-bold mb-px">{count}</span>}
+              {count > 0 && <span className={`text-[8px] font-bold mb-px ${isGreen ? "text-green-400" : "text-white"}`}>{count}</span>}
               <div
-                className={`w-full rounded-t-sm ${count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
+                className={`w-full rounded-t-sm ${isGreen ? "bg-green-500/60" : count > 0 ? "bg-yellow-500/50" : "bg-white/[0.04]"}`}
                 style={{ height: `${hPct}%`, minHeight: 1 }}
               />
             </div>
@@ -418,8 +423,13 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<st
           showLabel(k) ? <span key={k} className="text-[7px] text-white/50">{BUCKET_LABELS[k]}</span> : <span key={k} />
         ))}
       </div>
+      {purchasedCount > 0 && (
+        <div className="text-[8px] text-green-400 font-semibold mt-0.5">
+          $ {formatNum(purchasedCount)} bought
+        </div>
+      )}
       <div className="text-[8px] text-white/60 mt-0.5">
-        {formatNum(totalReplied)} fans replied
+        {formatNum(coldReplied)} cold fans replied · {formatNum(totalReplied)} total
       </div>
     </div>
   );
