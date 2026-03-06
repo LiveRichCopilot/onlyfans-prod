@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info } from "lucide-react";
+import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type WakeUp = {
@@ -165,6 +165,13 @@ function getPostAgeHours(sentAt: string): number {
   return (Date.now() - t) / (1000 * 60 * 60);
 }
 
+function formatAge(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)}m live`;
+  if (hours < 24) return `${Math.round(hours)}h live`;
+  const days = Math.floor(hours / 24);
+  return `${days}d live`;
+}
+
 function ContentCard({ item }: { item: ContentItem }) {
   const firstMedia = item.media[0];
   const permanentUrl = firstMedia?.permanentUrl;
@@ -183,6 +190,11 @@ function ContentCard({ item }: { item: ContentItem }) {
       {imgSrc ? (
         <div className="relative aspect-[4/3] bg-black/40">
           <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+          {/* Live meter — how long this has been live */}
+          <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+            <Clock size={11} className="text-teal-400" />
+            <span className="font-medium">{formatAge(ageHours)}</span>
+          </div>
           {isVideo && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center">
@@ -191,30 +203,34 @@ function ContentCard({ item }: { item: ContentItem }) {
             </div>
           )}
           {item.media.length > 1 && (
-            <span className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+            <span className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
               +{item.media.length - 1}
             </span>
           )}
           {item.isCanceled && (
-            <span className="absolute top-2 left-2 bg-red-500/80 text-white text-xs px-2 py-0.5 rounded-full">Unsent</span>
+            <span className="absolute bottom-2 left-2 bg-red-500/80 text-white text-xs px-2 py-0.5 rounded-full">Unsent</span>
           )}
         </div>
       ) : (
-        <div className="aspect-[4/3] bg-white/[0.02] flex items-center justify-center">
+        <div className="aspect-[4/3] bg-white/[0.02] flex items-center justify-center relative">
           <MessageSquare size={32} className="text-white/20" />
+          <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+            <Clock size={11} className="text-teal-400" />
+            <span className="font-medium">{formatAge(ageHours)}</span>
+          </div>
         </div>
       )}
 
       <div className="p-4">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-teal-400 font-medium">{item.creator.name || item.creator.ofUsername}</span>
-          <span className="text-xs text-white/30">{item.sentAtUk}</span>
+          <span className="text-xs text-white">{item.sentAtUk}</span>
         </div>
 
         <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
 
         {/* Stats row */}
-        <div className="flex items-center gap-3 text-xs text-white/40">
+        <div className="flex items-center gap-3 text-xs text-white/70">
           <span className="flex items-center gap-1"><Send size={12} /> {formatNum(item.sentCount)}</span>
           <span className="flex items-center gap-1"><Eye size={12} /> {formatNum(item.viewedCount)}</span>
           <span className={`font-medium ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>
@@ -226,19 +242,19 @@ function ContentCard({ item }: { item: ContentItem }) {
         {!item.isFree ? (
           <div className="mt-2 flex items-center justify-between">
             <div>
-              <span className={`text-lg font-bold ${revenuePending ? "text-white/40 italic" : item.revenue > 0 ? "text-green-400" : "text-red-400/60"}`}>
+              <span className={`text-lg font-bold ${revenuePending ? "text-white/50 italic" : item.revenue > 0 ? "text-green-400" : "text-red-400/60"}`}>
                 {revenuePending ? "Pending" : `$${item.revenue > 0 ? item.revenue.toFixed(0) : "0"}`}
               </span>
-              {!revenuePending && <span className="text-[10px] text-white/30 ml-1">earned</span>}
+              {!revenuePending && <span className="text-[10px] text-white/60 ml-1">earned</span>}
             </div>
-            <div className="text-right text-[10px] text-white/40">
+            <div className="text-right text-[10px] text-white">
               <div>${(item.priceCents / 100).toFixed(0)} PPV</div>
               <div>{item.purchasedCount > 0 ? `${item.purchasedCount} bought` : "No purchases yet"}</div>
             </div>
           </div>
         ) : (
           <div className="mt-2">
-            <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-white/40">Free</span>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-white/[0.06] text-white/70">Free</span>
           </div>
         )}
 
@@ -316,11 +332,11 @@ function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<st
             <div key={k} className="flex-1 text-center min-w-0">
               <div className="h-8 flex items-end justify-center">
                 <div
-                  className={`w-full rounded-sm ${isFuture ? "bg-white/[0.03]" : count > 0 ? "bg-amber-400/40" : "bg-white/[0.06]"}`}
+                  className={`w-full rounded-sm ${isFuture ? "bg-white/[0.03]" : count > 0 ? "bg-orange-400/40" : "bg-white/[0.06]"}`}
                   style={{ height: `${barPct}%`, minHeight: 1 }}
                 />
               </div>
-              <div className={`text-[8px] font-bold leading-tight mt-0.5 ${count > 0 ? "text-amber-400" : "text-white/15"}`}>{count || ""}</div>
+              <div className={`text-[8px] font-bold leading-tight mt-0.5 ${count > 0 ? "text-orange-400" : "text-white/15"}`}>{count || ""}</div>
               {showLabel(i) && <div className="text-[7px] text-white/25 leading-tight">{BUCKET_LABELS[k]}</div>}
             </div>
           );
