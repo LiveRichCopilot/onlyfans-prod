@@ -5,6 +5,36 @@ import { getAllDirectMessageStats } from "@/lib/ofapi-engagement";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const OFAPI_BASE = "https://app.onlyfansapi.com";
+const MEDIA_BUCKET = "content-media";
+
+async function persistImage(accountId: string, creatorId: string, creativeId: string, sourceUrl: string, mediaId: string): Promise<string | null> {
+  const apiKey = (process.env.OFAPI_API_KEY || "").trim();
+  if (!apiKey || !SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
+  try {
+    const res = await fetch(`${OFAPI_BASE}/api/${accountId}/media/download/${sourceUrl}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const blob = await res.arrayBuffer();
+    const path = `${creatorId}/${creativeId}/${mediaId}.jpg`;
+    const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": res.headers.get("content-type") || "image/jpeg",
+        "x-upsert": "true",
+      },
+      body: blob,
+    });
+    if (!upRes.ok) return null;
+    return `${SUPABASE_URL}/storage/v1/object/public/${MEDIA_BUCKET}/${path}`;
+  } catch { return null; }
+}
+
 /**
  * GET /api/cron/sync-dm-content
  * Separate cron for DM sync — doesn't compete with mass message sync for time.
@@ -56,7 +86,7 @@ export async function GET(req: NextRequest) {
             if (!isNaN(pc)) purchasedCount = pc;
           }
 
-          await prisma.outboundCreative.upsert({
+          const row = await prisma.outboundCreative.upsert({
             where: {
               creatorId_source_externalId: {
                 creatorId: creator.id,
@@ -89,6 +119,30 @@ export async function GET(req: NextRequest) {
             },
           });
           totalUpserted++;
+
+          // Persist media to Supabase immediately
+          if (Array.isArray(m.media) && m.media.length > 0) {
+            const existing = await prisma.outboundMedia.findFirst({ where: { creativeId: row.id, permanentUrl: { not: null } } });
+            if (!existing) {
+              for (const mi of m.media) {
+                const f = mi?.files;
+                if (!f) continue;
+                const srcUrl = f?.preview?.url || f?.thumb?.url || f?.full?.url;
+                if (!srcUrl || mi.type === "video") continue;
+                const permUrl = await persistImage(acctId, creator.id, row.id, srcUrl, String(mi.id || `dm${Date.now()}`));
+                await prisma.outboundMedia.create({
+                  data: {
+                    creativeId: row.id,
+                    mediaType: mi.type || "photo",
+                    fullUrl: f?.full?.url || null,
+                    previewUrl: f?.preview?.url || null,
+                    thumbUrl: f?.thumb?.url || null,
+                    permanentUrl: permUrl,
+                  },
+                });
+              }
+            }
+          }
         }
       } catch (e: any) {
         console.error(`[sync-dm] ${creator.name}:`, e.message);

@@ -6,6 +6,36 @@ import { ofapiRequest } from "@/lib/ofapi-core";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const OFAPI_BASE = "https://app.onlyfansapi.com";
+const MEDIA_BUCKET = "content-media";
+
+async function downloadAndPersist(accountId: string, creatorId: string, creativeId: string, sourceUrl: string, mediaId: string, contentType?: string): Promise<string | null> {
+  const apiKey = (process.env.OFAPI_API_KEY || "").trim();
+  if (!apiKey || !SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
+  try {
+    const res = await fetch(`${OFAPI_BASE}/api/${accountId}/media/download/${sourceUrl}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const blob = await res.arrayBuffer();
+    const path = `${creatorId}/${creativeId}/${mediaId}.jpg`;
+    const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": res.headers.get("content-type") || contentType || "image/jpeg",
+        "x-upsert": "true",
+      },
+      body: blob,
+    });
+    if (!upRes.ok) return null;
+    return `${SUPABASE_URL}/storage/v1/object/public/${MEDIA_BUCKET}/${path}`;
+  } catch { return null; }
+}
+
 /**
  * GET /api/cron/sync-outbound-content
  * Syncs mass messages AND chatter DMs (with media) from OFAPI.
@@ -104,7 +134,7 @@ export async function GET(req: NextRequest) {
           });
           totalUpserted++;
 
-          totalMedia += await syncMedia(row.id, m);
+          totalMedia += await syncMedia(row.id, creator.id, acctId, m);
         }
       } catch (e: any) {
         console.error(`[sync-outbound] mass ${acctId}:`, e.message);
@@ -171,7 +201,7 @@ export async function GET(req: NextRequest) {
           });
           totalUpserted++;
 
-          totalMedia += await syncMedia(row.id, m);
+          totalMedia += await syncMedia(row.id, creator.id, acctId, m);
         }
       } catch (e: any) {
         console.error(`[sync-outbound] dm ${acctId}:`, e.message);
@@ -227,7 +257,7 @@ export async function GET(req: NextRequest) {
               update: { ...shared },
             });
             totalUpserted++;
-            totalMedia += await syncMedia(row.id, p);
+            totalMedia += await syncMedia(row.id, creator.id, acctId, p);
           }
 
           offset += posts.length;
@@ -245,7 +275,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function syncMedia(creativeId: string, item: any): Promise<number> {
+async function syncMedia(creativeId: string, creatorId: string, accountId: string, item: any): Promise<number> {
   if (!Array.isArray(item.media) || item.media.length === 0) return 0;
 
   // Check if we already have persisted media — don't wipe permanentUrls
@@ -255,10 +285,8 @@ async function syncMedia(creativeId: string, item: any): Promise<number> {
   });
   const hasPersisted = existing.some((m) => m.permanentUrl);
 
-  // If we already have persisted media, just update CDN URLs (they refresh)
-  // Don't delete — that destroys permanentUrl
   if (hasPersisted) {
-    // Update CDN URLs on existing records for proxy freshness
+    // Update CDN URLs on existing records, keep permanentUrls
     for (const m of item.media) {
       const f = m?.files;
       if (!f) continue;
@@ -266,7 +294,6 @@ async function syncMedia(creativeId: string, item: any): Promise<number> {
       const previewUrl = f?.preview?.url ?? null;
       const thumbUrl = f?.thumb?.url ?? null;
       if (!fullUrl && !previewUrl && !thumbUrl) continue;
-      // Update first matching record by type (best effort refresh)
       const match = existing.shift();
       if (match) {
         await prisma.outboundMedia.update({
@@ -275,10 +302,10 @@ async function syncMedia(creativeId: string, item: any): Promise<number> {
         });
       }
     }
-    return 0; // No new records created
+    return 0;
   }
 
-  // No persisted media yet — safe to recreate
+  // No persisted media — create records AND download to Supabase immediately
   await prisma.outboundMedia.deleteMany({ where: { creativeId } });
 
   let created = 0;
@@ -290,6 +317,15 @@ async function syncMedia(creativeId: string, item: any): Promise<number> {
     const thumbUrl = f?.thumb?.url ?? null;
     if (!fullUrl && !previewUrl && !thumbUrl) continue;
 
+    // Download to Supabase right now while CDN URL is fresh (skip videos — too large)
+    let permanentUrl: string | null = null;
+    if (m.type !== "video") {
+      const sourceUrl = previewUrl || thumbUrl || fullUrl;
+      if (sourceUrl) {
+        permanentUrl = await downloadAndPersist(accountId, creatorId, creativeId, sourceUrl, String(m.id || `m${created}`));
+      }
+    }
+
     await prisma.outboundMedia.create({
       data: {
         creativeId,
@@ -297,6 +333,7 @@ async function syncMedia(creativeId: string, item: any): Promise<number> {
         fullUrl,
         previewUrl,
         thumbUrl,
+        permanentUrl,
         duration: m.duration ?? null,
         width: m.width ?? null,
         height: m.height ?? null,
