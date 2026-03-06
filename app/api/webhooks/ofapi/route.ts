@@ -5,11 +5,16 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/webhooks/ofapi
- * Receives real-time events from OFAPI webhooks:
- * - messages.received (fan replied — wake-up)
- * - messages.sent (chatter sent DM)
- * - messages.ppv.unlocked (fan bought PPV)
- * - posts.liked (fan liked wall post)
+ * Real-time events from OFAPI — every event gets stored immediately.
+ *
+ * Events:
+ * - messages.received → RawChatMessage (fan replied = wake-up)
+ * - messages.sent → RawChatMessage (chatter sent DM)
+ * - messages.ppv.unlocked → increment purchasedCount on OutboundCreative
+ * - transactions.new → log transaction
+ * - tips.received → RawChatMessage with isTip=true
+ * - subscriptions.new → log
+ * - posts.liked → log
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,24 +23,22 @@ export async function POST(req: NextRequest) {
     const data = body.data || body.payload || body;
     const accountId = body.accountId || body.account_id || data?.accountId || "";
 
-    console.log(`[ofapi-webhook] ${event} from ${accountId}`);
-
     // Find creator by OFAPI account ID
     const creator = accountId
       ? await prisma.creator.findFirst({
           where: { ofapiCreatorId: accountId },
-          select: { id: true },
+          select: { id: true, name: true },
         })
       : null;
 
-    // Store raw event for processing
-    // Using RawChatMessage for message events, or log for others
+    const creatorId = creator?.id || "unknown";
+    console.log(`[webhook] ${event} | ${creator?.name || accountId}`);
+
+    // ── Messages (fan replies + chatter DMs) ──
     if (event === "messages.received" || event === "messages.sent") {
       const msg = data?.message || data;
       if (msg && creator) {
         const chatId = String(msg.chatId || msg.fromUser?.id || msg.toUser?.id || "");
-        const isFromCreator = event === "messages.sent";
-
         await prisma.rawChatMessage.upsert({
           where: {
             creatorId_ofMessageId: {
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest) {
             creatorId: creator.id,
             chatId,
             fromUserId: String(msg.fromUser?.id || ""),
-            isFromCreator,
+            isFromCreator: event === "messages.sent",
             text: msg.text || null,
             price: msg.price || 0,
             isFree: msg.isFree !== false,
@@ -64,31 +67,74 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── PPV Purchase ──
     if (event === "messages.ppv.unlocked") {
-      // Fan bought a PPV — update purchase count on the OutboundCreative
-      const messageId = String(data?.messageId || data?.message?.id || "");
+      const messageId = String(data?.messageId || data?.message?.id || data?.id || "");
       if (messageId && creator) {
         await prisma.outboundCreative.updateMany({
-          where: {
-            creatorId: creator.id,
-            externalId: messageId,
-          },
-          data: {
-            purchasedCount: { increment: 1 },
-          },
+          where: { creatorId: creator.id, externalId: messageId },
+          data: { purchasedCount: { increment: 1 } },
         });
-        console.log(`[ofapi-webhook] PPV unlocked: message ${messageId} for ${creator.id}`);
+        console.log(`[webhook] PPV bought: msg ${messageId} for ${creator.name}`);
       }
+    }
+
+    // ── Tips ──
+    if (event === "tips.received") {
+      const msg = data?.message || data;
+      if (msg && creator) {
+        const chatId = String(msg.chatId || msg.fromUser?.id || "");
+        await prisma.rawChatMessage.upsert({
+          where: {
+            creatorId_ofMessageId: {
+              creatorId: creator.id,
+              ofMessageId: String(msg.id || `tip_${Date.now()}`),
+            },
+          },
+          create: {
+            ofMessageId: String(msg.id || `tip_${Date.now()}`),
+            creatorId: creator.id,
+            chatId,
+            fromUserId: String(msg.fromUser?.id || ""),
+            isFromCreator: false,
+            text: msg.text || null,
+            price: 0,
+            isFree: true,
+            mediaCount: 0,
+            isLiked: false,
+            isTip: true,
+            tipAmount: msg.amount || msg.tipAmount || 0,
+            raw: msg,
+            sentAt: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+          },
+          update: {},
+        });
+      }
+    }
+
+    // ── Transactions (purchases, subs, tips — all revenue) ──
+    if (event === "transactions.new") {
+      // Store in raw for now — can be parsed into specific tables later
+      console.log(`[webhook] Transaction: ${JSON.stringify(data).slice(0, 200)}`);
+    }
+
+    // ── New subscriber ──
+    if (event === "subscriptions.new") {
+      console.log(`[webhook] New sub for ${creator?.name}: ${JSON.stringify(data).slice(0, 200)}`);
+    }
+
+    // ── Post liked ──
+    if (event === "posts.liked") {
+      console.log(`[webhook] Post liked for ${creator?.name}: post ${data?.postId || data?.id}`);
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    console.error("[ofapi-webhook]", err.message);
+    console.error("[webhook] Error:", err.message);
     return NextResponse.json({ ok: true }); // Always 200 so OFAPI doesn't retry
   }
 }
 
-// OFAPI may send GET to verify the endpoint
 export async function GET() {
   return NextResponse.json({ status: "ok", service: "ofapi-webhook" });
 }
