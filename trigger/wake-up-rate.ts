@@ -1,11 +1,9 @@
 /**
  * Wake Up Rate — "How many cold fans started chatting after this post?"
  *
- * For each mass message, counts fans who messaged AFTER it
- * who had NOT chatted in the last 3 days (truly dormant/cold fans).
- *
- * Result: simple count like "12 fans woke up"
- * Not a percentage. Not against sentCount. Just the number of cold fans who replied.
+ * Computes at 30-minute intervals: 30m, 1h, 1h30, 2h, 2h30, 3h, 4h, 5h, 6h
+ * A "cold fan" = hadn't chatted in 3+ days before the mass message.
+ * Result: simple counts like "50 fans woke up at 30m, 120 at 1h, 180 at 1h30..."
  */
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -14,54 +12,50 @@ const prisma = new PrismaClient({
   datasources: { db: { url: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "" } },
 });
 
-// A fan is "dormant" if they haven't chatted (either direction) in this many days
 const DORMANT_DAYS = 3;
+
+// Every 30 min up to 3h, then hourly to 6h — all in minutes
+const BUCKETS = [30, 60, 90, 120, 150, 180, 240, 300, 360];
 
 function clampToNow(d: Date, now: Date) {
   return d.getTime() > now.getTime() ? now : d;
 }
 
 async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
-  // Dormant = no chat activity in 3 days before the mass message
   const dormantCutoff = new Date(T0.getTime() - DORMANT_DAYS * 24 * 3600_000);
+  const maxWindow = clampToNow(new Date(T0.getTime() + 360 * 60_000), now);
 
-  const w30m = clampToNow(new Date(T0.getTime() + 30 * 60_000), now);
-  const w1h = clampToNow(new Date(T0.getTime() + 1 * 3600_000), now);
-  const w3h = clampToNow(new Date(T0.getTime() + 3 * 3600_000), now);
-  const w6h = clampToNow(new Date(T0.getTime() + 6 * 3600_000), now);
-  const w24h = clampToNow(new Date(T0.getTime() + 24 * 3600_000), now);
-
-  // 1) All fans who sent an inbound message after the post (up to 24h)
+  // 1) All fans who sent an inbound message after the post
   const firstInboundByChat = await prisma.rawChatMessage.groupBy({
     by: ["chatId"],
     where: {
       creatorId,
       isFromCreator: false,
-      sentAt: { gt: T0, lte: w24h },
+      sentAt: { gt: T0, lte: maxWindow },
     },
     _min: { sentAt: true },
   });
 
-  // 2) Count outbound chatter DMs after the mass message
-  const chatterDMs1hCount = await prisma.rawChatMessage.count({
-    where: { creatorId, isFromCreator: true, sentAt: { gt: T0, lte: w1h } },
-  });
-  const chatterDMs3hCount = await prisma.rawChatMessage.count({
-    where: { creatorId, isFromCreator: true, sentAt: { gt: T0, lte: w3h } },
-  });
+  // 2) Outbound chatter DMs after the mass message (for each bucket)
+  const chatterDMsBuckets: Record<string, number> = {};
+  for (const mins of BUCKETS) {
+    const cutoff = clampToNow(new Date(T0.getTime() + mins * 60_000), now);
+    if (cutoff.getTime() <= T0.getTime()) { chatterDMsBuckets[String(mins)] = 0; continue; }
+    const count = await prisma.rawChatMessage.count({
+      where: { creatorId, isFromCreator: true, sentAt: { gt: T0, lte: cutoff } },
+    });
+    chatterDMsBuckets[String(mins)] = count;
+  }
 
   if (firstInboundByChat.length === 0) {
-    return {
-      totalReplied: 0, dormantWoke: 0,
-      wake30m: 0, wake1h: 0, wake3h: 0, wake6h: 0, wake24h: 0,
-      chatterDMs1h: chatterDMs1hCount, chatterDMs3h: chatterDMs3hCount,
-    };
+    const emptyBuckets: Record<string, number> = {};
+    for (const mins of BUCKETS) emptyBuckets[String(mins)] = 0;
+    return { totalReplied: 0, wakeUpBuckets: emptyBuckets, chatterDMs: chatterDMsBuckets };
   }
 
   const responderChatIds = firstInboundByChat.map((r) => r.chatId);
 
-  // 3) Find which responders had ANY chat activity in the 3 days before the post
-  //    (any direction — fan or creator messages both count as "active")
+  // 3) Find which responders had chat activity in the 3 days before the post
   const activeBeforePost = await prisma.rawChatMessage.groupBy({
     by: ["chatId"],
     where: {
@@ -73,22 +67,22 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
 
   const activeSet = new Set(activeBeforePost.map((a) => a.chatId));
 
-  // 4) Dormant wake-ups = responders who had NO activity in last 3 days
-  const dormantWakeUps = firstInboundByChat
+  // 4) Cold fan wake-ups per bucket
+  const coldWakeUps = firstInboundByChat
     .filter((r) => !activeSet.has(r.chatId))
     .map((r) => r._min.sentAt!)
     .filter(Boolean);
 
+  const wakeUpBuckets: Record<string, number> = {};
+  for (const mins of BUCKETS) {
+    const cutoff = clampToNow(new Date(T0.getTime() + mins * 60_000), now);
+    wakeUpBuckets[String(mins)] = coldWakeUps.filter((t) => t <= cutoff).length;
+  }
+
   return {
     totalReplied: firstInboundByChat.length,
-    dormantWoke: dormantWakeUps.length,
-    wake30m: dormantWakeUps.filter((t) => t <= w30m).length,
-    wake1h: dormantWakeUps.filter((t) => t <= w1h).length,
-    wake3h: dormantWakeUps.filter((t) => t <= w3h).length,
-    wake6h: dormantWakeUps.filter((t) => t <= w6h).length,
-    wake24h: dormantWakeUps.filter((t) => t <= w24h).length,
-    chatterDMs1h: chatterDMs1hCount,
-    chatterDMs3h: chatterDMs3hCount,
+    wakeUpBuckets,
+    chatterDMs: chatterDMsBuckets,
   };
 }
 
@@ -99,7 +93,6 @@ export const wakeUpRate = task({
     const limit = payload.limit || 50;
     const now = new Date();
 
-    // Process posts 15 min to 48h old
     const minAge = new Date(now.getTime() - 15 * 60 * 1000);
     const maxAge = new Date(now.getTime() - 48 * 60 * 60 * 1000);
     const where: any = {
@@ -130,23 +123,24 @@ export const wakeUpRate = task({
         await prisma.outboundCreative.update({
           where: { id: push.id },
           data: {
-            // dormantBefore = how many fans were truly dormant (no chat in 3 days)
-            // We don't know the exact number without checking all recipients,
-            // so we store totalReplied for context
             dormantBefore: result.totalReplied,
-            wakeUp30m: result.wake30m,
-            wakeUp1h: result.wake1h,
-            wakeUp3h: result.wake3h,
-            wakeUp6h: result.wake6h,
-            wakeUp24h: result.wake24h,
-            chatterDMs1h: result.chatterDMs1h,
-            chatterDMs3h: result.chatterDMs3h,
+            wakeUpBuckets: result.wakeUpBuckets,
+            chatterDMs: result.chatterDMs,
+            // Legacy columns
+            wakeUp30m: result.wakeUpBuckets["30"] ?? 0,
+            wakeUp1h: result.wakeUpBuckets["60"] ?? 0,
+            wakeUp3h: result.wakeUpBuckets["180"] ?? 0,
+            wakeUp6h: result.wakeUpBuckets["360"] ?? 0,
+            wakeUp24h: result.wakeUpBuckets["360"] ?? 0,
+            chatterDMs1h: result.chatterDMs["60"] ?? 0,
+            chatterDMs3h: result.chatterDMs["180"] ?? 0,
             wakeUpComputed: true,
             wakeUpComputedAt: now,
           },
         });
 
-        console.log(`[WakeUp] ${push.id}: ${result.dormantWoke} cold fans woke up (${result.totalReplied} total replied) | chatter DMs: ${result.chatterDMs1h}/${result.chatterDMs3h}`);
+        const b = result.wakeUpBuckets;
+        console.log(`[WakeUp] ${push.id}: 30m=${b["30"]} 1h=${b["60"]} 1h30=${b["90"]} 2h=${b["120"]} 3h=${b["180"]} (${result.totalReplied} total replied)`);
         computed++;
       } catch (e: any) {
         console.error(`[WakeUp] ${push.id}: ${e.message}`);
@@ -157,7 +151,6 @@ export const wakeUpRate = task({
   },
 });
 
-// Run every 15 minutes for fast feedback
 export const wakeUpRateScheduled = schedules.task({
   id: "wake-up-rate-scheduled",
   cron: "*/15 * * * *",

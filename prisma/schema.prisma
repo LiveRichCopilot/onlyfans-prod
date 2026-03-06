@@ -982,14 +982,17 @@ model OutboundCreative {
   sentCount  Int             @default(0)
   viewedCount Int            @default(0)
   purchasedCount Int?        // From /engagement/messages/{id}/buyers
-  dormantBefore  Int?        // Fans dormant (7d+ no message) at send time
-  wakeUp30m      Int?        // Dormant fans who sent inbound msg within 30min
-  wakeUp1h       Int?        // Dormant fans who sent inbound msg within 1h
-  wakeUp3h       Int?        // Dormant fans who sent inbound msg within 3h
-  wakeUp6h       Int?        // Dormant fans who sent inbound msg within 6h
-  wakeUp24h      Int?        // Dormant fans who sent inbound msg within 24h
-  chatterDMs1h   Int?        // Outbound chatter DMs sent within 1h of mass msg
-  chatterDMs3h   Int?        // Outbound chatter DMs sent within 3h of mass msg
+  dormantBefore  Int?        // Total fans who replied after mass msg
+  wakeUpBuckets  Json?       // {"30":5,"60":12,"90":18,"120":22,...} cold fans woke up per 30min
+  chatterDMs     Json?       // {"30":100,"60":250,...} outbound chatter DMs per 30min
+  // Legacy columns kept for backward compat — new data goes in JSON buckets
+  wakeUp30m      Int?
+  wakeUp1h       Int?
+  wakeUp3h       Int?
+  wakeUp6h       Int?
+  wakeUp24h      Int?
+  chatterDMs1h   Int?
+  chatterDMs3h   Int?
   wakeUpComputed Boolean     @default(false)
   wakeUpComputedAt DateTime? // When wake-up was last computed
   isCanceled Boolean         @default(false)

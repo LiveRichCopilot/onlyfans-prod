@@ -4,7 +4,11 @@ import { useEffect, useState, useMemo } from "react";
 import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
-type WakeUp = { dormantBefore: number; w30m: number; w1h: number; w3h: number; w6h: number; w24h: number; chatterDMs1h: number; chatterDMs3h: number };
+type WakeUp = {
+  totalReplied: number;
+  buckets: Record<string, number> | null; // {"30":5,"60":12,"90":18,...}
+  chatterDMs: Record<string, number> | null;
+};
 type CreatorOption = { id: string; name: string };
 type ContentItem = {
   id: string;
@@ -253,42 +257,73 @@ function ContentCard({ item }: { item: ContentItem }) {
         <div className="mt-3 pt-3 border-t border-white/[0.06]">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              {/* Purchases */}
               {!item.isFree && item.purchasedCount > 0 && (
                 <div className="flex items-center gap-1.5">
                   <DollarSign size={12} className="text-green-400" />
                   <span className="text-xs text-green-400 font-semibold">{item.purchasedCount} bought</span>
                 </div>
               )}
-              {/* Chatter DMs sent */}
-              {item.wakeUp && item.wakeUp.chatterDMs1h > 0 && (
+              {item.wakeUp?.chatterDMs && Number(item.wakeUp.chatterDMs["60"] || 0) > 0 && (
                 <div className="flex items-center gap-1">
                   <MessageSquare size={10} className="text-blue-400" />
-                  <span className="text-[10px] text-blue-400">{formatNum(item.wakeUp.chatterDMs1h)} DMs sent</span>
+                  <span className="text-[10px] text-blue-400">{formatNum(Number(item.wakeUp.chatterDMs["60"]))} DMs sent</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Cold fans who woke up — hadn't chatted in 3+ days */}
-          {item.wakeUp ? (
-            <div className="grid grid-cols-4 gap-1.5">
-              {([["30m", item.wakeUp.w30m], ["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h]] as [string, number][]).map(([label, count]) => (
-                <div key={label} className="text-center bg-white/[0.04] rounded-lg py-1.5">
-                  <div className={`text-sm font-bold ${count > 0 ? "text-amber-400" : "text-white/20"}`}>{count}</div>
-                  <div className="text-[9px] text-white/30">{label}</div>
-                </div>
-              ))}
-              <div className="col-span-4 text-[9px] text-white/30 mt-0.5">
-                fans woke up (hadn't chatted in 3+ days) &middot; {formatNum(item.wakeUp.dormantBefore)} total replied
-              </div>
-            </div>
+          {/* Fans woke up — every 30 min */}
+          {item.wakeUp?.buckets ? (
+            <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} />
+          ) : item.wakeUp ? (
+            <div className="text-[10px] text-white/30">0 fans woke up &middot; {item.wakeUp.totalReplied} total replied</div>
           ) : (
             <div className="text-[10px] text-white/30 italic">
               {ageHours < 0.25 ? "Just posted" : "Computing..."}
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const BUCKET_LABELS: Record<string, string> = {
+  "30": "30m", "60": "1h", "90": "1h30", "120": "2h", "150": "2h30",
+  "180": "3h", "240": "4h", "300": "5h", "360": "6h",
+};
+
+function WakeUpBuckets({ buckets, totalReplied, ageHours }: { buckets: Record<string, number>; totalReplied: number; ageHours: number }) {
+  // Only show buckets up to the post's age (don't show future buckets)
+  const ageMins = ageHours * 60;
+  const visibleKeys = Object.keys(BUCKET_LABELS).filter((k) => Number(k) <= ageMins + 15);
+  // Show at least the first 4 buckets, max 6 on the card
+  const keys = visibleKeys.length < 4 ? Object.keys(BUCKET_LABELS).slice(0, 4) : visibleKeys.slice(0, 6);
+  const maxCount = Math.max(...keys.map((k) => Number(buckets[k] || 0)), 1);
+
+  return (
+    <div>
+      <div className="flex gap-1">
+        {keys.map((k) => {
+          const count = Number(buckets[k] || 0);
+          const barPct = Math.max((count / maxCount) * 100, 4);
+          const isFuture = Number(k) > ageMins + 15;
+          return (
+            <div key={k} className="flex-1 text-center">
+              <div className="h-10 flex items-end justify-center mb-1">
+                <div
+                  className={`w-full rounded-t ${isFuture ? "bg-white/[0.04]" : count > 0 ? "bg-amber-400/30" : "bg-white/[0.06]"}`}
+                  style={{ height: `${barPct}%`, minHeight: 2 }}
+                />
+              </div>
+              <div className={`text-[11px] font-bold ${count > 0 ? "text-amber-400" : "text-white/20"}`}>{count}</div>
+              <div className="text-[8px] text-white/30">{BUCKET_LABELS[k]}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-[9px] text-white/30 mt-1">
+        fans woke up (no chat in 3+ days) &middot; {formatNum(totalReplied)} total replied
       </div>
     </div>
   );
