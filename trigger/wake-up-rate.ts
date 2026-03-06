@@ -4,6 +4,8 @@
  * For each mass message, counts unique fans who started chatting AFTER it,
  * excluding fans already in active conversation (any direction) 10 min before.
  * Uses RawChatMessage.chatId as the stable fan identifier.
+ *
+ * Also counts outbound chatter DMs sent after the mass message.
  */
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -21,6 +23,7 @@ function clampToNow(d: Date, now: Date) {
 async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   const activeStart = new Date(T0.getTime() - ACTIVE_LOOKBACK_MIN * 60_000);
 
+  const w30m = clampToNow(new Date(T0.getTime() + 30 * 60_000), now);
   const w1h = clampToNow(new Date(T0.getTime() + 1 * 3600_000), now);
   const w3h = clampToNow(new Date(T0.getTime() + 3 * 3600_000), now);
   const w6h = clampToNow(new Date(T0.getTime() + 6 * 3600_000), now);
@@ -37,13 +40,29 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
     _min: { sentAt: true },
   });
 
+  // 2) Count outbound chatter DMs after the mass message
+  const chatterDMs1hCount = await prisma.rawChatMessage.count({
+    where: {
+      creatorId,
+      isFromCreator: true,
+      sentAt: { gt: T0, lte: w1h },
+    },
+  });
+  const chatterDMs3hCount = await prisma.rawChatMessage.count({
+    where: {
+      creatorId,
+      isFromCreator: true,
+      sentAt: { gt: T0, lte: w3h },
+    },
+  });
+
   if (firstInboundByChat.length === 0) {
-    return { wake1h: 0, wake3h: 0, wake6h: 0, wake24h: 0 };
+    return { wake30m: 0, wake1h: 0, wake3h: 0, wake6h: 0, wake24h: 0, chatterDMs1h: chatterDMs1hCount, chatterDMs3h: chatterDMs3hCount };
   }
 
   const responderChatIds = firstInboundByChat.map((r) => r.chatId);
 
-  // 2) Exclude fans already active in 10 min before the post (any direction)
+  // 3) Exclude fans already active in 10 min before the post (any direction)
   const activeBefore = await prisma.rawChatMessage.groupBy({
     by: ["chatId"],
     where: {
@@ -55,17 +74,20 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
 
   const activeSet = new Set(activeBefore.map((a) => a.chatId));
 
-  // 3) Wake-ups = responders minus already-active, counted by first inbound time
+  // 4) Wake-ups = responders minus already-active, counted by first inbound time
   const wakeTimes = firstInboundByChat
     .filter((r) => !activeSet.has(r.chatId))
     .map((r) => r._min.sentAt!)
     .filter(Boolean);
 
   return {
+    wake30m: wakeTimes.filter((t) => t <= w30m).length,
     wake1h: wakeTimes.filter((t) => t <= w1h).length,
     wake3h: wakeTimes.filter((t) => t <= w3h).length,
     wake6h: wakeTimes.filter((t) => t <= w6h).length,
     wake24h: wakeTimes.filter((t) => t <= w24h).length,
+    chatterDMs1h: chatterDMs1hCount,
+    chatterDMs3h: chatterDMs3hCount,
   };
 }
 
@@ -76,8 +98,8 @@ export const wakeUpRate = task({
     const limit = payload.limit || 50;
     const now = new Date();
 
-    // Process posts 30 min to 48h old
-    const minAge = new Date(now.getTime() - 30 * 60 * 1000);
+    // Process posts 15 min to 48h old (reduced from 30 min for faster feedback)
+    const minAge = new Date(now.getTime() - 15 * 60 * 1000);
     const maxAge = new Date(now.getTime() - 48 * 60 * 60 * 1000);
     const where: any = {
       mediaCount: { gt: 0 },
@@ -108,17 +130,20 @@ export const wakeUpRate = task({
           where: { id: push.id },
           data: {
             dormantBefore: push.sentCount || 0,
+            wakeUp30m: result.wake30m,
             wakeUp1h: result.wake1h,
             wakeUp3h: result.wake3h,
             wakeUp6h: result.wake6h,
             wakeUp24h: result.wake24h,
+            chatterDMs1h: result.chatterDMs1h,
+            chatterDMs3h: result.chatterDMs3h,
             wakeUpComputed: true,
             wakeUpComputedAt: now,
           },
         });
 
-        if (result.wake1h > 0) {
-          console.log(`[WakeUp] ${push.id}: ${result.wake1h}/${result.wake3h}/${result.wake6h}/${result.wake24h} woke up`);
+        if (result.wake30m > 0 || result.wake1h > 0) {
+          console.log(`[WakeUp] ${push.id}: 30m=${result.wake30m} 1h=${result.wake1h} 3h=${result.wake3h} 6h=${result.wake6h} | chatter DMs: ${result.chatterDMs1h}/${result.chatterDMs3h}`);
         }
         computed++;
       } catch (e: any) {
@@ -130,10 +155,10 @@ export const wakeUpRate = task({
   },
 });
 
-// Run every 30 minutes
+// Run every 15 minutes for faster feedback
 export const wakeUpRateScheduled = schedules.task({
   id: "wake-up-rate-scheduled",
-  cron: "*/30 * * * *",
+  cron: "*/15 * * * *",
   run: async () => {
     const result = await wakeUpRate.triggerAndWait({ limit: 50, recompute: true });
     return result;

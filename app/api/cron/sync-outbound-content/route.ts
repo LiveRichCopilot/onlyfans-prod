@@ -54,12 +54,19 @@ export async function GET(req: NextRequest) {
             if (!isNaN(p) && p > 0) priceCents = Math.round(p * 100);
           }
 
+          let purchasedCount: number | null = null;
+          if (m.purchasedCount != null) {
+            const pc = typeof m.purchasedCount === "string" ? parseInt(m.purchasedCount) : Number(m.purchasedCount);
+            if (!isNaN(pc)) purchasedCount = pc;
+          }
+
           const shared = {
             sentAt: m.date ? new Date(m.date) : now,
             textHtml: m.text ?? null,
             textPlain: m.rawText ?? m.text ?? null,
             isFree: m.isFree !== false,
             priceCents,
+            purchasedCount,
             mediaCount: m.mediaCount ?? 0,
             sentCount: m.sentCount ?? 0,
             viewedCount: m.viewedCount ?? 0,
@@ -88,6 +95,7 @@ export async function GET(req: NextRequest) {
               textPlain: shared.textPlain,
               isFree: shared.isFree,
               priceCents: shared.priceCents,
+              purchasedCount: shared.purchasedCount,
               mediaCount: shared.mediaCount,
               sentCount: shared.sentCount,
               viewedCount: shared.viewedCount,

@@ -71,10 +71,13 @@ export async function GET(req: NextRequest) {
         media: c.media,
         wakeUp: c.wakeUpComputed ? {
           dormantBefore: c.dormantBefore ?? 0,
+          w30m: (c as any).wakeUp30m ?? 0,
           w1h: c.wakeUp1h ?? 0,
           w3h: c.wakeUp3h ?? 0,
           w6h: c.wakeUp6h ?? 0,
           w24h: c.wakeUp24h ?? 0,
+          chatterDMs1h: (c as any).chatterDMs1h ?? 0,
+          chatterDMs3h: (c as any).chatterDMs3h ?? 0,
         } : null,
       };
     });

@@ -983,10 +983,13 @@ model OutboundCreative {
   viewedCount Int            @default(0)
   purchasedCount Int?        // From /engagement/messages/{id}/buyers
   dormantBefore  Int?        // Fans dormant (7d+ no message) at send time
+  wakeUp30m      Int?        // Dormant fans who sent inbound msg within 30min
   wakeUp1h       Int?        // Dormant fans who sent inbound msg within 1h
   wakeUp3h       Int?        // Dormant fans who sent inbound msg within 3h
   wakeUp6h       Int?        // Dormant fans who sent inbound msg within 6h
   wakeUp24h      Int?        // Dormant fans who sent inbound msg within 24h
+  chatterDMs1h   Int?        // Outbound chatter DMs sent within 1h of mass msg
+  chatterDMs3h   Int?        // Outbound chatter DMs sent within 3h of mass msg
   wakeUpComputed Boolean     @default(false)
   wakeUpComputedAt DateTime? // When wake-up was last computed
   isCanceled Boolean         @default(false)

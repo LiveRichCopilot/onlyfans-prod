@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
-type WakeUp = { dormantBefore: number; w1h: number; w3h: number; w6h: number; w24h: number };
+type WakeUp = { dormantBefore: number; w30m: number; w1h: number; w3h: number; w6h: number; w24h: number; chatterDMs1h: number; chatterDMs3h: number };
 type CreatorOption = { id: string; name: string };
 type ContentItem = {
   id: string;
@@ -95,7 +95,7 @@ export default function ContentFeedPage() {
           <Info size={14} className="text-teal-400 mt-0.5 shrink-0" />
           <div className="text-[11px] text-white/60 leading-relaxed">
             <span className="text-white/80 font-medium">Mass Messages</span> = broadcasts sent from the creator account to many fans at once. Not 1-on-1 chatter DMs.
-            <br />Revenue updates as fans purchase. Wake-up rate updates every 30 min.
+            <br />Revenue updates on every sync. Wake-up rate + chatter DMs update every 15 min.
           </div>
         </div>
 
@@ -249,19 +249,27 @@ function ContentCard({ item }: { item: ContentItem }) {
           </div>
         )}
 
-        {/* Wake-up rate */}
+        {/* Wake-up rate + Chatter DMs */}
         {item.wakeUp && item.wakeUp.dormantBefore > 0 ? (
           <div className="mt-3 pt-3 border-t border-white/[0.06]">
-            <div className="flex items-center gap-1.5 text-[10px] text-white/40 mb-1.5">
-              <span className="text-amber-400">Wake-up Rate</span>
-              <span>{formatNum(item.wakeUp.dormantBefore)} dormant</span>
+            <div className="flex items-center justify-between text-[10px] text-white/40 mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-amber-400">Fan Wake-ups</span>
+                <span>{formatNum(item.wakeUp.dormantBefore)} sent to</span>
+              </div>
+              {(item.wakeUp.chatterDMs1h > 0 || item.wakeUp.chatterDMs3h > 0) && (
+                <div className="flex items-center gap-1">
+                  <MessageSquare size={10} className="text-blue-400" />
+                  <span className="text-blue-400">{formatNum(item.wakeUp.chatterDMs1h)} DMs sent</span>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-4 gap-1.5">
-              {([["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h], ["24h", item.wakeUp.w24h]] as const).map(([label, count]) => {
+              {([["30m", item.wakeUp.w30m], ["1h", item.wakeUp.w1h], ["3h", item.wakeUp.w3h], ["6h", item.wakeUp.w6h]] as [string, number][]).map(([label, count]) => {
                 const pct = item.wakeUp!.dormantBefore > 0 ? ((count / item.wakeUp!.dormantBefore) * 100).toFixed(1) : "0";
                 return (
                   <div key={label} className="text-center bg-white/[0.04] rounded-lg py-1.5">
-                    <div className={`text-xs font-semibold ${Number(pct) > 0 ? "text-amber-400" : "text-white/30"}`}>{pct}%</div>
+                    <div className={`text-xs font-semibold ${count > 0 ? "text-amber-400" : "text-white/30"}`}>{count > 0 ? count : pct + "%"}</div>
                     <div className="text-[9px] text-white/30">{label}</div>
                   </div>
                 );
@@ -271,7 +279,7 @@ function ContentCard({ item }: { item: ContentItem }) {
         ) : !item.wakeUp ? (
           <div className="mt-3 pt-3 border-t border-white/[0.06]">
             <div className="text-[10px] text-white/30 italic">
-              {ageHours < 0.5 ? "Wake-up: Just posted" : "Wake-up: Computing..."}
+              {ageHours < 0.25 ? "Wake-up: Just posted" : "Wake-up: Computing..."}
             </div>
           </div>
         ) : null}
