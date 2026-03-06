@@ -1,9 +1,9 @@
 /**
- * Wake Up Rate — "How many fans replied after this post?"
+ * Wake Up Rate — "How many cold fans started chatting after this post?"
  *
  * Every 30 min for first 6h, then hourly to 8h: 30m,1h,1h30,2h,...,5h30,6h,7h,8h
- * Counts ALL fans who sent an inbound message after the mass message.
- * Result: simple counts like "50 fans replied at 30m, 120 at 1h, 180 at 1h30..."
+ * A "cold fan" = hadn't chatted in 3+ days before the mass message.
+ * Result: simple counts like "50 fans woke up at 30m, 120 at 1h, 180 at 1h30..."
  */
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -11,6 +11,8 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient({
   datasources: { db: { url: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "" } },
 });
+
+const DORMANT_DAYS = 3;
 
 // Every 30 min to 6h, then hourly to 24h — all in minutes
 const BUCKETS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 420, 480, 540, 600, 660, 720, 840, 960, 1080, 1200, 1320, 1440];
@@ -20,6 +22,7 @@ function clampToNow(d: Date, now: Date) {
 }
 
 async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
+  const dormantCutoff = new Date(T0.getTime() - DORMANT_DAYS * 24 * 3600_000);
   const maxWindow = clampToNow(new Date(T0.getTime() + 360 * 60_000), now);
 
   // 1) All fans who sent an inbound message after the post
@@ -50,15 +53,30 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
     return { totalReplied: 0, wakeUpBuckets: emptyBuckets, chatterDMs: chatterDMsBuckets };
   }
 
-  // 3) All responder first-reply timestamps per bucket
-  const allWakeUps = firstInboundByChat
+  const responderChatIds = firstInboundByChat.map((r) => r.chatId);
+
+  // 3) Find which responders had chat activity in the 3 days before the post
+  const activeBeforePost = await prisma.rawChatMessage.groupBy({
+    by: ["chatId"],
+    where: {
+      creatorId,
+      chatId: { in: responderChatIds },
+      sentAt: { gte: dormantCutoff, lte: T0 },
+    },
+  });
+
+  const activeSet = new Set(activeBeforePost.map((a) => a.chatId));
+
+  // 4) Cold fan wake-ups per bucket
+  const coldWakeUps = firstInboundByChat
+    .filter((r) => !activeSet.has(r.chatId))
     .map((r) => r._min.sentAt!)
     .filter(Boolean);
 
   const wakeUpBuckets: Record<string, number> = {};
   for (const mins of BUCKETS) {
     const cutoff = clampToNow(new Date(T0.getTime() + mins * 60_000), now);
-    wakeUpBuckets[String(mins)] = allWakeUps.filter((t) => t <= cutoff).length;
+    wakeUpBuckets[String(mins)] = coldWakeUps.filter((t) => t <= cutoff).length;
   }
 
   return {
