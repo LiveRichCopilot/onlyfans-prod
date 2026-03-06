@@ -120,24 +120,22 @@ export async function GET(req: NextRequest) {
           });
           totalUpserted++;
 
-          // Persist media to Supabase immediately
+          // Create media records (Trigger.dev handles Supabase persistence)
           if (Array.isArray(m.media) && m.media.length > 0) {
-            const existing = await prisma.outboundMedia.findFirst({ where: { creativeId: row.id, permanentUrl: { not: null } } });
+            const existing = await prisma.outboundMedia.findFirst({ where: { creativeId: row.id } });
             if (!existing) {
               for (const mi of m.media) {
                 const f = mi?.files;
                 if (!f) continue;
-                const srcUrl = mi.type === "video" ? (f?.thumb?.url || f?.preview?.url) : (f?.preview?.url || f?.thumb?.url || f?.full?.url);
-                if (!srcUrl) continue;
-                const permUrl = await persistImage(acctId, creator.id, row.id, srcUrl, String(mi.id || `dm${Date.now()}`));
+                const fullUrl = f?.full?.url || null;
+                const previewUrl = f?.preview?.url || null;
+                const thumbUrl = f?.thumb?.url || null;
+                if (!fullUrl && !previewUrl && !thumbUrl) continue;
                 await prisma.outboundMedia.create({
                   data: {
                     creativeId: row.id,
                     mediaType: mi.type || "photo",
-                    fullUrl: f?.full?.url || null,
-                    previewUrl: f?.preview?.url || null,
-                    thumbUrl: f?.thumb?.url || null,
-                    permanentUrl: permUrl,
+                    fullUrl, previewUrl, thumbUrl,
                   },
                 });
               }

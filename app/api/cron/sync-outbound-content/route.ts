@@ -268,6 +268,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Fire media persistence in background (Trigger.dev handles Supabase uploads)
+    if (totalMedia > 0) {
+      try {
+        const triggerUrl = "https://api.trigger.dev/api/v1/tasks/media-persistence/trigger";
+        const triggerKey = process.env.TRIGGER_SECRET_KEY || "";
+        if (triggerKey) {
+          fetch(triggerUrl, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${triggerKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ payload: { limit: Math.min(totalMedia * 2, 200) } }),
+          }).catch(() => {}); // fire and forget
+        }
+      } catch {}
+    }
+
     return NextResponse.json({ ok: true, upserted: totalUpserted, media: totalMedia });
   } catch (err: any) {
     console.error("[sync-outbound]", err.message);
@@ -317,16 +332,6 @@ async function syncMedia(creativeId: string, creatorId: string, accountId: strin
     const thumbUrl = f?.thumb?.url ?? null;
     if (!fullUrl && !previewUrl && !thumbUrl) continue;
 
-    // Download to Supabase right now while CDN URL is fresh
-    // For videos: grab the thumbnail/preview image (not the full video)
-    let permanentUrl: string | null = null;
-    {
-      const sourceUrl = m.type === "video" ? (thumbUrl || previewUrl) : (previewUrl || thumbUrl || fullUrl);
-      if (sourceUrl) {
-        permanentUrl = await downloadAndPersist(accountId, creatorId, creativeId, sourceUrl, String(m.id || `m${created}`));
-      }
-    }
-
     await prisma.outboundMedia.create({
       data: {
         creativeId,
@@ -334,7 +339,6 @@ async function syncMedia(creativeId: string, creatorId: string, accountId: strin
         fullUrl,
         previewUrl,
         thumbUrl,
-        permanentUrl,
         duration: m.duration ?? null,
         width: m.width ?? null,
         height: m.height ?? null,
