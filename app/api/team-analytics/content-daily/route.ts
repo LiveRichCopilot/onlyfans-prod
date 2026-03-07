@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
     const days = parseInt(searchParams.get("days") || "7");
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const where: any = { sentAt: { gte: since } };
+    // Content Daily = mass messages + wall posts (the summary view)
+    // Content Feed handles DMs + everything else
+    const where: any = { sentAt: { gte: since }, source: { in: ["mass_message", "wall_post"] } };
     if (creatorId) where.creatorId = creatorId;
 
     const creatives = await prisma.outboundCreative.findMany({
