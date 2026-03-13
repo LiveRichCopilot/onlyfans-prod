@@ -5,7 +5,7 @@
  * Analyzes hook quality, tactic tags, what works vs doesn't.
  * Writes insights to ContentInsight (keyed by creativeId). Stateless.
  */
-import { task } from "@trigger.dev/sdk";
+import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -84,16 +84,16 @@ export const contentIntelScanner = task({
       });
 
       if (!response.ok) {
-        await markProcessed(creatives.map((c) => c.id));
-        return { processed: creatives.length, error: `Kimi ${response.status}` };
+        console.error(`[Content Intel] Kimi returned ${response.status} — NOT marking as processed so they retry`);
+        return { processed: 0, error: `Kimi ${response.status}` };
       }
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
       let result: any = {};
       try { result = JSON.parse(content || "{}"); } catch {
-        await markProcessed(creatives.map((c) => c.id));
-        return { processed: creatives.length, error: "JSON parse failed" };
+        console.error(`[Content Intel] JSON parse failed — NOT marking as processed`);
+        return { processed: 0, error: "JSON parse failed", rawContent: (content || "").slice(0, 200) };
       }
 
       // Find the results array — Kimi may use any key
@@ -162,8 +162,8 @@ export const contentIntelScanner = task({
         patterns: result.patterns || null,
       };
     } catch (e: any) {
-      await markProcessed(creatives.map((c) => c.id));
-      return { processed: creatives.length, error: e.message };
+      console.error(`[Content Intel] Error: ${e.message} — NOT marking as processed`);
+      return { processed: 0, error: e.message };
     }
   },
 });
@@ -174,3 +174,13 @@ async function markProcessed(ids: string[]): Promise<void> {
     data: { processed: true },
   });
 }
+
+// Run every 30 minutes — scores 20 mass messages per batch
+export const contentIntelScheduled = schedules.task({
+  id: "content-intel-scheduled",
+  cron: "*/30 * * * *",
+  run: async () => {
+    const result = await contentIntelScanner.triggerAndWait({ limit: 20 });
+    return result;
+  },
+});
