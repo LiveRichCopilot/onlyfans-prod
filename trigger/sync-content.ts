@@ -90,9 +90,9 @@ async function uploadToSupabase(creatorId: string, creativeId: string, mediaId: 
 
 async function persistMediaBatch(accountId: string, creatorId: string, mediaRows: any[], apiKey: string): Promise<{ ok: number; failed: number }> {
   let ok = 0, failed = 0;
-  // Process in batches of 5 concurrently
-  for (let i = 0; i < mediaRows.length; i += 5) {
-    const batch = mediaRows.slice(i, i + 5);
+  // Process in batches of 2 concurrently (CF rate limit on vault endpoint)
+  for (let i = 0; i < mediaRows.length; i += 2) {
+    const batch = mediaRows.slice(i, i + 2);
     const results = await Promise.allSettled(batch.map(async (row: any) => {
       const ofMediaId = row.onlyfansMediaId;
       if (!ofMediaId) return false;
@@ -133,6 +133,8 @@ async function persistMediaBatch(accountId: string, creatorId: string, mediaRows
       if (r.status === "fulfilled" && r.value) ok++;
       else failed++;
     }
+    // Rate limit: wait 500ms between batches to avoid CF 429
+    if (i + 2 < mediaRows.length) await new Promise(r => setTimeout(r, 500));
   }
   return { ok, failed };
 }
@@ -351,7 +353,7 @@ export const syncContent = task({
     }
 
     // ── STAGE 2: Persist pending media (Pattern A — fresh vault URLs) ──
-    const persistLimit = payload.persistLimit || 500;
+    const persistLimit = payload.persistLimit || 100;
     const pendingMedia = await prisma.outboundMedia.findMany({
       where: { persistStatus: "pending", onlyfansMediaId: { not: null } },
       orderBy: { createdAt: "desc" },
