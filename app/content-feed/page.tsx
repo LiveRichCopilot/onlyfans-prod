@@ -229,8 +229,9 @@ function ContentCard({ item }: { item: ContentItem }) {
   const firstMedia = item.media[0];
   const permanentUrl = firstMedia?.permanentUrl;
   const cdnUrl = firstMedia?.previewUrl || firstMedia?.thumbUrl || firstMedia?.fullUrl;
+  // Supabase Image Transforms: auto resize + WebP on the fly
   const imgSrc = permanentUrl
-    ? permanentUrl
+    ? permanentUrl.replace("/object/", "/render/image/") + "?width=600&quality=75"
     : cdnUrl
       ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
       : null;

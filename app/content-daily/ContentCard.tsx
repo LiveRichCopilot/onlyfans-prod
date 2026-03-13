@@ -39,8 +39,9 @@ export function KpiCard({ icon, label, value, accent }: { icon: React.ReactNode;
 export default function ContentCard({ item }: { item: ContentItem }) {
   const permanentUrl = item.media[0]?.permanentUrl;
   const cdnUrl = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
+  // Use Supabase Image Transforms for fast thumbnails (auto WebP, resized on the fly)
   const imgSrc = permanentUrl
-    ? permanentUrl
+    ? permanentUrl.replace("/object/", "/render/image/") + "?width=600&quality=75"
     : cdnUrl
       ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
       : null;
