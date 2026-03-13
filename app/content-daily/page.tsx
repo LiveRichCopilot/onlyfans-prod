@@ -9,6 +9,7 @@ import {
 import ContentCard, { KpiCard, fN, type ContentItem } from "./ContentCard";
 import HourlyBreakdown from "./HourlyBreakdown";
 import ChatterDmScoreboard from "./ChatterDmScoreboard";
+import DmPictureSort from "./DmPictureSort";
 
 type DailyRow = { date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; free: number; paid: number };
 type TacticRow = { tag: string; count: number; avgScore: number };
@@ -270,6 +271,9 @@ export default function ContentDailyPage() {
 
         {/* Chatter DM Sales Scoreboard */}
         <ChatterDmScoreboard stats={chatterDmStats} expanded={expanded} onToggle={toggle} />
+
+        {/* DM Picture Sort — visual gallery for sold/unsold/by chatter */}
+        {(sourceFilter === "direct_message" || sourceFilter === "all") && <DmPictureSort items={items} />}
 
         {/* Hour-by-Hour Breakdown */}
         <HourlyBreakdown hourly={hourly} expanded={expanded} onToggle={toggle} />
