@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
         return age < 48 * 3600_000;
       }
       return false;
-    });
+    }).slice(0, 50); // Cap at 50 to prevent API timeout — each does 2-3 DB queries
     const livePurchaseCounts = new Map<string, number>();
     if (ppvsNeedingLiveCount.length > 0) {
       for (const ppv of ppvsNeedingLiveCount) {
