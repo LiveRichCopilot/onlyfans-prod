@@ -26,6 +26,7 @@ export default function ContentDailyPage() {
   const [days, setDays] = useState(1);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("mass_message");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState(new Set<string>());
 
   useEffect(() => {
@@ -57,8 +58,12 @@ export default function ContentDailyPage() {
   const filtered = useMemo(() => {
     let f = items;
     if (creatorFilter !== "all") f = f.filter((i) => (i.creator.ofUsername || i.creator.name) === creatorFilter);
+    if (statusFilter === "ppv") f = f.filter((i) => !i.isFree && i.priceCents && i.priceCents > 0);
+    else if (statusFilter === "free") f = f.filter((i) => i.isFree || !i.priceCents);
+    else if (statusFilter === "sold") f = f.filter((i) => i.status === "selling");
+    else if (statusFilter === "didnt_sell") f = f.filter((i) => i.status === "stagnant");
     return f;
-  }, [items, creatorFilter]);
+  }, [items, creatorFilter, statusFilter]);
 
   // Group by date
   const byDate = useMemo(() => {
@@ -126,6 +131,35 @@ export default function ContentDailyPage() {
             </div>
           </div>
         </header>
+
+        {/* Status Filter Tabs */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {([
+            ["all", "All"],
+            ["ppv", "PPV Only"],
+            ["free", "Free Only"],
+            ["sold", "Sold"],
+            ["didnt_sell", "Didn't Sell"],
+          ] as [string, string][]).map(([key, label]) => {
+            const counts: Record<string, number> = {
+              all: items.length,
+              ppv: items.filter((i) => !i.isFree && i.priceCents && i.priceCents > 0).length,
+              free: items.filter((i) => i.isFree || !i.priceCents).length,
+              sold: items.filter((i) => i.status === "selling").length,
+              didnt_sell: items.filter((i) => i.status === "stagnant").length,
+            };
+            return (
+              <button key={key} onClick={() => setStatusFilter(key)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === key
+                  ? key === "sold" ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30"
+                  : key === "didnt_sell" ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/30"
+                  : "bg-teal-500/20 text-teal-400 ring-1 ring-teal-500/30"
+                  : "glass-panel text-white/60 hover:text-white/80"}`}>
+                {label} <span className="text-xs opacity-70">({counts[key]})</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* KPIs */}
         {kpis && (
