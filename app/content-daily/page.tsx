@@ -62,7 +62,7 @@ export default function ContentDailyPage() {
         setChatterDmStats(data.chatterDmStats || []);
         setTotalCount(data.totalCount || 0);
         // Auto-expand today
-        if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard", "chatter-dm", "chatter-hourly"]));
+        setExpanded(new Set(["silent", "leaderboard", "chatter-dm", "chatter-hourly"]));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -84,16 +84,28 @@ export default function ContentDailyPage() {
     return f;
   }, [items, creatorFilter, statusFilter]);
 
-  // Group by date
-  const byDate = useMemo(() => {
+  // Group by hour (UK time)
+  const byHour = useMemo(() => {
     const map = new Map<string, ContentItem[]>();
     filtered.forEach((i) => {
-      const d = i.sentAtUk.split(",")[0]; // "04/03/2026"
-      const arr = map.get(d) || [];
+      const parts = i.sentAtUk.split(",");
+      const date = parts[0]?.trim() || "";
+      const time = parts[1]?.trim() || "00:00";
+      const hour = time.split(":")[0] || "00";
+      const key = `${date}|${hour}`; // "13/03/2026|21"
+      const arr = map.get(key) || [];
       arr.push(i);
-      map.set(d, arr);
+      map.set(key, arr);
     });
-    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+    // Sort newest hour first
+    return [...map.entries()].sort((a, b) => {
+      const [dA, hA] = a[0].split("|");
+      const [dB, hB] = b[0].split("|");
+      const [ddA, mmA, yyA] = dA.split("/");
+      const [ddB, mmB, yyB] = dB.split("/");
+      const cmp = `${yyB}${mmB}${ddB}${hB}`.localeCompare(`${yyA}${mmA}${ddA}${hA}`);
+      return cmp;
+    });
   }, [filtered]);
 
   const toggle = (key: string) => {
@@ -317,43 +329,56 @@ export default function ContentDailyPage() {
           </div>
         )}
 
-        {/* Content by Day — collapsible */}
+        {/* Content by Hour — collapsible */}
         {loading ? (
           <div className="text-center text-white/50 py-20">Loading content...</div>
-        ) : byDate.length === 0 ? (
+        ) : byHour.length === 0 ? (
           <div className="text-center text-white/50 py-20">No content found</div>
         ) : (
-          <div className="space-y-4">
-            {byDate.map(([dateStr, dayItems]) => {
-              const isOpen = expanded.has(dateStr);
-              const selling = dayItems.filter((i) => i.status === "selling").length;
-              const stagnant = dayItems.filter((i) => i.status === "stagnant").length;
-              const freeCount = dayItems.filter((i) => i.status === "free").length;
-              const massCount = dayItems.filter((i) => i.source === "mass_message").length;
-              const dmCount = dayItems.filter((i) => i.source === "direct_message").length;
-              const wallCount = dayItems.filter((i) => i.source === "wall_post").length;
+          <div className="space-y-3">
+            {byHour.map(([key, hourItems]) => {
+              const [dateStr, hourStr] = key.split("|");
+              const h = parseInt(hourStr);
+              const hourLabel = h === 0 ? "12am" : h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h - 12}pm`;
+              const isOpen = expanded.has(key);
+              const selling = hourItems.filter((i) => i.status === "selling").length;
+              const stagnant = hourItems.filter((i) => i.status === "stagnant").length;
+              const dmCount = hourItems.filter((i) => i.source === "direct_message").length;
+              // Chatters active this hour
+              const chatters = new Map<string, { count: number; sold: number }>();
+              hourItems.forEach((i) => {
+                if (i.chatterName) {
+                  const e = chatters.get(i.chatterName) || { count: 0, sold: 0 };
+                  e.count++;
+                  if (i.status === "selling") e.sold++;
+                  chatters.set(i.chatterName, e);
+                }
+              });
               return (
-                <div key={dateStr} className="glass-card rounded-2xl overflow-hidden">
-                  <button onClick={() => toggle(dateStr)}
+                <div key={key} className="glass-card rounded-2xl overflow-hidden">
+                  <button onClick={() => toggle(key)}
                     className="w-full flex items-center justify-between p-4 text-left">
                     <div className="flex items-center gap-3">
                       <Calendar size={16} className="text-teal-400" />
-                      <span className="text-base text-white font-semibold">{dateStr}</span>
-                      <span className="text-sm text-white/50">{dayItems.length} total</span>
-                      {massCount > 0 && <span className="text-xs text-white/60">{massCount} mass</span>}
+                      <span className="text-lg text-white font-bold">{hourLabel}</span>
+                      <span className="text-xs text-white/40">{dateStr}</span>
+                      <span className="text-sm text-white/50">{hourItems.length} sent</span>
                       {dmCount > 0 && <span className="text-xs text-purple-400">{dmCount} DMs</span>}
-                      {wallCount > 0 && <span className="text-xs text-blue-400">{wallCount} wall</span>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      {selling > 0 && <span className="text-xs text-emerald-400">{selling} sold</span>}
+                    <div className="flex items-center gap-3 flex-wrap justify-end">
+                      {[...chatters.entries()].map(([name, c]) => (
+                        <span key={name} className={`text-xs px-2 py-0.5 rounded-full ${c.sold > 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-orange-500/15 text-orange-400"}`}>
+                          {name}: {c.count}{c.sold > 0 ? ` (${c.sold} sold)` : ""}
+                        </span>
+                      ))}
+                      {selling > 0 && <span className="text-xs text-emerald-400 font-semibold">{selling} sold</span>}
                       {stagnant > 0 && <span className="text-xs text-red-400">{stagnant} didn't sell</span>}
-                      {freeCount > 0 && <span className="text-xs text-white/40">{freeCount} free</span>}
                       <ChevronDown size={16} className={`text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                     </div>
                   </button>
                   {isOpen && (
                     <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {dayItems.map((item) => <ContentCard key={item.id} item={item} />)}
+                      {hourItems.map((item) => <ContentCard key={item.id} item={item} />)}
                     </div>
                   )}
                 </div>
