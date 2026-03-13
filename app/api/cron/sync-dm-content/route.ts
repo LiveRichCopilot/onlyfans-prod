@@ -134,8 +134,10 @@ export async function GET(req: NextRequest) {
                 await prisma.outboundMedia.create({
                   data: {
                     creativeId: row.id,
+                    onlyfansMediaId: mi.id ? String(mi.id) : null,
                     mediaType: mi.type || "photo",
                     fullUrl, previewUrl, thumbUrl,
+                    persistStatus: "pending",
                   },
                 });
               }

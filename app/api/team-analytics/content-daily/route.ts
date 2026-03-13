@@ -24,9 +24,6 @@ export async function GET(req: NextRequest) {
     }
     if (creatorId) where.creatorId = creatorId;
 
-    // Only return items that have actual media records (no empty cards)
-    where.media = { some: {} };
-
     // Cap results — DMs can be thousands per day
     const limit = Math.min(parseInt(searchParams.get("limit") || "500"), 2000);
 

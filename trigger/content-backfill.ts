@@ -108,11 +108,13 @@ export const contentBackfill = task({
                 await prisma.outboundMedia.create({
                   data: {
                     creativeId: row.id,
+                    onlyfansMediaId: med.id ? String(med.id) : null,
                     mediaType: med.type || "photo",
                     fullUrl, previewUrl, thumbUrl,
                     duration: med.duration ?? null,
                     width: med.width ?? null,
                     height: med.height ?? null,
+                    persistStatus: "pending",
                   },
                 });
                 media++;
@@ -191,11 +193,13 @@ export const contentBackfill = task({
                 await prisma.outboundMedia.create({
                   data: {
                     creativeId: row.id,
+                    onlyfansMediaId: med.id ? String(med.id) : null,
                     mediaType: med.type || "photo",
                     fullUrl, previewUrl, thumbUrl,
                     duration: med.duration ?? null,
                     width: med.width ?? null,
                     height: med.height ?? null,
+                    persistStatus: "pending",
                   },
                 });
               }

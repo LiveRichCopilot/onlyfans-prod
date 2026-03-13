@@ -93,10 +93,11 @@ export async function POST(req: NextRequest) {
             if (!fullUrl && !previewUrl && !thumbUrl) continue;
 
             const mediaId = m.id ? String(m.id) : `m${Date.now()}_${saved}`;
+            const compositeId = `wh_${creative.id}_${mediaId}`;
             await prisma.outboundMedia.upsert({
-              where: { id: `wh_${mediaId}` },
+              where: { id: compositeId },
               create: {
-                id: `wh_${mediaId}`,
+                id: compositeId,
                 creativeId: creative.id,
                 onlyfansMediaId: m.id ? String(m.id) : null,
                 mediaType: m.type || "photo",
