@@ -27,14 +27,14 @@ export async function POST(req: NextRequest) {
   });
 
   if (dmsMissingRaw.length === 0) {
-    return NextResponse.json({ backfilled: 0, message: "No DMs with null raw" });
+    return NextResponse.json({ scanned: 0, updated: 0, missingRawChatMessage: 0, done: true });
   }
 
-  let backfilled = 0;
-  let notFound = 0;
+  let updated = 0;
+  let missingRawChatMessage = 0;
+  const missingIds: string[] = [];
 
   for (const dm of dmsMissingRaw) {
-    // Look up the corresponding RawChatMessage (which does store raw)
     const rawMsg = await prisma.rawChatMessage.findUnique({
       where: {
         creatorId_ofMessageId: {
@@ -50,12 +50,15 @@ export async function POST(req: NextRequest) {
         where: { id: dm.id },
         data: { raw: rawMsg.raw },
       });
-      backfilled++;
+      updated++;
     } else {
-      notFound++;
+      missingRawChatMessage++;
+      if (missingIds.length < 10) missingIds.push(dm.externalId);
     }
   }
 
-  console.log(`[backfill-dm-raw] ${backfilled} backfilled, ${notFound} not found in RawChatMessage`);
-  return NextResponse.json({ backfilled, notFound, total: dmsMissingRaw.length });
+  const scanned = dmsMissingRaw.length;
+  const done = scanned < 500; // If we hit the limit, there may be more
+  console.log(`[backfill-dm-raw] scanned=${scanned} updated=${updated} missing=${missingRawChatMessage} done=${done}`);
+  return NextResponse.json({ scanned, updated, missingRawChatMessage, missingIds, done });
 }
