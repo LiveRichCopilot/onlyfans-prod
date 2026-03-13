@@ -194,12 +194,21 @@ export async function GET(req: NextRequest) {
       const viewRate = c.sentCount > 0 ? Math.round((c.viewedCount / c.sentCount) * 1000) / 10 : 0;
       const hoursLive = Math.round((Date.now() - new Date(c.sentAt).getTime()) / 3600000);
       const isPaid = !c.isFree && c.priceCents && c.priceCents > 0;
-      // Use whichever is higher: enrichment count or live transaction count
-      // (live count catches sales that happened after enrichment set 0)
+      // Determine purchased count from best available source:
+      // 1. Live transaction match (real-time)
+      // 2. OFAPI canPurchase flag (authoritative for DMs)
+      // 3. Enrichment count (from buyers-enrichment cron)
       const liveCount = livePurchaseCounts.get(c.id);
-      const purchased = liveCount != null
-        ? Math.max(c.purchasedCount ?? 0, liveCount)
-        : c.purchasedCount;
+      const rawObj = c.raw as Record<string, any> | null;
+      const ofapiSold = c.source === "direct_message" && rawObj?.canPurchase === false;
+      let purchased: number | null;
+      if (liveCount != null && liveCount > 0) {
+        purchased = Math.max(c.purchasedCount ?? 0, liveCount);
+      } else if (ofapiSold) {
+        purchased = Math.max(c.purchasedCount ?? 0, 1);
+      } else {
+        purchased = c.purchasedCount; // null = unknown, 0 = no purchases
+      }
       let status: "selling" | "stagnant" | "awaiting" | "free" | "unsent" = "free";
       if (c.isCanceled) status = "unsent";
       else if (isPaid && purchased != null && purchased > 0) status = "selling";
