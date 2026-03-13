@@ -127,8 +127,9 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           </div>
         )}
         {(item.totalReplied != null || item.dormantBefore != null) && (() => {
-          const replied = item.totalReplied ?? 0;
           const cold = item.dormantBefore ?? 0;
+          // totalReplied >= cold always (cold fans are a subset of all who replied)
+          const replied = Math.max(item.totalReplied ?? 0, cold);
           if (replied === 0 && cold === 0) {
             return (
               <div className="mt-2 glass-inset rounded-lg p-2">
