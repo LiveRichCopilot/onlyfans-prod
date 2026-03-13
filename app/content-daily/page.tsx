@@ -38,7 +38,7 @@ export default function ContentDailyPage() {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(1);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("mass_message");
   const [expanded, setExpanded] = useState(new Set<string>());
 
   useEffect(() => {
