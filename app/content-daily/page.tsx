@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import {
-  Eye, Send, MessageSquare, BarChart3,
+  Eye, Send, Image as ImageIcon, MessageSquare, BarChart3,
   Zap, TrendingUp, Calendar, ChevronDown,
   AlertTriangle, Filter, Trophy,
 } from "lucide-react";
