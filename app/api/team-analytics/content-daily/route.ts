@@ -104,6 +104,55 @@ export async function GET(req: NextRequest) {
 
     const daily = [...dailyMap.values()].sort((a, b) => b.date.localeCompare(a.date));
 
+    // ── Hourly breakdown (UK timezone) — "1 hour, 2 hours, someone hasn't sent..." ──
+    type HourSlot = { hour: number; count: number; sources: Record<string, number>; creators: string[] };
+    const hourlyMap = new Map<string, Map<number, HourSlot>>();
+    for (const c of creatives) {
+      const ukDate = new Date(new Date(c.sentAt).toLocaleString("en-US", { timeZone: "Europe/London" }));
+      const dateKey = `${ukDate.getFullYear()}-${String(ukDate.getMonth() + 1).padStart(2, "0")}-${String(ukDate.getDate()).padStart(2, "0")}`;
+      const hour = ukDate.getHours();
+      if (!hourlyMap.has(dateKey)) hourlyMap.set(dateKey, new Map());
+      const dayHours = hourlyMap.get(dateKey)!;
+      const slot = dayHours.get(hour) || { hour, count: 0, sources: {}, creators: [] };
+      slot.count++;
+      slot.sources[c.source] = (slot.sources[c.source] || 0) + 1;
+      const cName = creatorMap[c.creatorId]?.name || "Unknown";
+      if (!slot.creators.includes(cName)) slot.creators.push(cName);
+      dayHours.set(hour, slot);
+    }
+    const hourly = [...hourlyMap.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, hours]) => ({
+        date,
+        hours: Array.from({ length: 24 }, (_, h) => hours.get(h) || { hour: h, count: 0, sources: {}, creators: [] }),
+      }));
+
+    // ── Real-time purchase counts from transactions (source of truth) ──
+    // For PPVs where purchasedCount is null (enrichment job hasn't run yet),
+    // query the Transaction table directly so Jay sees data immediately.
+    const ppvsNeedingLiveCount = creatives.filter(
+      (c) => !c.isFree && c.priceCents && c.priceCents > 0 && c.purchasedCount == null
+    );
+    const livePurchaseCounts = new Map<string, number>();
+    if (ppvsNeedingLiveCount.length > 0) {
+      const now = new Date();
+      for (const ppv of ppvsNeedingLiveCount) {
+        try {
+          const sentAt = new Date(ppv.sentAt);
+          const maxWindow = new Date(Math.min(sentAt.getTime() + 24 * 3600_000, now.getTime()));
+          const count = await prisma.transaction.count({
+            where: {
+              creatorId: ppv.creatorId,
+              type: { contains: "message" },
+              amount: { gt: 0 },
+              date: { gt: sentAt, lte: maxWindow },
+            },
+          });
+          if (count > 0) livePurchaseCounts.set(ppv.id, count);
+        } catch { /* skip */ }
+      }
+    }
+
     // ── VALIDATION: Only include items with actual media ──
     // Text-only messages (mediaCount=0) were showing as blank cards.
     // Filter them out server-side so no blank image placeholder ever renders.
@@ -114,11 +163,13 @@ export async function GET(req: NextRequest) {
       const viewRate = c.sentCount > 0 ? Math.round((c.viewedCount / c.sentCount) * 1000) / 10 : 0;
       const hoursLive = Math.round((Date.now() - new Date(c.sentAt).getTime()) / 3600000);
       const isPaid = !c.isFree && c.priceCents && c.priceCents > 0;
+      // Use live transaction count if enrichment hasn't run yet
+      const purchased = c.purchasedCount ?? livePurchaseCounts.get(c.id) ?? null;
       let status: "selling" | "stagnant" | "awaiting" | "free" | "unsent" = "free";
       if (c.isCanceled) status = "unsent";
-      else if (isPaid && c.purchasedCount != null && c.purchasedCount > 0) status = "selling";
-      else if (isPaid && c.purchasedCount != null && c.purchasedCount === 0 && hoursLive >= 6) status = "stagnant";
-      else if (isPaid && c.purchasedCount == null) status = "awaiting"; // no buyer data yet
+      else if (isPaid && purchased != null && purchased > 0) status = "selling";
+      else if (isPaid && purchased != null && purchased === 0 && hoursLive >= 6) status = "stagnant";
+      else if (isPaid && purchased == null) status = "awaiting"; // no buyer data yet
       else if (isPaid) status = "awaiting"; // paid, < 6h, give it time
       return {
         id: c.id, externalId: c.externalId,
@@ -127,7 +178,7 @@ export async function GET(req: NextRequest) {
         caption: c.textPlain || c.textHtml || "",
         isFree: c.isFree, priceCents: c.priceCents, mediaCount: c.mediaCount,
         sentCount: c.sentCount, viewedCount: c.viewedCount, viewRate,
-        purchasedCount: c.purchasedCount,
+        purchasedCount: purchased,
         // Wake-up data only valid for mass messages + wall posts, not DMs
         totalReplied: c.source !== "direct_message" ? c.totalReplied : null,
         dormantBefore: c.source !== "direct_message" ? c.dormantBefore : null,
@@ -231,14 +282,15 @@ export async function GET(req: NextRequest) {
       if (c.mediaCount > 0) e.withMedia++; else e.bumps++;
       e.totalSent += c.sentCount;
       e.totalViewed += c.viewedCount;
-      if (c.purchasedCount && c.purchasedCount > 0) e.purchased += c.purchasedCount;
+      const pCount = c.purchasedCount ?? livePurchaseCounts.get(c.id) ?? 0;
+      if (pCount > 0) e.purchased += pCount;
       modelCounts.set(key, e);
     }
     const leaderboard = [...modelCounts.values()].sort((a, b) => b.massMessages - a.massMessages);
 
     return NextResponse.json({
       kpis: { totalMessages, totalWithMedia, totalSent, totalViewed, avgViewRate, insightsCount },
-      daily, items, bumps, tactics, silentModels, leaderboard, totalCount,
+      daily, hourly, items, bumps, tactics, silentModels, leaderboard, totalCount,
       dateRange: { days, since: since.toISOString() },
     });
   } catch (err: any) {

@@ -7,10 +7,13 @@ import {
   AlertTriangle, Filter, Trophy,
 } from "lucide-react";
 import ContentCard, { KpiCard, fN, type ContentItem } from "./ContentCard";
+import HourlyBreakdown from "./HourlyBreakdown";
 
 type DailyRow = { date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; free: number; paid: number };
 type TacticRow = { tag: string; count: number; avgScore: number };
 type KPIs = { totalMessages: number; totalWithMedia: number; totalSent: number; totalViewed: number; avgViewRate: number; insightsCount: number };
+type HourSlot = { hour: number; count: number; sources: Record<string, number>; creators: string[] };
+type HourlyDay = { date: string; hours: HourSlot[] };
 type SilentModel = { id: string; name: string; ofUsername: string | null; lastContentAt: string | null; daysSilent: number | null };
 type LeaderRow = { name: string; ofUsername: string; massMessages: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; purchased: number };
 type BumpItem = { id: string; creator: { name: string; ofUsername: string }; sentAtUk: string; caption: string; sentCount: number; viewedCount: number; viewRate: number; source: string; chatterName: string | null };
@@ -23,6 +26,7 @@ export default function ContentDailyPage() {
   const [silentModels, setSilentModels] = useState<SilentModel[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [bumps, setBumps] = useState<BumpItem[]>([]);
+  const [hourly, setHourly] = useState<HourlyDay[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(1);
@@ -49,6 +53,7 @@ export default function ContentDailyPage() {
         setSilentModels(data.silentModels || []);
         setLeaderboard(data.leaderboard || []);
         setBumps(data.bumps || []);
+        setHourly(data.hourly || []);
         setTotalCount(data.totalCount || 0);
         // Auto-expand today
         if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard"]));
@@ -258,6 +263,9 @@ export default function ContentDailyPage() {
             </div>}
           </div>
         )}
+
+        {/* Hour-by-Hour Breakdown */}
+        <HourlyBreakdown hourly={hourly} expanded={expanded} onToggle={toggle} />
 
         {/* Bumps — text-only messages, collapsible */}
         {bumps.length > 0 && (
