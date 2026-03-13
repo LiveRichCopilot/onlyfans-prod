@@ -204,7 +204,11 @@ export default function ContentDailyPage() {
                     <div className="text-sm text-white font-medium">{m.name}</div>
                     {m.ofUsername && <div className="text-xs text-white/50">@{m.ofUsername}</div>}
                     <div className="text-xs text-red-400 mt-1">
-                      {m.lastContentAt ? `Last: ${new Date(m.lastContentAt).toLocaleDateString("en-GB", { timeZone: "Europe/London" })} (${m.daysSilent}d ago)` : "Never sent content"}
+                      {m.lastContentAt ? (() => {
+                        const hoursAgo = Math.round((Date.now() - new Date(m.lastContentAt).getTime()) / 3600000);
+                        const timeAgo = hoursAgo < 1 ? "just now" : hoursAgo < 24 ? `${hoursAgo}h ago` : `${m.daysSilent}d ago`;
+                        return `Last sent: ${timeAgo}`;
+                      })() : "Never sent content"}
                     </div>
                   </div>
                 ))}

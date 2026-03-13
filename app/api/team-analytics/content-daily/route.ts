@@ -191,12 +191,17 @@ export async function GET(req: NextRequest) {
       .map(([tag, d]) => ({ tag, count: d.count, avgScore: Math.round(d.totalScore / d.count) }))
       .sort((a, b) => b.count - a.count);
 
-    // Silent models — active creators with no content in this window
+    // Silent models — active creators with no content in this window (ANY source)
     const allCreators = await prisma.creator.findMany({
       where: { active: true },
       select: { id: true, name: true, ofUsername: true },
     });
-    const activeCreatorIds = new Set(creatives.map((c) => c.creatorId));
+    // Check ALL sources for activity, not just the currently filtered source
+    const anyActivity = await prisma.outboundCreative.groupBy({
+      by: ["creatorId"],
+      where: { sentAt: { gte: since }, mediaCount: { gt: 0 } },
+    });
+    const activeCreatorIds = new Set(anyActivity.map((a) => a.creatorId));
     // For silent models, get their last mass message date
     const silentCreators = allCreators.filter((c) => !activeCreatorIds.has(c.id));
     const silentModels = await Promise.all(
@@ -210,6 +215,7 @@ export async function GET(req: NextRequest) {
           id: c.id, name: c.name || c.ofUsername || "Unknown",
           ofUsername: c.ofUsername,
           lastContentAt: last?.sentAt || null,
+          hoursSilent: last ? Math.round((Date.now() - new Date(last.sentAt).getTime()) / 3600000) : null,
           daysSilent: last ? Math.round((Date.now() - new Date(last.sentAt).getTime()) / 86400000) : null,
         };
       })
