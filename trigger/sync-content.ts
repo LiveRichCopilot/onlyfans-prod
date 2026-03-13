@@ -309,7 +309,7 @@ export const syncContent = task({
     }
 
     // ── STAGE 2: Retry old pending/failed media (vault for fresh URLs) ──
-    const retryLimit = payload.retryLimit || 200;
+    const retryLimit = payload.retryLimit || 500;
     const pendingMedia = await prisma.outboundMedia.findMany({
       where: { persistStatus: { in: ["pending", "failed"] }, onlyfansMediaId: { not: null } },
       orderBy: { createdAt: "desc" },
