@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import ContentCard, { KpiCard, fN, type ContentItem } from "./ContentCard";
 import HourlyBreakdown from "./HourlyBreakdown";
+import ChatterDmScoreboard from "./ChatterDmScoreboard";
 
 type DailyRow = { date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; free: number; paid: number };
 type TacticRow = { tag: string; count: number; avgScore: number };
@@ -17,6 +18,7 @@ type HourlyDay = { date: string; hours: HourSlot[] };
 type SilentModel = { id: string; name: string; ofUsername: string | null; lastContentAt: string | null; daysSilent: number | null };
 type LeaderRow = { name: string; ofUsername: string; massMessages: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; purchased: number };
 type BumpItem = { id: string; creator: { name: string; ofUsername: string }; sentAtUk: string; caption: string; sentCount: number; viewedCount: number; viewRate: number; source: string; chatterName: string | null };
+type ChatterDmRow = { chatter: string; sent: number; sold: number; unsold: number; pending: number; revenue: number; creators: string[] };
 
 export default function ContentDailyPage() {
   const [items, setItems] = useState<ContentItem[]>([]);
@@ -27,6 +29,7 @@ export default function ContentDailyPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [bumps, setBumps] = useState<BumpItem[]>([]);
   const [hourly, setHourly] = useState<HourlyDay[]>([]);
+  const [chatterDmStats, setChatterDmStats] = useState<ChatterDmRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(1);
@@ -54,9 +57,10 @@ export default function ContentDailyPage() {
         setLeaderboard(data.leaderboard || []);
         setBumps(data.bumps || []);
         setHourly(data.hourly || []);
+        setChatterDmStats(data.chatterDmStats || []);
         setTotalCount(data.totalCount || 0);
         // Auto-expand today
-        if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard"]));
+        if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard", "chatter-dm"]));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -263,6 +267,9 @@ export default function ContentDailyPage() {
             </div>}
           </div>
         )}
+
+        {/* Chatter DM Sales Scoreboard */}
+        <ChatterDmScoreboard stats={chatterDmStats} expanded={expanded} onToggle={toggle} />
 
         {/* Hour-by-Hour Breakdown */}
         <HourlyBreakdown hourly={hourly} expanded={expanded} onToggle={toggle} />

@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
                 mediaCount: mediaItems.length,
                 sentCount: 1,
                 viewedCount: 0,
+                raw: msg,
               },
             });
           }

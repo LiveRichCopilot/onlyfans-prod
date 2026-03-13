@@ -242,6 +242,31 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // ── Chatter DM Sales Stats ──
+    // Group DM PPVs by chatter → sold vs not sold
+    const chatterDmStats: { chatter: string; sent: number; sold: number; unsold: number; pending: number; revenue: number; creators: string[] }[] = [];
+    const dmPpvItems = items.filter((i) => i.source === "direct_message" && !i.isFree && i.priceCents && i.priceCents > 0);
+    const chatterDmMap = new Map<string, { sent: number; sold: number; unsold: number; pending: number; revenue: number; creators: Set<string> }>();
+    for (const dm of dmPpvItems) {
+      const chatter = dm.chatterName || "Unassigned";
+      const e = chatterDmMap.get(chatter) || { sent: 0, sold: 0, unsold: 0, pending: 0, revenue: 0, creators: new Set<string>() };
+      e.sent++;
+      if (dm.purchasedCount != null && dm.purchasedCount > 0) {
+        e.sold++;
+        e.revenue += (dm.priceCents || 0) / 100;
+      } else if (dm.status === "stagnant") {
+        e.unsold++;
+      } else {
+        e.pending++;
+      }
+      e.creators.add(dm.creator.name || "Unknown");
+      chatterDmMap.set(chatter, e);
+    }
+    for (const [chatter, stats] of chatterDmMap) {
+      chatterDmStats.push({ chatter, ...stats, creators: [...stats.creators] });
+    }
+    chatterDmStats.sort((a, b) => b.sold - a.sold || b.sent - a.sent);
+
     const totalMessages = creatives.length;
     const totalWithMedia = creatives.filter((c) => c.mediaCount > 0).length;
     const totalSent = creatives.reduce((s, c) => s + c.sentCount, 0);
@@ -310,7 +335,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       kpis: { totalMessages, totalWithMedia, totalSent, totalViewed, avgViewRate, insightsCount },
-      daily, hourly, items, bumps, tactics, silentModels, leaderboard, totalCount,
+      daily, hourly, items, bumps, tactics, silentModels, leaderboard, chatterDmStats, totalCount,
       dateRange: { days, since: since.toISOString() },
     });
   } catch (err: any) {
