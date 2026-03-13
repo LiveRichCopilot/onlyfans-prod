@@ -335,10 +335,12 @@ async function syncMedia(creativeId: string, creatorId: string, accountId: strin
     await prisma.outboundMedia.create({
       data: {
         creativeId,
+        onlyfansMediaId: m.id ? String(m.id) : null,
         mediaType: m.type || "photo",
         fullUrl,
         previewUrl,
         thumbUrl,
+        persistStatus: "pending",
         duration: m.duration ?? null,
         width: m.width ?? null,
         height: m.height ?? null,

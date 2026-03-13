@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle, XCircle, Filter, Trophy, Users,
 } from "lucide-react";
 
-type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null };
+type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type InsightData = { tacticTag: string; hookScore: number; insight: string; viewRate: number } | null;
 type ContentItem = {
   id: string; externalId: string;
@@ -249,7 +249,13 @@ export default function ContentDailyPage() {
 }
 
 function ContentCard({ item }: { item: ContentItem }) {
-  const previewUrl = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
+  const permanentUrl = item.media[0]?.permanentUrl;
+  const cdnUrl = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
+  const imgSrc = permanentUrl
+    ? permanentUrl
+    : cdnUrl
+      ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
+      : null;
   const isPaid = !item.isFree && item.priceCents && item.priceCents > 0;
   const mediaSummary = useMemo(() => {
     const c: Record<string, number> = {};
@@ -264,9 +270,9 @@ function ContentCard({ item }: { item: ContentItem }) {
 
   return (
     <div className={`glass-card rounded-2xl overflow-hidden ${item.status === "stagnant" ? "border border-red-500/20" : ""}`}>
-      {previewUrl ? (
+      {imgSrc ? (
         <div className="relative aspect-[4/3] bg-black/40">
-          <img src={`/api/proxy-media?url=${encodeURIComponent(previewUrl)}`} alt="" className="w-full h-full object-cover" />
+          <img src={imgSrc} alt="" className="w-full h-full object-cover" />
           {/* Big time overlay top-left */}
           <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-3">
             <div className="text-xl text-white font-bold">{timeOnly} UK</div>

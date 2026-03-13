@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       where,
       orderBy: { sentAt: "desc" },
       include: {
-        media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true } },
+        media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true, permanentUrl: true } },
         insight: { select: { tacticTag: true, hookScore: true, insight: true, viewRate: true } },
       },
     });
