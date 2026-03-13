@@ -1,8 +1,8 @@
 /**
  * Content Sync Pipeline — Trigger.dev (no Vercel timeout)
- * Stage 1: POLL OFAPI → upsert DB (fast)
- * Stage 2: PERSIST media → vault fresh URL → download → Supabase upload
- * Pattern A: GET /api/{account}/media/vault/{media_id} for fresh URLs
+ * Stage 1: POLL OFAPI → upsert DB → PERSIST to Supabase IMMEDIATELY (CDN URLs are fresh)
+ * Stage 2: RETRY any failed persistence (uses vault for fresh URLs)
+ * Media is downloaded from OF CDN at discovery time and permanently stored in Supabase Storage.
  */
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -44,43 +44,25 @@ async function fetchAllPages(path: string, apiKey: string, maxPages = 20) {
   return all;
 }
 
-// ── Stage 2: Media persistence (Pattern A — fresh URL from vault) ──
-
-async function getFreshMediaUrl(accountId: string, mediaId: string, apiKey: string): Promise<{ preview?: string; thumb?: string; full?: string } | null> {
-  try {
-    const res = await ofapiFetch(`/api/${accountId}/media/vault/${mediaId}`, apiKey);
-    const files = res?.data?.files || res?.files;
-    if (!files) return null;
-    return {
-      preview: files?.preview?.url,
-      thumb: files?.thumb?.url,
-      full: files?.full?.url,
-    };
-  } catch {
-    return null;
-  }
-}
+// ── Media persistence: download from OF CDN → upload to Supabase Storage ──
 
 async function uploadToSupabase(creatorId: string, creativeId: string, mediaId: string, sourceUrl: string, apiKey: string, accountId: string): Promise<string | null> {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
   try {
-    // Download via OFAPI (handles auth + IP restrictions)
+    // Download via OFAPI proxy (handles auth + IP restrictions)
     const dlUrl = `${OFAPI_BASE}/api/${accountId}/media/download/${sourceUrl}`;
     const res = await fetch(dlUrl, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) return null;
-
     const blob = await res.arrayBuffer();
-    const path = `${creatorId}/${creativeId}/${mediaId}.jpg`;
+    const ct = res.headers.get("content-type") || "image/jpeg";
+    const ext = ct.includes("video") ? "mp4" : ct.includes("png") ? "png" : "jpg";
+    const path = `${creatorId}/${creativeId}/${mediaId}.${ext}`;
     const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        "Content-Type": res.headers.get("content-type") || "image/jpeg",
-        "x-upsert": "true",
-      },
+      headers: { Authorization: `Bearer ${SERVICE_ROLE_KEY}`, "Content-Type": ct, "x-upsert": "true" },
       body: blob,
     });
     if (!upRes.ok) return null;
@@ -88,13 +70,63 @@ async function uploadToSupabase(creatorId: string, creativeId: string, mediaId: 
   } catch { return null; }
 }
 
-async function persistMediaBatch(accountId: string, creatorId: string, mediaRows: any[], apiKey: string): Promise<{ ok: number; failed: number }> {
+/**
+ * Create OutboundMedia records AND persist to Supabase immediately.
+ * CDN URLs from the OFAPI response are fresh right now — download before they expire.
+ */
+async function createAndPersistMedia(
+  creativeId: string, creatorId: string, acctId: string, apiKey: string, mediaItems: any[]
+): Promise<{ created: number; persisted: number }> {
+  const toPersist: { id: string; mi: any }[] = [];
+  for (const mi of mediaItems) {
+    if (!mi?.files || (!mi.files?.full?.url && !mi.files?.preview?.url && !mi.files?.thumb?.url)) continue;
+    if (mi.canView === false || mi.isReady === false) continue;
+    const record = await prisma.outboundMedia.create({
+      data: {
+        creativeId, onlyfansMediaId: mi.id ? String(mi.id) : null, mediaType: mi.type || "photo",
+        fullUrl: mi.files?.full?.url ?? null, previewUrl: mi.files?.preview?.url ?? null,
+        thumbUrl: mi.files?.thumb?.url ?? null, persistStatus: "pending",
+      },
+    });
+    toPersist.push({ id: record.id, mi });
+  }
+  // Persist all in parallel — CDN URLs are fresh right now
+  let persisted = 0;
+  if (toPersist.length > 0) {
+    const results = await Promise.allSettled(toPersist.map(async ({ id, mi }) => {
+      const isVideo = (mi.type || "photo") === "video";
+      const src = isVideo
+        ? (mi.files?.thumb?.url || mi.files?.preview?.url)
+        : (mi.files?.preview?.url || mi.files?.thumb?.url || mi.files?.full?.url);
+      if (!src) return false;
+      const url = await uploadToSupabase(creatorId, creativeId, id, src, apiKey, acctId);
+      if (url) {
+        await prisma.outboundMedia.update({ where: { id }, data: { permanentUrl: url, persistStatus: "ok", persistedAt: new Date() } });
+        return true;
+      }
+      return false;
+    }));
+    persisted = results.filter(r => r.status === "fulfilled" && r.value).length;
+  }
+  return { created: toPersist.length, persisted };
+}
+
+// Stage 2 retry: Get fresh URL from vault for old pending media whose CDN URLs expired
+async function getFreshMediaUrl(accountId: string, mediaId: string, apiKey: string) {
+  try {
+    const res = await ofapiFetch(`/api/${accountId}/media/vault/${mediaId}`, apiKey);
+    const files = res?.data?.files || res?.files;
+    if (!files) return null;
+    return { preview: files?.preview?.url, thumb: files?.thumb?.url, full: files?.full?.url };
+  } catch { return null; }
+}
+
+async function retryPersistBatch(accountId: string, creatorId: string, mediaRows: any[], apiKey: string): Promise<{ ok: number; failed: number }> {
   let ok = 0, failed = 0;
   for (let i = 0; i < mediaRows.length; i += 3) {
     const batch = mediaRows.slice(i, i + 3);
     const results = await Promise.allSettled(batch.map(async (row: any) => {
       if (!row.onlyfansMediaId) return false;
-      // Get fresh URL from vault, fall back to stored CDN URL
       let src: string | null = null;
       const fresh = await getFreshMediaUrl(accountId, row.onlyfansMediaId, apiKey);
       if (fresh) src = row.mediaType === "video" ? (fresh.thumb || fresh.preview) : (fresh.preview || fresh.thumb || fresh.full);
@@ -114,26 +146,12 @@ async function persistMediaBatch(accountId: string, creatorId: string, mediaRows
   return { ok, failed };
 }
 
-// Refresh CDN URLs for existing non-persisted media (keeps proxy working with fresh URLs)
-async function refreshMediaUrls(creativeId: string, media: any[]) {
-  for (const mi of media) {
-    if (!mi?.id || !mi?.files) continue;
-    const d: any = {};
-    if (mi.files?.full?.url) d.fullUrl = mi.files.full.url;
-    if (mi.files?.preview?.url) d.previewUrl = mi.files.preview.url;
-    if (mi.files?.thumb?.url) d.thumbUrl = mi.files.thumb.url;
-    if (!Object.keys(d).length) continue;
-    await prisma.outboundMedia.updateMany({ where: { creativeId, onlyfansMediaId: String(mi.id), persistStatus: { not: "ok" } }, data: d });
-  }
-}
-
-// ── Stage 1: Poll + upsert ──
+// ── Stage 1: Poll + upsert + persist inline ──
 
 async function pollCreator(creatorId: string, acctId: string, apiKey: string, startDate: Date, now: Date) {
   const s = encodeURIComponent(fmtDate(startDate));
   const e = encodeURIComponent(fmtDate(now));
-  let upserted = 0;
-  let mediaCreated = 0;
+  let upserted = 0, mediaCreated = 0, mediaPersisted = 0;
 
   // ── Mass Messages ──
   const messages = await fetchAllPages(
@@ -142,7 +160,6 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
   for (const m of messages) {
     const externalId = String(m.id || "");
     if (!externalId) continue;
-
     let priceCents: number | null = null;
     if (m.price != null) {
       const p = typeof m.price === "string" ? parseFloat(m.price) : Number(m.price);
@@ -153,7 +170,6 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
       const pc = typeof m.purchasedCount === "string" ? parseInt(m.purchasedCount) : Number(m.purchasedCount);
       if (!isNaN(pc)) purchasedCount = pc;
     }
-
     const row = await prisma.outboundCreative.upsert({
       where: { creatorId_source_externalId: { creatorId, source: "mass_message", externalId } },
       create: {
@@ -172,30 +188,11 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
       },
     });
     upserted++;
-
-    // Create or refresh media records
     if (Array.isArray(m.media) && m.media.length > 0) {
       const existingCount = await prisma.outboundMedia.count({ where: { creativeId: row.id } });
       if (existingCount === 0) {
-        for (const mi of m.media) {
-          if (!mi?.files || (!mi.files?.full?.url && !mi.files?.preview?.url && !mi.files?.thumb?.url)) continue;
-          if (mi.canView === false || mi.isReady === false) continue;
-          await prisma.outboundMedia.create({
-            data: {
-              creativeId: row.id,
-              onlyfansMediaId: mi.id ? String(mi.id) : null,
-              mediaType: mi.type || "photo",
-              fullUrl: mi.files?.full?.url ?? null,
-              previewUrl: mi.files?.preview?.url ?? null,
-              thumbUrl: mi.files?.thumb?.url ?? null,
-              persistStatus: "pending",
-            },
-          });
-          mediaCreated++;
-        }
-      } else {
-        // Refresh CDN URLs for non-persisted media (keeps proxy working)
-        await refreshMediaUrls(row.id, m.media);
+        const r = await createAndPersistMedia(row.id, creatorId, acctId, apiKey, m.media);
+        mediaCreated += r.created; mediaPersisted += r.persisted;
       }
     }
   }
@@ -208,7 +205,6 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
     if (!m.mediaCount && (!m.media || m.media.length === 0)) continue;
     const externalId = String(m.id || "");
     if (!externalId) continue;
-
     let priceCents: number | null = null;
     if (m.price != null) {
       const p = typeof m.price === "string" ? parseFloat(m.price) : Number(m.price);
@@ -219,7 +215,6 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
       const pc = typeof m.purchasedCount === "string" ? parseInt(m.purchasedCount) : Number(m.purchasedCount);
       if (!isNaN(pc)) purchasedCount = pc;
     }
-
     const row = await prisma.outboundCreative.upsert({
       where: { creatorId_source_externalId: { creatorId, source: "direct_message", externalId } },
       create: {
@@ -234,28 +229,11 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
       update: { priceCents, purchasedCount, viewedCount: m.isOpened ? 1 : 0, raw: m },
     });
     upserted++;
-
     if (Array.isArray(m.media) && m.media.length > 0) {
       const existingCount = await prisma.outboundMedia.count({ where: { creativeId: row.id } });
       if (existingCount === 0) {
-        for (const mi of m.media) {
-          if (!mi?.files || (!mi.files?.full?.url && !mi.files?.preview?.url && !mi.files?.thumb?.url)) continue;
-          if (mi.canView === false || mi.isReady === false) continue;
-          await prisma.outboundMedia.create({
-            data: {
-              creativeId: row.id,
-              onlyfansMediaId: mi.id ? String(mi.id) : null,
-              mediaType: mi.type || "photo",
-              fullUrl: mi.files?.full?.url ?? null,
-              previewUrl: mi.files?.preview?.url ?? null,
-              thumbUrl: mi.files?.thumb?.url ?? null,
-              persistStatus: "pending",
-            },
-          });
-          mediaCreated++;
-        }
-      } else {
-        await refreshMediaUrls(row.id, m.media);
+        const r = await createAndPersistMedia(row.id, creatorId, acctId, apiKey, m.media);
+        mediaCreated += r.created; mediaPersisted += r.persisted;
       }
     }
   }
@@ -269,7 +247,6 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
       if (postDate && new Date(postDate) < startDate) continue;
       const externalId = String(p.id || "");
       if (!externalId) continue;
-
       const row = await prisma.outboundCreative.upsert({
         where: { creatorId_source_externalId: { creatorId, source: "wall_post", externalId } },
         create: {
@@ -285,34 +262,17 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
         update: { sentCount: p.favoritesCount ?? 0, viewedCount: p.viewsCount ?? 0, raw: p },
       });
       upserted++;
-
       if (Array.isArray(p.media) && p.media.length > 0) {
         const existingCount = await prisma.outboundMedia.count({ where: { creativeId: row.id } });
         if (existingCount === 0) {
-          for (const mi of p.media) {
-            if (!mi?.files || (!mi.files?.full?.url && !mi.files?.preview?.url && !mi.files?.thumb?.url)) continue;
-            if (mi.canView === false || mi.isReady === false) continue;
-            await prisma.outboundMedia.create({
-              data: {
-                creativeId: row.id,
-                onlyfansMediaId: mi.id ? String(mi.id) : null,
-                mediaType: mi.type || "photo",
-                fullUrl: mi.files?.full?.url ?? null,
-                previewUrl: mi.files?.preview?.url ?? null,
-                thumbUrl: mi.files?.thumb?.url ?? null,
-                persistStatus: "pending",
-              },
-            });
-            mediaCreated++;
-          }
-        } else {
-          await refreshMediaUrls(row.id, p.media);
+          const r = await createAndPersistMedia(row.id, creatorId, acctId, apiKey, p.media);
+          mediaCreated += r.created; mediaPersisted += r.persisted;
         }
       }
     }
   } catch {}
 
-  return { upserted, mediaCreated };
+  return { upserted, mediaCreated, mediaPersisted };
 }
 
 // ── Main task ──
@@ -321,7 +281,7 @@ export const syncContent = task({
   id: "sync-content",
   retry: { maxAttempts: 1 },
   machine: "small-2x",
-  run: async (payload: { creatorId?: string; daysBack?: number; persistLimit?: number }) => {
+  run: async (payload: { creatorId?: string; daysBack?: number; retryLimit?: number }) => {
     const apiKey = (process.env.OFAPI_API_KEY || "").trim();
     if (!apiKey) return { error: "No OFAPI_API_KEY" };
 
@@ -332,8 +292,8 @@ export const syncContent = task({
     if (payload.creatorId) where.id = payload.creatorId;
     const creators = await prisma.creator.findMany({ where, select: { id: true, name: true, ofapiCreatorId: true } });
 
-    // ── STAGE 1: Poll all creators ──
-    let totalUpserted = 0, totalMediaCreated = 0;
+    // ── STAGE 1: Poll + persist inline ──
+    let totalUpserted = 0, totalMediaCreated = 0, totalPersisted = 0;
     const errors: string[] = [];
 
     for (const creator of creators) {
@@ -341,22 +301,22 @@ export const syncContent = task({
         const result = await pollCreator(creator.id, creator.ofapiCreatorId!, apiKey, startDate, now);
         totalUpserted += result.upserted;
         totalMediaCreated += result.mediaCreated;
-        console.log(`[sync] ${creator.name}: ${result.upserted} posts, ${result.mediaCreated} new media`);
+        totalPersisted += result.mediaPersisted;
+        console.log(`[sync] ${creator.name}: ${result.upserted} posts, ${result.mediaCreated} media (${result.mediaPersisted} persisted to Supabase)`);
       } catch (err: any) {
         errors.push(`${creator.name}: ${err.message}`);
       }
     }
 
-    // ── STAGE 2: Persist pending media (Pattern A — fresh vault URLs) ──
-    const persistLimit = payload.persistLimit || 500;
+    // ── STAGE 2: Retry old pending/failed media (vault for fresh URLs) ──
+    const retryLimit = payload.retryLimit || 200;
     const pendingMedia = await prisma.outboundMedia.findMany({
-      where: { persistStatus: "pending", onlyfansMediaId: { not: null } },
+      where: { persistStatus: { in: ["pending", "failed"] }, onlyfansMediaId: { not: null } },
       orderBy: { createdAt: "desc" },
-      take: persistLimit,
+      take: retryLimit,
       include: { creative: { select: { creatorId: true } } },
     });
 
-    // Group by creator for batch processing
     const byCreator = new Map<string, any[]>();
     for (const m of pendingMedia) {
       const cId = m.creative.creatorId;
@@ -364,19 +324,19 @@ export const syncContent = task({
       byCreator.get(cId)!.push(m);
     }
 
-    let totalPersisted = 0, totalFailed = 0;
+    let retryOk = 0, retryFailed = 0;
     for (const [creatorId, mediaRows] of byCreator) {
       const creator = creators.find((c) => c.id === creatorId);
       if (!creator?.ofapiCreatorId) continue;
-      const result = await persistMediaBatch(creator.ofapiCreatorId, creatorId, mediaRows, apiKey);
-      totalPersisted += result.ok;
-      totalFailed += result.failed;
-      console.log(`[persist] ${creator.name}: ${result.ok} ok, ${result.failed} failed`);
+      const result = await retryPersistBatch(creator.ofapiCreatorId, creatorId, mediaRows, apiKey);
+      retryOk += result.ok;
+      retryFailed += result.failed;
+      if (retryOk + retryFailed > 0) console.log(`[retry] ${creator.name}: ${result.ok} ok, ${result.failed} failed`);
     }
 
     return {
-      stage1: { upserted: totalUpserted, mediaCreated: totalMediaCreated },
-      stage2: { persisted: totalPersisted, failed: totalFailed, pending: pendingMedia.length },
+      stage1: { upserted: totalUpserted, mediaCreated: totalMediaCreated, persisted: totalPersisted },
+      stage2_retry: { ok: retryOk, failed: retryFailed, attempted: pendingMedia.length },
       creators: creators.length,
       errors,
     };
