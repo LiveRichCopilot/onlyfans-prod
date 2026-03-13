@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
   ` as any[];
 
   // 2. Recent DM PPVs and their enrichment status
+  const take = parseInt(req.nextUrl.searchParams.get("take") || "30");
   const dmPpvs = await prisma.outboundCreative.findMany({
     where: {
       source: "direct_message",
@@ -37,12 +38,23 @@ export async function GET(req: NextRequest) {
       sentAt: { gt: since },
     },
     orderBy: { sentAt: "desc" },
-    take: 30,
+    take,
     select: {
       id: true, externalId: true, creatorId: true, sentAt: true,
       priceCents: true, purchasedCount: true, raw: true,
     },
   });
+
+  // Quick count: how many DM PPVs have canPurchase=false in raw (OFAPI says purchased)
+  const allDmPpvs = await prisma.$queryRaw`
+    SELECT COUNT(*)::int as total,
+      COUNT(*) FILTER (WHERE (raw->>'canPurchase')::text = 'false')::int as purchased,
+      COUNT(*) FILTER (WHERE (raw->>'canPurchase')::text = 'true')::int as unpurchased,
+      COUNT(*) FILTER (WHERE (raw->>'isOpened')::text = 'true')::int as opened
+    FROM "OutboundCreative"
+    WHERE source = 'direct_message' AND "isFree" = false AND "priceCents" > 0 AND "sentAt" > ${since}
+  ` as any[];
+  const ofapiPurchaseSummary = allDmPpvs[0] || {};
 
   // 3. For each DM PPV, check if we can find matching transactions
   const audit: any[] = [];
@@ -163,7 +175,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     transactionTypes: distinctTypes,
     dmPpvCount: dmPpvs.length,
+    ofapiPurchaseSummary,
     diagnosisCounts,
-    audit,
+    audit: audit.slice(0, 10), // limit response size
   });
 }
