@@ -203,6 +203,7 @@ export const wakeUpRate = task({
         await prisma.outboundCreative.update({
           where: { id: push.id },
           data: {
+            totalReplied: result.totalReplied,
             dormantBefore: result.coldFanCount,
             wakeUpBuckets: result.wakeUpBuckets,
             chatterDMs: result.chatterDMs,

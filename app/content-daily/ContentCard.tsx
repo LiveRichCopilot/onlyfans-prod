@@ -14,6 +14,7 @@ export type ContentItem = {
   isFree: boolean; priceCents: number | null; mediaCount: number;
   sentCount: number; viewedCount: number; viewRate: number;
   purchasedCount: number | null;
+  totalReplied: number | null;
   dormantBefore: number | null;
   wakeUp1h: number | null; wakeUp3h: number | null; wakeUp6h: number | null; wakeUp24h: number | null;
   reactivationBuckets: Record<string, number> | null;
@@ -119,46 +120,37 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           )}
           <span className={`ml-auto text-base font-bold ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>{item.viewRate}%</span>
         </div>
-        {/* Wake Up Rate — show status for all content */}
-        {item.dormantBefore == null && item.hoursLive >= 2 && (
+        {/* Fan Response — total replied + cold fans woke up */}
+        {item.dormantBefore == null && item.totalReplied == null && item.hoursLive >= 2 && (
           <div className="mt-2 glass-inset rounded-lg p-2">
-            <div className="text-xs text-white/30">Wake-up data pending</div>
+            <div className="text-xs text-white/30">Response data pending</div>
           </div>
         )}
-        {item.dormantBefore === 0 && (
-          <div className="mt-2 glass-inset rounded-lg p-2">
-            <div className="text-xs text-white/40">0 cold fans woke up</div>
-          </div>
-        )}
-        {item.dormantBefore != null && item.dormantBefore > 0 && (() => {
-          const w = [item.wakeUp1h ?? 0, item.wakeUp3h ?? 0, item.wakeUp6h ?? 0, item.wakeUp24h ?? 0];
-          const labels = ["1h", "3h", "6h", "24h"];
-          const max = w[3]; // 24h is the total (cumulative)
-          const allSame = w.every(v => v === w[0]);
-          // Find the earliest non-zero bucket for the summary
-          const earliest = labels[w.findIndex(v => v > 0)] || "24h";
+        {(item.totalReplied != null || item.dormantBefore != null) && (() => {
+          const replied = item.totalReplied ?? 0;
+          const cold = item.dormantBefore ?? 0;
+          if (replied === 0 && cold === 0) {
+            return (
+              <div className="mt-2 glass-inset rounded-lg p-2">
+                <div className="text-xs text-white/40">0 fans replied</div>
+              </div>
+            );
+          }
           return (
             <div className="mt-2 glass-inset rounded-lg p-2">
-              {allSame ? (
-                <div className="text-xs text-white/70">
-                  <span className="text-teal-400 font-bold">{max}</span> cold fan{max !== 1 ? "s" : ""} woke up within <span className="text-white font-medium">{earliest}</span>
-                </div>
-              ) : (
-                <>
-                  <div className="text-xs text-white/70 mb-1 font-medium">{max} cold fan{max !== 1 ? "s" : ""} woke up</div>
-                  <div className="flex items-center gap-1 text-xs">
-                    {w.map((v, i) => {
-                      const added = i === 0 ? v : v - w[i - 1]; // new fans in this window
-                      return (
-                        <div key={labels[i]} className="flex-1 text-center">
-                          <div className={`text-sm font-bold ${added > 0 ? "text-teal-400" : "text-white/20"}`}>+{added}</div>
-                          <div className="text-white/50">{labels[i]}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-white/70">
+                  <span className="text-white font-bold text-sm">{replied}</span> fan{replied !== 1 ? "s" : ""} replied
+                </span>
+                {cold > 0 && (
+                  <span className="text-teal-400">
+                    <span className="font-bold text-sm">{cold}</span> were cold (3d+ inactive)
+                  </span>
+                )}
+                {replied > 0 && cold === 0 && (
+                  <span className="text-white/40">all were already active</span>
+                )}
+              </div>
             </div>
           );
         })()}

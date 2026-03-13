@@ -128,6 +128,7 @@ export async function GET(req: NextRequest) {
         isFree: c.isFree, priceCents: c.priceCents, mediaCount: c.mediaCount,
         sentCount: c.sentCount, viewedCount: c.viewedCount, viewRate,
         purchasedCount: c.purchasedCount,
+        totalReplied: c.totalReplied,
         dormantBefore: c.dormantBefore,
         wakeUp1h: c.wakeUp1h,
         wakeUp3h: c.wakeUp3h,
