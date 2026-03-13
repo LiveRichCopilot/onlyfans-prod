@@ -24,14 +24,21 @@ export async function GET(req: NextRequest) {
     }
     if (creatorId) where.creatorId = creatorId;
 
+    // Cap results — DMs can be thousands per day
+    const limit = Math.min(parseInt(searchParams.get("limit") || "500"), 2000);
+
     const creatives = await prisma.outboundCreative.findMany({
       where,
       orderBy: { sentAt: "desc" },
+      take: limit,
       include: {
         media: { select: { mediaType: true, fullUrl: true, previewUrl: true, thumbUrl: true, permanentUrl: true } },
         insight: { select: { tacticTag: true, hookScore: true, insight: true, viewRate: true } },
       },
     });
+
+    // Get total count for display (without loading all records)
+    const totalCount = await prisma.outboundCreative.count({ where });
 
     const creatorIds = [...new Set(creatives.map((c) => c.creatorId))];
     const creators = await prisma.creator.findMany({
@@ -159,7 +166,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       kpis: { totalMessages, totalWithMedia, totalSent, totalViewed, avgViewRate, insightsCount },
-      daily, items, tactics, silentModels, leaderboard,
+      daily, items, tactics, silentModels, leaderboard, totalCount,
       dateRange: { days, since: since.toISOString() },
     });
   } catch (err: any) {

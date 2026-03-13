@@ -34,6 +34,7 @@ export default function ContentDailyPage() {
   const [kpis, setKpis] = useState<KPIs | null>(null);
   const [silentModels, setSilentModels] = useState<SilentModel[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(1);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
@@ -52,6 +53,7 @@ export default function ContentDailyPage() {
         setKpis(data.kpis || null);
         setSilentModels(data.silentModels || []);
         setLeaderboard(data.leaderboard || []);
+        setTotalCount(data.totalCount || 0);
         // Auto-expand today
         if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard"]));
       })
@@ -147,6 +149,13 @@ export default function ContentDailyPage() {
             <KpiCard icon={<Eye size={14} />} label="Total Viewed" value={fN(kpis.totalViewed)} />
             <KpiCard icon={<TrendingUp size={14} />} label="Avg View Rate" value={`${kpis.avgViewRate}%`} accent />
             <KpiCard icon={<Zap size={14} />} label="AI Insights" value={kpis.insightsCount} />
+          </div>
+        )}
+
+        {/* Capped indicator */}
+        {totalCount > items.length && (
+          <div className="glass-inset rounded-xl p-3 mb-6 flex items-center justify-between">
+            <span className="text-sm text-white/60">Showing {items.length} of {totalCount.toLocaleString()} total — filter by model or source to see more</span>
           </div>
         )}
 
