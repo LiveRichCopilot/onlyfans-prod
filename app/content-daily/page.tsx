@@ -10,6 +10,7 @@ import ContentCard, { KpiCard, fN, type ContentItem } from "./ContentCard";
 import HourlyBreakdown from "./HourlyBreakdown";
 import ChatterDmScoreboard from "./ChatterDmScoreboard";
 import DmPictureSort from "./DmPictureSort";
+import ChatterHourly from "./ChatterHourly";
 
 type DailyRow = { date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; free: number; paid: number };
 type TacticRow = { tag: string; count: number; avgScore: number };
@@ -61,7 +62,7 @@ export default function ContentDailyPage() {
         setChatterDmStats(data.chatterDmStats || []);
         setTotalCount(data.totalCount || 0);
         // Auto-expand today
-        if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard", "chatter-dm"]));
+        if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard", "chatter-dm", "chatter-hourly"]));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -271,6 +272,11 @@ export default function ContentDailyPage() {
 
         {/* Chatter DM Sales Scoreboard */}
         <ChatterDmScoreboard stats={chatterDmStats} expanded={expanded} onToggle={toggle} />
+
+        {/* Chatter Activity by Hour — heatmap */}
+        {(sourceFilter === "direct_message" || sourceFilter === "all") && (
+          <ChatterHourly items={items} expanded={expanded} onToggle={toggle} />
+        )}
 
         {/* DM Picture Sort — visual gallery for sold/unsold/by chatter */}
         {(sourceFilter === "direct_message" || sourceFilter === "all") && <DmPictureSort items={items} />}
