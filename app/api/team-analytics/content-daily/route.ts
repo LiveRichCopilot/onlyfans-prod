@@ -128,14 +128,22 @@ export async function GET(req: NextRequest) {
       }));
 
     // ── Real-time purchase counts from transactions (source of truth) ──
-    // For PPVs where purchasedCount is null (enrichment job hasn't run yet),
-    // query the Transaction table directly so data shows immediately.
-    const ppvsNeedingLiveCount = creatives.filter(
-      (c) => !c.isFree && c.priceCents && c.priceCents > 0 && c.purchasedCount == null
-    );
+    // Check transactions for PPVs that either:
+    //   1. Never enriched (purchasedCount is null)
+    //   2. Enriched as 0 but still in buying window (sale may have come in after enrichment)
+    const now = new Date();
+    const ppvsNeedingLiveCount = creatives.filter((c) => {
+      if (c.isFree || !c.priceCents || c.priceCents <= 0) return false;
+      if (c.purchasedCount == null) return true; // Never enriched
+      if (c.purchasedCount === 0) {
+        // Already enriched as 0 — re-check if still within 48h window
+        const age = now.getTime() - new Date(c.sentAt).getTime();
+        return age < 48 * 3600_000;
+      }
+      return false;
+    });
     const livePurchaseCounts = new Map<string, number>();
     if (ppvsNeedingLiveCount.length > 0) {
-      const now = new Date();
       for (const ppv of ppvsNeedingLiveCount) {
         try {
           const sentAt = new Date(ppv.sentAt);
@@ -183,8 +191,12 @@ export async function GET(req: NextRequest) {
       const viewRate = c.sentCount > 0 ? Math.round((c.viewedCount / c.sentCount) * 1000) / 10 : 0;
       const hoursLive = Math.round((Date.now() - new Date(c.sentAt).getTime()) / 3600000);
       const isPaid = !c.isFree && c.priceCents && c.priceCents > 0;
-      // Use live transaction count if enrichment hasn't run yet
-      const purchased = c.purchasedCount ?? livePurchaseCounts.get(c.id) ?? null;
+      // Use whichever is higher: enrichment count or live transaction count
+      // (live count catches sales that happened after enrichment set 0)
+      const liveCount = livePurchaseCounts.get(c.id);
+      const purchased = liveCount != null
+        ? Math.max(c.purchasedCount ?? 0, liveCount)
+        : c.purchasedCount;
       let status: "selling" | "stagnant" | "awaiting" | "free" | "unsent" = "free";
       if (c.isCanceled) status = "unsent";
       else if (isPaid && purchased != null && purchased > 0) status = "selling";
@@ -327,7 +339,8 @@ export async function GET(req: NextRequest) {
       if (c.mediaCount > 0) e.withMedia++; else e.bumps++;
       e.totalSent += c.sentCount;
       e.totalViewed += c.viewedCount;
-      const pCount = c.purchasedCount ?? livePurchaseCounts.get(c.id) ?? 0;
+      const liveC = livePurchaseCounts.get(c.id);
+      const pCount = liveC != null ? Math.max(c.purchasedCount ?? 0, liveC) : (c.purchasedCount ?? 0);
       if (pCount > 0) e.purchased += pCount;
       modelCounts.set(key, e);
     }
