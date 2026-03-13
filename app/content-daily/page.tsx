@@ -13,6 +13,7 @@ type TacticRow = { tag: string; count: number; avgScore: number };
 type KPIs = { totalMessages: number; totalWithMedia: number; totalSent: number; totalViewed: number; avgViewRate: number; insightsCount: number };
 type SilentModel = { id: string; name: string; ofUsername: string | null; lastContentAt: string | null; daysSilent: number | null };
 type LeaderRow = { name: string; ofUsername: string; massMessages: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; purchased: number };
+type BumpItem = { id: string; creator: { name: string; ofUsername: string }; sentAtUk: string; caption: string; sentCount: number; viewedCount: number; viewRate: number; source: string; chatterName: string | null };
 
 export default function ContentDailyPage() {
   const [items, setItems] = useState<ContentItem[]>([]);
@@ -21,6 +22,7 @@ export default function ContentDailyPage() {
   const [kpis, setKpis] = useState<KPIs | null>(null);
   const [silentModels, setSilentModels] = useState<SilentModel[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
+  const [bumps, setBumps] = useState<BumpItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(1);
@@ -46,6 +48,7 @@ export default function ContentDailyPage() {
         setKpis(data.kpis || null);
         setSilentModels(data.silentModels || []);
         setLeaderboard(data.leaderboard || []);
+        setBumps(data.bumps || []);
         setTotalCount(data.totalCount || 0);
         // Auto-expand today
         if (data.daily?.[0]) setExpanded(new Set([data.daily[0].date, "silent", "leaderboard"]));
@@ -249,6 +252,39 @@ export default function ContentDailyPage() {
                 </tbody>
               </table>
             </div>}
+          </div>
+        )}
+
+        {/* Bumps — text-only messages, collapsible */}
+        {bumps.length > 0 && (
+          <div className="glass-card rounded-2xl mb-6 overflow-hidden">
+            <button onClick={() => toggle("bumps")} className="w-full flex items-center justify-between p-4 text-left">
+              <span className="text-sm font-semibold text-white flex items-center gap-2">
+                <MessageSquare size={14} className="text-purple-400" /> Bumps (Text Only) — {bumps.length} messages
+              </span>
+              <ChevronDown size={16} className={`text-white/50 transition-transform ${expanded.has("bumps") ? "rotate-180" : ""}`} />
+            </button>
+            {expanded.has("bumps") && (
+              <div className="px-4 pb-4 space-y-1">
+                {bumps.map((b) => {
+                  const timeParts = b.sentAtUk.split(", ");
+                  const time = (timeParts[1] || "").slice(0, 5);
+                  return (
+                    <div key={b.id} className="glass-inset rounded-lg px-3 py-2 flex items-center gap-3">
+                      <span className="text-xs text-white/40 w-12 shrink-0">{time}</span>
+                      <span className="text-xs text-teal-400 font-medium w-24 shrink-0 truncate">{b.creator.name}</span>
+                      <p className="text-xs text-white/70 flex-1 truncate">{b.caption || "(no text)"}</p>
+                      <div className="flex items-center gap-3 shrink-0 text-xs">
+                        <span className="text-white/50 flex items-center gap-1"><Send size={11} /> {fN(b.sentCount)}</span>
+                        <span className="text-white/50 flex items-center gap-1"><Eye size={11} /> {fN(b.viewedCount)}</span>
+                        <span className={`font-semibold ${b.viewRate > 1 ? "text-teal-400" : b.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>{b.viewRate}%</span>
+                      </div>
+                      {b.chatterName && <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded-full shrink-0">{b.chatterName}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

@@ -151,6 +151,24 @@ export async function GET(req: NextRequest) {
       return hasDisplayableMedia;
     });
 
+    // ── Bumps: text-only messages (no media) — returned separately ──
+    const textOnly = creatives.filter((c) => c.mediaCount === 0 || c.media.length === 0);
+    const bumps = textOnly.map((c) => {
+      const sentAtUk = new Date(c.sentAt).toLocaleString("en-GB", { timeZone: "Europe/London" });
+      const viewRate = c.sentCount > 0 ? Math.round((c.viewedCount / c.sentCount) * 1000) / 10 : 0;
+      return {
+        id: c.id,
+        creator: creatorMap[c.creatorId] || { name: "Unknown", ofUsername: "" },
+        sentAtUk,
+        caption: c.textPlain || c.textHtml || "",
+        sentCount: c.sentCount,
+        viewedCount: c.viewedCount,
+        viewRate,
+        source: c.source,
+        chatterName: c.source === "direct_message" ? resolveChatter(c.creatorId, new Date(c.sentAt)) : null,
+      };
+    });
+
     const totalMessages = creatives.length;
     const totalWithMedia = creatives.filter((c) => c.mediaCount > 0).length;
     const totalSent = creatives.reduce((s, c) => s + c.sentCount, 0);
@@ -212,7 +230,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       kpis: { totalMessages, totalWithMedia, totalSent, totalViewed, avgViewRate, insightsCount },
-      daily, items, tactics, silentModels, leaderboard, totalCount,
+      daily, items, bumps, tactics, silentModels, leaderboard, totalCount,
       dateRange: { days, since: since.toISOString() },
     });
   } catch (err: any) {
