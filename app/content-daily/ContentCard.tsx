@@ -56,11 +56,25 @@ export default function ContentCard({ item }: { item: ContentItem }) {
   const dateOnly = timeParts[0] || "";
   const timeOnly = (timeParts[1] || "").slice(0, 5);
 
+  // VALIDATION: Never render this card if there's no media at all
+  if (!item.media || item.media.length === 0 || item.mediaCount === 0) return null;
+
   return (
     <div className={`glass-card rounded-2xl overflow-hidden ${item.status === "stagnant" ? "border border-red-500/20" : ""}`}>
       {imgSrc ? (
         <div className="relative aspect-[4/3] bg-black/40">
-          <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+          <img src={imgSrc} alt="" className="w-full h-full object-cover"
+            onError={(e) => {
+              // If image fails to load, replace with a styled fallback — never show broken img
+              const target = e.currentTarget;
+              target.style.display = "none";
+              const fallback = target.parentElement?.querySelector(".img-fallback");
+              if (fallback) (fallback as HTMLElement).style.display = "flex";
+            }}
+          />
+          <div className="img-fallback hidden aspect-[4/3] bg-white/[0.04] items-center justify-center absolute inset-0">
+            <ImageIcon size={32} className="text-white/30" />
+          </div>
           <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-3">
             <div className="text-xl text-white font-bold">{timeOnly} UK</div>
             <div className="text-sm text-white/80">{dateOnly}</div>
@@ -77,9 +91,7 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           </div>
           {item.isCanceled && <span className="absolute top-3 right-3 bg-red-500/90 text-white text-sm px-3 py-1 rounded-full font-bold">Unsent</span>}
         </div>
-      ) : (
-        <div className="aspect-[4/3] bg-white/[0.02] flex items-center justify-center"><ImageIcon size={32} className="text-white/20" /></div>
-      )}
+      ) : null}
       <div className="p-4">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">

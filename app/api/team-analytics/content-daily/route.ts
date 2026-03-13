@@ -104,7 +104,12 @@ export async function GET(req: NextRequest) {
 
     const daily = [...dailyMap.values()].sort((a, b) => b.date.localeCompare(a.date));
 
-    const items = creatives.map((c) => {
+    // ── VALIDATION: Only include items with actual media ──
+    // Text-only messages (mediaCount=0) were showing as blank cards.
+    // Filter them out server-side so no blank image placeholder ever renders.
+    const withMedia = creatives.filter((c) => c.mediaCount > 0 && c.media.length > 0);
+
+    const items = withMedia.map((c) => {
       const sentAtUk = new Date(c.sentAt).toLocaleString("en-GB", { timeZone: "Europe/London" });
       const viewRate = c.sentCount > 0 ? Math.round((c.viewedCount / c.sentCount) * 1000) / 10 : 0;
       const hoursLive = Math.round((Date.now() - new Date(c.sentAt).getTime()) / 3600000);
@@ -135,6 +140,15 @@ export async function GET(req: NextRequest) {
         chatterName: c.source === "direct_message" ? resolveChatter(c.creatorId, new Date(c.sentAt)) : null,
         media: c.media, insight: c.insight,
       };
+    }).filter((item) => {
+      // Final validation: every item MUST have at least one media record with a displayable URL
+      const hasDisplayableMedia = item.media.some(
+        (m: any) => m.permanentUrl || m.previewUrl || m.thumbUrl || m.fullUrl
+      );
+      if (!hasDisplayableMedia) {
+        console.warn(`[content-daily] Filtered out item ${item.id} (${item.creator.name}) — no displayable media URL`);
+      }
+      return hasDisplayableMedia;
     });
 
     const totalMessages = creatives.length;

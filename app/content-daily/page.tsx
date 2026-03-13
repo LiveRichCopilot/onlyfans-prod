@@ -35,7 +35,12 @@ export default function ContentDailyPage() {
     fetch(`/api/team-analytics/content-daily?days=${days}${sourceParam}`)
       .then((r) => r.json())
       .then((data) => {
-        setItems(data.items || []);
+        // Client-side validation: only accept items that have real media
+        const validItems = (data.items || []).filter((i: ContentItem) =>
+          i.mediaCount > 0 && i.media && i.media.length > 0 &&
+          i.media.some((m: any) => m.permanentUrl || m.previewUrl || m.thumbUrl || m.fullUrl)
+        );
+        setItems(validItems);
         setDaily(data.daily || []);
         setTactics(data.tactics || []);
         setKpis(data.kpis || null);
