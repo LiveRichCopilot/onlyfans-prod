@@ -156,6 +156,14 @@ model Fan {
   name               String?
   username           String?
   lifetimeSpend      Float     @default(0)
+  tipsTotal          Float     @default(0) // subscribedOnData.tipsSumm
+  subscriptionSpend  Float     @default(0) // subscribedOnData.subscribesSumm
+  messageSpend       Float     @default(0) // subscribedOnData.messagesSumm
+  postSpend          Float     @default(0) // subscribedOnData.postsSumm
+  subscriptionStatus String?   // "active" | "expired"
+  subscriptionPrice  Float?    // Monthly sub price
+  messageCount       Int       @default(0) // Total messages from this fan
+  lastActiveAt       DateTime? // Last activity (message or purchase)
   lastPurchaseAt     DateTime? // Last tip/PPV/purchase timestamp
   lastPurchaseType   String? // tip, message, post, subscription
   lastPurchaseAmount Float? // Amount of last purchase

@@ -85,23 +85,35 @@ export async function GET(req: NextRequest) {
             const fans: any[] = fansRes?.data?.list || fansRes?.data || fansRes?.list || (Array.isArray(fansRes) ? fansRes : []);
             timing.fansFetchMs = Date.now() - t0;
 
-            const fanRecords = fans
-                .filter((f: any) => f.id)
-                .map((f: any) => ({
+            const validFans = fans.filter((f: any) => f.id);
+
+            if (validFans.length > 0) {
+                t0 = Date.now();
+                // Create new fans (skip existing)
+                const fanRecords = validFans.map((f: any) => ({
                     ofapiFanId: f.id.toString(),
                     creatorId: creator.id,
                     name: f.name || f.displayName || null,
                     username: f.username || null,
                     lifetimeSpend: f.subscribedOnData?.totalSumm || 0,
                 }));
-
-            if (fanRecords.length > 0) {
-                t0 = Date.now();
                 const created = await prisma.fan.createMany({
                     data: fanRecords,
                     skipDuplicates: true,
                 });
                 result.fansUpserted = created.count;
+
+                // Update ALL fans with full OFAPI spending breakdowns + sub status
+                for (const f of validFans) {
+                    const s = f.subscribedOnData || {};
+                    try { await prisma.fan.update({ where: { ofapiFanId: f.id.toString() }, data: {
+                        name: f.name || f.displayName || undefined, username: f.username || undefined,
+                        lifetimeSpend: s.totalSumm || 0, tipsTotal: s.tipsSumm || 0,
+                        subscriptionSpend: s.subscribesSumm || 0, messageSpend: s.messagesSumm || 0,
+                        postSpend: s.postsSumm || 0, subscribedAt: s.subscribeAt ? new Date(s.subscribeAt) : undefined,
+                        subscriptionStatus: "active", subscriptionPrice: s.subscribePrice || s.regularPrice || undefined,
+                    }}); } catch { /* skip */ }
+                }
                 timing.fansWriteMs = Date.now() - t0;
             }
         } catch (e: any) {
@@ -323,6 +335,26 @@ export async function GET(req: NextRequest) {
             `;
         } catch (e: any) {
             result.errors.push(`priceRange update: ${e.message}`);
+        }
+
+        // 4f. Message count + last active from RawChatMessage
+        try {
+            await prisma.$executeRaw`
+                UPDATE "Fan" f SET
+                    "messageCount" = sub."msgCount",
+                    "lastActiveAt" = sub."lastMsg"
+                FROM (
+                    SELECT r."chatId", COUNT(*) as "msgCount", MAX(r."sentAt") as "lastMsg"
+                    FROM "RawChatMessage" r
+                    WHERE r."creatorId" = ${creator.id}
+                      AND r."isFromCreator" = false
+                    GROUP BY r."chatId"
+                ) sub
+                WHERE f."ofapiFanId" = sub."chatId"
+                  AND f."creatorId" = ${creator.id}
+            `;
+        } catch (e: any) {
+            result.errors.push(`messageCount update: ${e.message}`);
         }
 
         timing.computedFieldsMs = Date.now() - t0;
