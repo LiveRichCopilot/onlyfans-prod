@@ -119,7 +119,17 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           )}
           <span className={`ml-auto text-base font-bold ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>{item.viewRate}%</span>
         </div>
-        {/* Wake Up Rate — cumulative, so show smart summary */}
+        {/* Wake Up Rate — show status for all content */}
+        {item.dormantBefore == null && item.hoursLive >= 2 && (
+          <div className="mt-2 glass-inset rounded-lg p-2">
+            <div className="text-xs text-white/30">Wake-up data pending</div>
+          </div>
+        )}
+        {item.dormantBefore === 0 && (
+          <div className="mt-2 glass-inset rounded-lg p-2">
+            <div className="text-xs text-white/40">0 cold fans woke up</div>
+          </div>
+        )}
         {item.dormantBefore != null && item.dormantBefore > 0 && (() => {
           const w = [item.wakeUp1h ?? 0, item.wakeUp3h ?? 0, item.wakeUp6h ?? 0, item.wakeUp24h ?? 0];
           const labels = ["1h", "3h", "6h", "24h"];

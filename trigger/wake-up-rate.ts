@@ -239,7 +239,10 @@ export const wakeUpRateScheduled = schedules.task({
   id: "wake-up-rate-scheduled",
   cron: "*/15 * * * *",
   run: async () => {
-    const result = await wakeUpRate.triggerAndWait({ limit: 50, recompute: true });
+    // First pass: compute any that haven't been computed yet (new items)
+    const fresh = await wakeUpRate.triggerAndWait({ limit: 100, recompute: false });
+    // Second pass: recompute existing ones to update running totals
+    const result = await wakeUpRate.triggerAndWait({ limit: 100, recompute: true });
     return result;
   },
 });
