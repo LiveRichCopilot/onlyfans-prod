@@ -119,40 +119,73 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           )}
           <span className={`ml-auto text-base font-bold ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>{item.viewRate}%</span>
         </div>
-        {/* Wake Up Rate */}
-        {item.dormantBefore != null && item.dormantBefore > 0 && (
-          <div className="mt-2 glass-inset rounded-lg p-2">
-            <div className="text-xs text-white/70 mb-1 font-medium">Cold Fans Woke Up — {item.dormantBefore} replied</div>
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              {([["1h", item.wakeUp1h], ["3h", item.wakeUp3h], ["6h", item.wakeUp6h], ["24h", item.wakeUp24h]] as [string, number | null][]).map(([label, val]) => {
-                const v = val ?? 0;
-                return (
-                  <div key={label} className="text-center">
-                    <div className={`text-sm font-bold ${v > 0 ? "text-teal-400" : "text-white/30"}`}>{v}</div>
-                    <div className="text-white/50">{label}</div>
+        {/* Wake Up Rate — cumulative, so show smart summary */}
+        {item.dormantBefore != null && item.dormantBefore > 0 && (() => {
+          const w = [item.wakeUp1h ?? 0, item.wakeUp3h ?? 0, item.wakeUp6h ?? 0, item.wakeUp24h ?? 0];
+          const labels = ["1h", "3h", "6h", "24h"];
+          const max = w[3]; // 24h is the total (cumulative)
+          const allSame = w.every(v => v === w[0]);
+          // Find the earliest non-zero bucket for the summary
+          const earliest = labels[w.findIndex(v => v > 0)] || "24h";
+          return (
+            <div className="mt-2 glass-inset rounded-lg p-2">
+              {allSame ? (
+                <div className="text-xs text-white/70">
+                  <span className="text-teal-400 font-bold">{max}</span> cold fan{max !== 1 ? "s" : ""} woke up within <span className="text-white font-medium">{earliest}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="text-xs text-white/70 mb-1 font-medium">{max} cold fan{max !== 1 ? "s" : ""} woke up</div>
+                  <div className="flex items-center gap-1 text-xs">
+                    {w.map((v, i) => {
+                      const added = i === 0 ? v : v - w[i - 1]; // new fans in this window
+                      return (
+                        <div key={labels[i]} className="flex-1 text-center">
+                          <div className={`text-sm font-bold ${added > 0 ? "text-teal-400" : "text-white/20"}`}>+{added}</div>
+                          <div className="text-white/50">{labels[i]}</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </>
+              )}
             </div>
-          </div>
-        )}
-        {/* Reactivation — how long fans were inactive before this content woke them */}
-        {item.reactivationBuckets && Object.values(item.reactivationBuckets).some(v => v > 0) && (
-          <div className="mt-2 glass-inset rounded-lg p-2">
-            <div className="text-xs text-white/70 mb-1 font-medium">Reactivated Fans — by inactivity</div>
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              {(["3d", "7d", "15d", "30d"] as const).map((bucket) => {
-                const v = item.reactivationBuckets?.[bucket] ?? 0;
-                return (
-                  <div key={bucket} className="text-center">
-                    <div className={`text-sm font-bold ${v > 0 ? "text-orange-400" : "text-white/30"}`}>{v}</div>
-                    <div className="text-white/50">{bucket}</div>
+          );
+        })()}
+        {/* Reactivation — show smart summary */}
+        {item.reactivationBuckets && Object.values(item.reactivationBuckets).some(v => v > 0) && (() => {
+          const b = item.reactivationBuckets!;
+          const buckets = ["3d", "7d", "15d", "30d"] as const;
+          const vals = buckets.map(k => b[k] ?? 0);
+          const total = vals.reduce((s, v) => s + v, 0);
+          const allSame = vals.every(v => v === vals[0]) && vals[0] > 0;
+          // Find the longest inactivity bucket with a value
+          const longest = [...buckets].reverse().find(k => (b[k] ?? 0) > 0) || "3d";
+          return (
+            <div className="mt-2 glass-inset rounded-lg p-2">
+              {allSame ? (
+                <div className="text-xs text-white/70">
+                  <span className="text-orange-400 font-bold">{vals[0]}</span> fan{vals[0] !== 1 ? "s" : ""} reactivated — was inactive <span className="text-white font-medium">{longest}+</span>
+                </div>
+              ) : (
+                <>
+                  <div className="text-xs text-white/70 mb-1 font-medium">{total} fan{total !== 1 ? "s" : ""} reactivated</div>
+                  <div className="flex items-center gap-1 text-xs">
+                    {buckets.map((k) => {
+                      const v = b[k] ?? 0;
+                      return (
+                        <div key={k} className="flex-1 text-center">
+                          <div className={`text-sm font-bold ${v > 0 ? "text-orange-400" : "text-white/20"}`}>{v}</div>
+                          <div className="text-white/50">{k}+</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
         {mediaSummary && <div className="text-xs text-white/50 mt-1">{mediaSummary}</div>}
         {item.insight && (
           <div className="mt-2 glass-inset rounded-lg p-2">
