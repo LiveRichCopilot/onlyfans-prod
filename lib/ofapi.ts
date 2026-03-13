@@ -7,7 +7,12 @@ export {
     fetchAllTransactions,
     getMe,
     getActiveFans,
+    getExpiredFans,
+    fetchAllExpiredFans,
     listAllFans,
+    getChargebacks,
+    getChargebackRatio,
+    getChargebackStats,
     getNotificationCounts,
     calculateTopFans,
 } from "./ofapi-core";

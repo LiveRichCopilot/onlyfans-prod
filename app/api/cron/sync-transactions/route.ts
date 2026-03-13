@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { fetchAllTransactions, getActiveFans } from "@/lib/ofapi";
+import { fetchAllTransactions, getActiveFans, fetchAllExpiredFans } from "@/lib/ofapi";
+import { updateFanComputedFields } from "@/lib/fan-computed-fields";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
             creatorId: creator.id,
             name: creator.name || creator.ofUsername || accountName,
             fansUpserted: 0,
+            expiredFansUpserted: 0,
             txUpserted: 0,
             lastPurchaseUpdated: 0,
             computedFieldsUpdated: 0,
@@ -118,6 +120,50 @@ export async function GET(req: NextRequest) {
             }
         } catch (e: any) {
             result.errors.push(`Fan sync: ${e.message}`);
+        }
+
+        // --- 1b. Sync Expired Fans (churned but still reachable + can still buy) ---
+        t0 = Date.now();
+        try {
+            const expiredFans = await fetchAllExpiredFans(accountName, apiKey, 10); // up to 200 expired fans
+            timing.expiredFansFetchMs = Date.now() - t0;
+
+            if (expiredFans.length > 0) {
+                t0 = Date.now();
+                const expiredRecords = expiredFans.filter((f: any) => f.id).map((f: any) => ({
+                    ofapiFanId: f.id.toString(),
+                    creatorId: creator.id,
+                    name: f.name || f.displayName || null,
+                    username: f.username || null,
+                    lifetimeSpend: f.subscribedOnData?.totalSumm || 0,
+                }));
+                const created = await prisma.fan.createMany({ data: expiredRecords, skipDuplicates: true });
+                result.expiredFansUpserted = created.count;
+
+                // Update expired fans with spending + mark as expired
+                for (const f of expiredFans.filter((f: any) => f.id)) {
+                    const s = f.subscribedOnData || {};
+                    try { await prisma.fan.update({ where: { ofapiFanId: f.id.toString() }, data: {
+                        name: f.name || f.displayName || undefined, username: f.username || undefined,
+                        lifetimeSpend: s.totalSumm || 0, tipsTotal: s.tipsSumm || 0,
+                        subscriptionSpend: s.subscribesSumm || 0, messageSpend: s.messagesSumm || 0,
+                        postSpend: s.postsSumm || 0,
+                        subscribedAt: s.subscribeAt ? new Date(s.subscribeAt) : undefined,
+                        subscriptionStatus: "expired",
+                        subscriptionPrice: s.subscribePrice || s.regularPrice || undefined,
+                        lastActiveAt: s.lastActivity ? new Date(s.lastActivity) : undefined,
+                    }}); } catch { /* skip */ }
+                }
+
+                // Store expired fan count on creator
+                await prisma.creator.update({
+                    where: { id: creator.id },
+                    data: { expiredFanCount: expiredFans.length },
+                });
+                timing.expiredFansWriteMs = Date.now() - t0;
+            }
+        } catch (e: any) {
+            result.errors.push(`Expired fan sync: ${e.message}`);
         }
 
         // --- 2. Sync Transactions (batch, append-only) ---
@@ -202,163 +248,12 @@ export async function GET(req: NextRequest) {
             result.errors.push(`Transaction sync: ${e.message}`);
         }
 
-        // --- 3. Update lastPurchaseAt + lifetimeSpend (bulk SQL) ---
+        // --- 3+4. Update computed fields (bulk SQL — extracted to helper) ---
         t0 = Date.now();
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "lastPurchaseAt" = sub."lastDate",
-                    "lastPurchaseType" = sub."lastType",
-                    "lastPurchaseAmount" = sub."lastAmount"
-                FROM (
-                    SELECT DISTINCT ON ("fanId")
-                        "fanId", "date" as "lastDate", "type" as "lastType", "amount" as "lastAmount"
-                    FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id}
-                    ORDER BY "fanId", "date" DESC
-                ) sub
-                WHERE f."id" = sub."fanId"
-            `;
-
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "lifetimeSpend" = sub."total"
-                FROM (
-                    SELECT "fanId", SUM("amount") as "total"
-                    FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id}
-                    GROUP BY "fanId"
-                ) sub
-                WHERE f."id" = sub."fanId"
-            `;
-            timing.updateMs = Date.now() - t0;
-        } catch (e: any) {
-            result.errors.push(`lastPurchaseAt update: ${e.message}`);
-        }
-
-        // --- 4. Update computed fields (bulk SQL) ---
-        t0 = Date.now();
-
-        // 4a. Average Order Value (positive transactions only — exclude chargebacks)
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "avgOrderValue" = sub."avg"
-                FROM (
-                    SELECT "fanId", AVG("amount") as "avg"
-                    FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id} AND "amount" > 0
-                    GROUP BY "fanId"
-                ) sub
-                WHERE f."id" = sub."fanId"
-            `;
-        } catch (e: any) {
-            result.errors.push(`avgOrderValue update: ${e.message}`);
-        }
-
-        // 4b. Biggest Purchase (positive transactions only — exclude chargebacks)
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "biggestPurchase" = sub."max"
-                FROM (
-                    SELECT "fanId", MAX("amount") as "max"
-                    FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id} AND "amount" > 0
-                    GROUP BY "fanId"
-                ) sub
-                WHERE f."id" = sub."fanId"
-            `;
-        } catch (e: any) {
-            result.errors.push(`biggestPurchase update: ${e.message}`);
-        }
-
-        // 4c. First Purchase Date (only if not already set)
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "firstPurchaseAt" = sub."first_date"
-                FROM (
-                    SELECT "fanId", MIN("date") as "first_date"
-                    FROM "Transaction"
-                    WHERE "creatorId" = ${creator.id}
-                    GROUP BY "fanId"
-                ) sub
-                WHERE f."id" = sub."fanId"
-                AND f."firstPurchaseAt" IS NULL
-            `;
-        } catch (e: any) {
-            result.errors.push(`firstPurchaseAt update: ${e.message}`);
-        }
-
-        // 4d. Buyer Type (dominant transaction type in last 30 days)
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "buyerType" = sub."dominant_type"
-                FROM (
-                    SELECT DISTINCT ON ("fanId")
-                        "fanId",
-                        CASE
-                            WHEN "type" = 'tip' THEN 'tipper'
-                            WHEN "type" = 'message' THEN 'ppv_buyer'
-                            WHEN "type" = 'subscription' THEN 'subscriber_only'
-                            ELSE 'subscriber_only'
-                        END as "dominant_type"
-                    FROM (
-                        SELECT "fanId", "type", COUNT(*) as cnt
-                        FROM "Transaction"
-                        WHERE "creatorId" = ${creator.id}
-                        AND "date" >= NOW() - INTERVAL '30 days'
-                        GROUP BY "fanId", "type"
-                        ORDER BY "fanId", cnt DESC
-                    ) ranked
-                ) sub
-                WHERE f."id" = sub."fanId"
-            `;
-        } catch (e: any) {
-            result.errors.push(`buyerType update: ${e.message}`);
-        }
-
-        // 4e. Price Range (based on lifetimeSpend)
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "priceRange" = CASE
-                        WHEN f."lifetimeSpend" >= 200 THEN 'whale'
-                        WHEN f."lifetimeSpend" >= 50 THEN 'high'
-                        WHEN f."lifetimeSpend" >= 10 THEN 'mid'
-                        WHEN f."lifetimeSpend" > 0 THEN 'low'
-                        ELSE 'none'
-                    END
-                WHERE f."creatorId" = ${creator.id}
-            `;
-        } catch (e: any) {
-            result.errors.push(`priceRange update: ${e.message}`);
-        }
-
-        // 4f. Message count + last active from RawChatMessage
-        try {
-            await prisma.$executeRaw`
-                UPDATE "Fan" f SET
-                    "messageCount" = sub."msgCount",
-                    "lastActiveAt" = sub."lastMsg"
-                FROM (
-                    SELECT r."chatId", COUNT(*) as "msgCount", MAX(r."sentAt") as "lastMsg"
-                    FROM "RawChatMessage" r
-                    WHERE r."creatorId" = ${creator.id}
-                      AND r."isFromCreator" = false
-                    GROUP BY r."chatId"
-                ) sub
-                WHERE f."ofapiFanId" = sub."chatId"
-                  AND f."creatorId" = ${creator.id}
-            `;
-        } catch (e: any) {
-            result.errors.push(`messageCount update: ${e.message}`);
-        }
-
+        const fieldErrors = await updateFanComputedFields(prisma, creator.id);
+        result.errors.push(...fieldErrors);
         timing.computedFieldsMs = Date.now() - t0;
-        result.computedFieldsUpdated = 1;
+        result.computedFieldsUpdated = fieldErrors.length === 0 ? 1 : 0;
 
         // --- 5. Mark sync time ---
         await prisma.creator.update({
@@ -367,7 +262,7 @@ export async function GET(req: NextRequest) {
         });
 
         const creatorElapsed = Date.now() - startTime;
-        console.log(`[Cron Sync] ${result.name}: ${result.fansUpserted} fans, ${result.txUpserted} tx (${Math.round(creatorElapsed / 1000)}s total)`, timing, result.errors.length > 0 ? result.errors : "");
+        console.log(`[Cron Sync] ${result.name}: ${result.fansUpserted} active, ${result.expiredFansUpserted} expired, ${result.txUpserted} tx (${Math.round(creatorElapsed / 1000)}s total)`, timing, result.errors.length > 0 ? result.errors : "");
         allResults.push(result);
 
         // Safety: if we're running long, stop and finish the rest next cycle

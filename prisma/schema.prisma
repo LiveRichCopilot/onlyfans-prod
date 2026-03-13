@@ -29,7 +29,16 @@ model Creator {
   organizationId        String?
   group                 String? // Creator group/category for reporting
 
+  // Chargeback health (updated by sync-chargebacks cron)
+  chargebackRatio       Float?    // 0.08 = 0.08% — should be under 1%
+  chargebackTotal       Float?    // Total $ chargedback
+  chargebackCount       Int?      // Total number of chargebacks
+  chargebackLastSyncAt  DateTime? // When chargebacks were last synced
+  // Expired fan counts (updated by sync-transactions cron)
+  expiredFanCount       Int?      // Total expired/churned fans
+
   fans                Fan[]
+  chargebacks         Chargeback[]
   mediaAssets         MediaAsset[]
   assignedUsers       CreatorAssignment[]
   chatterSessions     ChatterSession[]
@@ -422,6 +431,30 @@ model Transaction {
 
   @@index([creatorId, date])
   @@index([date])
+}
+
+model Chargeback {
+  id            String   @id @default(cuid())
+  ofapiCbId     String   // OFAPI chargeback ID
+  creatorId     String
+  fanOfId       String?  // OF user ID of the fan who chargebacked
+  fanUsername   String?
+  fanName      String?
+  paymentType  String?   // "tips", "subscription", "message", etc.
+  amount       Float     @default(0)
+  vatAmount    Float     @default(0)
+  net          Float     @default(0)
+  fee          Float     @default(0)
+  currency     String    @default("USD")
+  description  String?   // HTML description from OFAPI
+  status       String?   // "undo" etc.
+  chargebackAt DateTime  // When the chargeback occurred (OFAPI createdAt)
+  creator      Creator   @relation(fields: [creatorId], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@unique([creatorId, ofapiCbId])
+  @@index([creatorId, chargebackAt])
+  @@index([fanOfId])
 }
 
 model ChatterPerformance {

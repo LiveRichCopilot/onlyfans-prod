@@ -127,6 +127,82 @@ export async function listAllFans(
 }
 
 /**
+ * Fetch expired (churned) fans — GET /api/{account}/fans/expired
+ * These fans can still buy content even without an active subscription.
+ * Paginates with limit (max 20) + offset. Returns subscribedOnData with full spend breakdown.
+ */
+export async function getExpiredFans(
+    account: string,
+    apiKey: string,
+    options?: { limit?: number; offset?: number }
+) {
+    const params = new URLSearchParams();
+    params.set("limit", String(options?.limit || 20));
+    params.set("offset", String(options?.offset || 0));
+    return ofapiRequest(`/api/${account}/fans/expired?${params.toString()}`, apiKey);
+}
+
+/**
+ * Paginate through ALL expired fans
+ */
+export async function fetchAllExpiredFans(account: string, apiKey: string, maxPages: number = 50) {
+    const allFans: any[] = [];
+    let offset = 0;
+    const limit = 20;
+
+    for (let page = 0; page < maxPages; page++) {
+        const res = await getExpiredFans(account, apiKey, { limit, offset }).catch(() => null);
+        if (!res) break;
+        const fans = res?.data?.list || res?.data || res?.list || (Array.isArray(res) ? res : []);
+        if (fans.length === 0) break;
+        allFans.push(...fans);
+        const hasMore = res?.data?.hasMore ?? false;
+        if (!hasMore) break;
+        offset += limit;
+    }
+    return allFans;
+}
+
+/**
+ * List chargebacks — GET /api/{account}/chargebacks
+ */
+export async function getChargebacks(
+    account: string,
+    apiKey: string,
+    options?: { startDate?: string; endDate?: string; limit?: number; offset?: number }
+) {
+    const params = new URLSearchParams();
+    params.set("limit", String(options?.limit || 100));
+    params.set("offset", String(options?.offset || 0));
+    if (options?.startDate) params.set("start_date", options.startDate);
+    if (options?.endDate) params.set("end_date", options.endDate);
+    return ofapiRequest(`/api/${account}/chargebacks?${params.toString()}`, apiKey);
+}
+
+/**
+ * Get chargeback ratio — GET /api/{account}/chargebacks/ratio
+ * Returns { chargebacksRatio: 0.08 } (percentage)
+ */
+export async function getChargebackRatio(account: string, apiKey: string) {
+    return ofapiRequest(`/api/${account}/chargebacks/ratio`, apiKey);
+}
+
+/**
+ * Get chargeback statistics — GET /api/{account}/chargebacks/statistics
+ * Returns chartAmount, chartCount, total, delta
+ */
+export async function getChargebackStats(
+    account: string,
+    apiKey: string,
+    options?: { startDate?: string; endDate?: string }
+) {
+    const params = new URLSearchParams();
+    if (options?.startDate) params.set("start_date", options.startDate);
+    if (options?.endDate) params.set("end_date", options.endDate);
+    return ofapiRequest(`/api/${account}/chargebacks/statistics?${params.toString()}`, apiKey);
+}
+
+/**
  * Get a quick overview of all unread notification types
  */
 export async function getNotificationCounts(account: string, apiKey: string) {
