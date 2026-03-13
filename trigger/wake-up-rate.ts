@@ -65,7 +65,7 @@ async function computePurchaseBuckets(creatorId: string, T0: Date, creativeId: s
 
 async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   const dormantCutoff = new Date(T0.getTime() - DORMANT_DAYS * 24 * 3600_000);
-  const maxWindow = clampToNow(new Date(T0.getTime() + 360 * 60_000), now);
+  const maxWindow = clampToNow(new Date(T0.getTime() + 1440 * 60_000), now);
 
   // 1) All fans who sent an inbound message after the post
   const firstInboundByChat = await prisma.rawChatMessage.groupBy({
@@ -92,7 +92,7 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   if (firstInboundByChat.length === 0) {
     const emptyBuckets: Record<string, number> = {};
     for (const mins of BUCKETS) emptyBuckets[String(mins)] = 0;
-    return { totalReplied: 0, wakeUpBuckets: emptyBuckets, chatterDMs: chatterDMsBuckets };
+    return { totalReplied: 0, coldFanCount: 0, wakeUpBuckets: emptyBuckets, chatterDMs: chatterDMsBuckets };
   }
 
   const responderChatIds = firstInboundByChat.map((r) => r.chatId);
@@ -123,6 +123,7 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
 
   return {
     totalReplied: firstInboundByChat.length,
+    coldFanCount: coldWakeUps.length,
     wakeUpBuckets,
     chatterDMs: chatterDMsBuckets,
   };
@@ -166,7 +167,7 @@ export const wakeUpRate = task({
         await prisma.outboundCreative.update({
           where: { id: push.id },
           data: {
-            dormantBefore: result.totalReplied,
+            dormantBefore: result.coldFanCount,
             wakeUpBuckets: result.wakeUpBuckets,
             chatterDMs: result.chatterDMs,
             purchaseBuckets: purchases,
@@ -175,7 +176,7 @@ export const wakeUpRate = task({
             wakeUp1h: result.wakeUpBuckets["60"] ?? 0,
             wakeUp3h: result.wakeUpBuckets["180"] ?? 0,
             wakeUp6h: result.wakeUpBuckets["360"] ?? 0,
-            wakeUp24h: result.wakeUpBuckets["360"] ?? 0,
+            wakeUp24h: result.wakeUpBuckets["1440"] ?? 0,
             chatterDMs1h: result.chatterDMs["60"] ?? 0,
             chatterDMs3h: result.chatterDMs["180"] ?? 0,
             wakeUpComputed: true,

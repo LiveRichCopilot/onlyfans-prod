@@ -35,7 +35,7 @@ export default function ContentDailyPage() {
   const [silentModels, setSilentModels] = useState<SilentModel[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useState(1);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState(new Set<string>());
 
@@ -321,14 +321,13 @@ function ContentCard({ item }: { item: ContentItem }) {
         {/* Wake Up Rate */}
         {item.dormantBefore != null && item.dormantBefore > 0 && (
           <div className="mt-2 glass-inset rounded-lg p-2">
-            <div className="text-xs text-white/70 mb-1 font-medium">Wake Up Rate — {fN(item.dormantBefore)} dormant fans</div>
+            <div className="text-xs text-white/70 mb-1 font-medium">Cold Fans Woke Up — {item.dormantBefore} replied</div>
             <div className="grid grid-cols-4 gap-2 text-xs">
               {([["1h", item.wakeUp1h], ["3h", item.wakeUp3h], ["6h", item.wakeUp6h], ["24h", item.wakeUp24h]] as [string, number | null][]).map(([label, val]) => {
                 const v = val ?? 0;
-                const pct = item.dormantBefore! > 0 ? (v / item.dormantBefore! * 100).toFixed(1) : "0.0";
                 return (
                   <div key={label} className="text-center">
-                    <div className={`text-sm font-bold ${v > 0 ? "text-teal-400" : "text-white/30"}`}>{pct}%</div>
+                    <div className={`text-sm font-bold ${v > 0 ? "text-teal-400" : "text-white/30"}`}>{v}</div>
                     <div className="text-white/50">{label}</div>
                   </div>
                 );
