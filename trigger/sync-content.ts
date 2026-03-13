@@ -90,53 +90,41 @@ async function uploadToSupabase(creatorId: string, creativeId: string, mediaId: 
 
 async function persistMediaBatch(accountId: string, creatorId: string, mediaRows: any[], apiKey: string): Promise<{ ok: number; failed: number }> {
   let ok = 0, failed = 0;
-  // Process in batches of 2 concurrently (CF rate limit on vault endpoint)
-  for (let i = 0; i < mediaRows.length; i += 2) {
-    const batch = mediaRows.slice(i, i + 2);
+  for (let i = 0; i < mediaRows.length; i += 3) {
+    const batch = mediaRows.slice(i, i + 3);
     const results = await Promise.allSettled(batch.map(async (row: any) => {
-      const ofMediaId = row.onlyfansMediaId;
-      if (!ofMediaId) return false;
-
-      // Pattern A: get fresh URL from vault
-      let sourceUrl: string | null = null;
-      const fresh = await getFreshMediaUrl(accountId, ofMediaId, apiKey);
-      if (fresh) {
-        sourceUrl = row.mediaType === "video"
-          ? (fresh.thumb || fresh.preview)
-          : (fresh.preview || fresh.thumb || fresh.full);
-      }
-
-      // Fallback: use stored CDN URL (might still be fresh if recently polled)
-      if (!sourceUrl) {
-        sourceUrl = row.mediaType === "video"
-          ? (row.thumbUrl || row.previewUrl)
-          : (row.previewUrl || row.thumbUrl || row.fullUrl);
-      }
-      if (!sourceUrl) return false;
-
-      const permanentUrl = await uploadToSupabase(creatorId, row.creativeId, row.id, sourceUrl, apiKey, accountId);
+      if (!row.onlyfansMediaId) return false;
+      // Get fresh URL from vault, fall back to stored CDN URL
+      let src: string | null = null;
+      const fresh = await getFreshMediaUrl(accountId, row.onlyfansMediaId, apiKey);
+      if (fresh) src = row.mediaType === "video" ? (fresh.thumb || fresh.preview) : (fresh.preview || fresh.thumb || fresh.full);
+      if (!src) src = row.mediaType === "video" ? (row.thumbUrl || row.previewUrl) : (row.previewUrl || row.thumbUrl || row.fullUrl);
+      if (!src) return false;
+      const permanentUrl = await uploadToSupabase(creatorId, row.creativeId, row.id, src, apiKey, accountId);
       if (permanentUrl) {
-        await prisma.outboundMedia.update({
-          where: { id: row.id },
-          data: { permanentUrl, persistStatus: "ok", persistedAt: new Date(), lastError: null },
-        });
+        await prisma.outboundMedia.update({ where: { id: row.id }, data: { permanentUrl, persistStatus: "ok", persistedAt: new Date(), lastError: null } });
         return true;
       }
-      await prisma.outboundMedia.update({
-        where: { id: row.id },
-        data: { persistStatus: "failed", lastError: "download or upload failed" },
-      });
+      await prisma.outboundMedia.update({ where: { id: row.id }, data: { persistStatus: "failed", lastError: "download or upload failed" } });
       return false;
     }));
-
-    for (const r of results) {
-      if (r.status === "fulfilled" && r.value) ok++;
-      else failed++;
-    }
-    // Rate limit: wait 500ms between batches to avoid CF 429
-    if (i + 2 < mediaRows.length) await new Promise(r => setTimeout(r, 500));
+    for (const r of results) { if (r.status === "fulfilled" && r.value) ok++; else failed++; }
+    if (i + 3 < mediaRows.length) await new Promise(r => setTimeout(r, 300));
   }
   return { ok, failed };
+}
+
+// Refresh CDN URLs for existing non-persisted media (keeps proxy working with fresh URLs)
+async function refreshMediaUrls(creativeId: string, media: any[]) {
+  for (const mi of media) {
+    if (!mi?.id || !mi?.files) continue;
+    const d: any = {};
+    if (mi.files?.full?.url) d.fullUrl = mi.files.full.url;
+    if (mi.files?.preview?.url) d.previewUrl = mi.files.preview.url;
+    if (mi.files?.thumb?.url) d.thumbUrl = mi.files.thumb.url;
+    if (!Object.keys(d).length) continue;
+    await prisma.outboundMedia.updateMany({ where: { creativeId, onlyfansMediaId: String(mi.id), persistStatus: { not: "ok" } }, data: d });
+  }
 }
 
 // ── Stage 1: Poll + upsert ──
@@ -185,7 +173,7 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
     });
     upserted++;
 
-    // Create media records with stable onlyfansMediaId
+    // Create or refresh media records
     if (Array.isArray(m.media) && m.media.length > 0) {
       const existingCount = await prisma.outboundMedia.count({ where: { creativeId: row.id } });
       if (existingCount === 0) {
@@ -205,6 +193,9 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
           });
           mediaCreated++;
         }
+      } else {
+        // Refresh CDN URLs for non-persisted media (keeps proxy working)
+        await refreshMediaUrls(row.id, m.media);
       }
     }
   }
@@ -263,6 +254,8 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
           });
           mediaCreated++;
         }
+      } else {
+        await refreshMediaUrls(row.id, m.media);
       }
     }
   }
@@ -312,6 +305,8 @@ async function pollCreator(creatorId: string, acctId: string, apiKey: string, st
             });
             mediaCreated++;
           }
+        } else {
+          await refreshMediaUrls(row.id, p.media);
         }
       }
     }
@@ -353,7 +348,7 @@ export const syncContent = task({
     }
 
     // ── STAGE 2: Persist pending media (Pattern A — fresh vault URLs) ──
-    const persistLimit = payload.persistLimit || 100;
+    const persistLimit = payload.persistLimit || 500;
     const pendingMedia = await prisma.outboundMedia.findMany({
       where: { persistStatus: "pending", onlyfansMediaId: { not: null } },
       orderBy: { createdAt: "desc" },
