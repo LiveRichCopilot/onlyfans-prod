@@ -21,7 +21,7 @@ type ContentItem = {
   isCanceled: boolean; status: "selling" | "stagnant" | "awaiting" | "free" | "unsent";
   source: string; type: "content" | "bump"; media: MediaItem[]; insight: InsightData;
 };
-type DailyRow = { date: string; massMessages: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; free: number; paid: number };
+type DailyRow = { date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number; totalSent: number; totalViewed: number; free: number; paid: number };
 type TacticRow = { tag: string; count: number; avgScore: number };
 type KPIs = { totalMessages: number; totalWithMedia: number; totalSent: number; totalViewed: number; avgViewRate: number; insightsCount: number };
 type SilentModel = { id: string; name: string; ofUsername: string | null; lastContentAt: string | null; daysSilent: number | null };
@@ -37,11 +37,13 @@ export default function ContentDailyPage() {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(1);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState(new Set<string>());
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/team-analytics/content-daily?days=${days}`)
+    const sourceParam = sourceFilter !== "all" ? `&source=${sourceFilter}` : "";
+    fetch(`/api/team-analytics/content-daily?days=${days}${sourceParam}`)
       .then((r) => r.json())
       .then((data) => {
         setItems(data.items || []);
@@ -55,7 +57,7 @@ export default function ContentDailyPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, sourceFilter]);
 
   const creatorNames = useMemo(() => {
     const names = new Map<string, string>();
@@ -64,7 +66,7 @@ export default function ContentDailyPage() {
   }, [items]);
 
   const filtered = useMemo(() => {
-    let f = items.filter((i) => i.type === "content");
+    let f = items;
     if (creatorFilter !== "all") f = f.filter((i) => (i.creator.ofUsername || i.creator.name) === creatorFilter);
     return f;
   }, [items, creatorFilter]);
@@ -102,9 +104,19 @@ export default function ContentDailyPage() {
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               <BarChart3 size={22} className="text-teal-400" /> Content Daily
             </h1>
-            <p className="text-white/50 text-sm">Mass messages + PPVs — Wall posts and stories coming soon (OFAPI endpoint pending)</p>
+            <p className="text-white/50 text-sm">Mass messages, DMs, wall posts — all outbound content with media</p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
+            <div className="glass-panel rounded-xl p-1 flex items-center gap-1">
+              <MessageSquare size={12} className="text-white/40 ml-2" />
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+                className="bg-transparent text-xs text-white border-none outline-none px-1 py-1.5 cursor-pointer">
+                <option value="all" className="bg-[#111]">All Content</option>
+                <option value="mass_message" className="bg-[#111]">Mass Messages</option>
+                <option value="direct_message" className="bg-[#111]">DMs</option>
+                <option value="wall_post" className="bg-[#111]">Wall Posts</option>
+              </select>
+            </div>
             <div className="glass-panel rounded-xl p-1 flex items-center gap-1">
               <Filter size={12} className="text-white/40 ml-2" />
               <select value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)}
@@ -216,7 +228,10 @@ export default function ContentDailyPage() {
               const isOpen = expanded.has(dateStr);
               const selling = dayItems.filter((i) => i.status === "selling").length;
               const stagnant = dayItems.filter((i) => i.status === "stagnant").length;
-              const free = dayItems.filter((i) => i.status === "free").length;
+              const freeCount = dayItems.filter((i) => i.status === "free").length;
+              const massCount = dayItems.filter((i) => i.source === "mass_message").length;
+              const dmCount = dayItems.filter((i) => i.source === "direct_message").length;
+              const wallCount = dayItems.filter((i) => i.source === "wall_post").length;
               return (
                 <div key={dateStr} className="glass-card rounded-2xl overflow-hidden">
                   <button onClick={() => toggle(dateStr)}
@@ -224,12 +239,15 @@ export default function ContentDailyPage() {
                     <div className="flex items-center gap-3">
                       <Calendar size={16} className="text-teal-400" />
                       <span className="text-base text-white font-semibold">{dateStr}</span>
-                      <span className="text-sm text-white/50">{dayItems.length} messages</span>
+                      <span className="text-sm text-white/50">{dayItems.length} total</span>
+                      {massCount > 0 && <span className="text-xs text-white/60">{massCount} mass</span>}
+                      {dmCount > 0 && <span className="text-xs text-purple-400">{dmCount} DMs</span>}
+                      {wallCount > 0 && <span className="text-xs text-blue-400">{wallCount} wall</span>}
                     </div>
                     <div className="flex items-center gap-3">
                       {selling > 0 && <span className="text-xs text-emerald-400">{selling} sold</span>}
                       {stagnant > 0 && <span className="text-xs text-red-400">{stagnant} didn't sell</span>}
-                      {free > 0 && <span className="text-xs text-white/40">{free} free</span>}
+                      {freeCount > 0 && <span className="text-xs text-white/40">{freeCount} free</span>}
                       <ChevronDown size={16} className={`text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                     </div>
                   </button>
@@ -298,7 +316,9 @@ function ContentCard({ item }: { item: ContentItem }) {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <span className="text-sm text-teal-400 font-semibold">{item.creator.name}</span>
-            <span className="text-[10px] bg-white/[0.08] text-white/50 px-1.5 py-0.5 rounded">{item.source === "wall_post" ? "Wall Post" : "Mass Msg"}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.source === "direct_message" ? "bg-purple-500/20 text-purple-400" : item.source === "wall_post" ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.08] text-white/50"}`}>
+              {item.source === "direct_message" ? "DM" : item.source === "wall_post" ? "Wall Post" : "Mass Msg"}
+            </span>
           </div>
           {item.status === "selling" && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">Sold</span>}
           {item.status === "stagnant" && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium">Didn't Sell</span>}

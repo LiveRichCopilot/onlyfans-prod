@@ -14,9 +14,14 @@ export async function GET(req: NextRequest) {
     const days = parseInt(searchParams.get("days") || "7");
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    // Content Daily = mass messages + wall posts (the summary view)
-    // Content Feed handles DMs + everything else
-    const where: any = { sentAt: { gte: since }, source: { in: ["mass_message", "wall_post"] } };
+    // Content Daily = mass messages + wall posts + DMs (with media)
+    const sourceFilter = searchParams.get("source"); // "mass_message" | "wall_post" | "direct_message" | null (all)
+    const where: any = { sentAt: { gte: since } };
+    if (sourceFilter) {
+      where.source = sourceFilter;
+    } else {
+      where.source = { in: ["mass_message", "wall_post", "direct_message"] };
+    }
     if (creatorId) where.creatorId = creatorId;
 
     const creatives = await prisma.outboundCreative.findMany({
@@ -37,7 +42,7 @@ export async function GET(req: NextRequest) {
 
     // Group by date (UK timezone)
     const dailyMap = new Map<string, {
-      date: string; massMessages: number; withMedia: number; bumps: number;
+      date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number;
       totalSent: number; totalViewed: number; free: number; paid: number;
     }>();
 
@@ -47,10 +52,12 @@ export async function GET(req: NextRequest) {
       });
       const iso = dateKey.split("/").reverse().join("-");
       const d = dailyMap.get(iso) || {
-        date: iso, massMessages: 0, withMedia: 0, bumps: 0,
+        date: iso, massMessages: 0, dms: 0, wallPosts: 0, withMedia: 0, bumps: 0,
         totalSent: 0, totalViewed: 0, free: 0, paid: 0,
       };
-      d.massMessages++;
+      if (c.source === "mass_message") d.massMessages++;
+      else if (c.source === "direct_message") d.dms++;
+      else if (c.source === "wall_post") d.wallPosts++;
       if (c.mediaCount > 0) d.withMedia++; else d.bumps++;
       d.totalSent += c.sentCount;
       d.totalViewed += c.viewedCount;
@@ -85,7 +92,7 @@ export async function GET(req: NextRequest) {
         wakeUp6h: c.wakeUp6h,
         wakeUp24h: c.wakeUp24h,
         isCanceled: c.isCanceled, status,
-        source: c.source, // "mass_message" | "wall_post"
+        source: c.source, // "mass_message" | "wall_post" | "direct_message"
         type: (c.mediaCount > 0 ? "content" : "bump") as "content" | "bump",
         media: c.media, insight: c.insight,
       };
