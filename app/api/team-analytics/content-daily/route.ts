@@ -150,9 +150,9 @@ export async function GET(req: NextRequest) {
           const maxWindow = new Date(Math.min(sentAt.getTime() + 48 * 3600_000, now.getTime()));
 
           if (ppv.source === "direct_message") {
-            // DM: exact fan-level match using raw.toUserId
+            // DM: exact fan-level match using raw.toUser.id (OFAPI stores fan as toUser object)
             const rawObj = ppv.raw as Record<string, any> | null;
-            const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+            const toUserId = rawObj?.toUser?.id ? String(rawObj.toUser.id) : (rawObj?.toUserId ? String(rawObj.toUserId) : null);
             if (toUserId) {
               const fan = await prisma.fan.findFirst({ where: { ofapiFanId: toUserId }, select: { id: true } });
               if (fan) {

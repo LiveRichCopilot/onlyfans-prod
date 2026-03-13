@@ -134,9 +134,9 @@ export const buyersEnrichment = task({
         let count: number;
 
         if (creative.source === "direct_message") {
-          // Extract fan OF ID from raw JSON
+          // Extract fan OF ID from raw JSON — field is toUser.id (object), not toUserId
           const rawObj = creative.raw as Record<string, any> | null;
-          const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+          const toUserId = rawObj?.toUser?.id ? String(rawObj.toUser.id) : (rawObj?.toUserId ? String(rawObj.toUserId) : null);
           count = await countDmPurchase(
             creative.creatorId, new Date(creative.sentAt),
             creative.priceCents, toUserId, now
@@ -206,7 +206,7 @@ export const buyersVerify = task({
 
         if (ppv.source === "direct_message") {
           const rawObj = ppv.raw as Record<string, any> | null;
-          const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+          const toUserId = rawObj?.toUser?.id ? String(rawObj.toUser.id) : (rawObj?.toUserId ? String(rawObj.toUserId) : null);
           liveCount = await countDmPurchase(ppv.creatorId, sentAt, ppv.priceCents, toUserId, now);
         } else {
           liveCount = await countMassPurchases(ppv.creatorId, sentAt, now);

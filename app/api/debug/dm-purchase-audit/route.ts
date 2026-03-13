@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
   const audit: any[] = [];
   for (const dm of dmPpvs) {
     const rawObj = dm.raw as Record<string, any> | null;
-    const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+    const toUserId = rawObj?.toUser?.id ? String(rawObj.toUser.id) : (rawObj?.toUserId ? String(rawObj.toUserId) : null);
 
     let fanRecord: any = null;
     let matchingTxs: any[] = [];
