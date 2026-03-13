@@ -11,13 +11,10 @@ function Thumb({ item }: { item: ContentItem }) {
     ? perm.replace("/object/", "/render/image/") + "?width=300&quality=70"
     : cdn ? `/api/proxy-media?url=${encodeURIComponent(cdn)}` : null;
 
-  const borderColor =
-    item.status === "selling" ? "ring-emerald-500/60" :
-    item.status === "stagnant" ? "ring-red-500/40" :
-    item.status === "awaiting" ? "ring-yellow-500/30" : "ring-white/10";
+  const isSold = item.status === "selling";
 
   return (
-    <div className={`relative rounded-xl overflow-hidden ring-2 ${borderColor} bg-black/40 group`}>
+    <div className={`relative rounded-xl overflow-hidden bg-black/40 group ${isSold ? "ring-[3px] ring-emerald-500" : "ring-1 ring-white/10"}`}>
       {src ? (
         <img src={src} alt="" className="w-full aspect-[3/4] object-cover" />
       ) : (
@@ -29,12 +26,22 @@ function Thumb({ item }: { item: ContentItem }) {
           <DollarSign size={9} />{(item.priceCents / 100).toFixed(0)}
         </span>
       )}
-      {/* Status icon */}
-      <div className="absolute top-1.5 left-1.5">
-        {item.status === "selling" && <CheckCircle size={16} className="text-emerald-400 drop-shadow-lg" />}
-        {item.status === "stagnant" && <XCircle size={16} className="text-red-400 drop-shadow-lg" />}
-        {item.status === "awaiting" && <Clock size={14} className="text-yellow-400 drop-shadow-lg" />}
-      </div>
+      {/* Sold = green check + amount overlay at bottom */}
+      {isSold && (
+        <>
+          <div className="absolute top-1.5 left-1.5"><CheckCircle size={16} className="text-emerald-400 drop-shadow-lg" /></div>
+          <div className="absolute bottom-0 left-0 right-0 bg-emerald-600/90 px-2 py-1 flex items-center justify-between">
+            <span className="text-[10px] text-white font-bold">${((item.priceCents || 0) / 100).toFixed(0)} SOLD</span>
+            <span className="text-[9px] text-white/80">{item.sentAtUk.split(", ")[1]?.slice(0, 5) || ""}</span>
+          </div>
+        </>
+      )}
+      {!isSold && item.status === "stagnant" && (
+        <div className="absolute top-1.5 left-1.5"><XCircle size={16} className="text-red-400 drop-shadow-lg" /></div>
+      )}
+      {!isSold && item.status === "awaiting" && (
+        <div className="absolute top-1.5 left-1.5"><Clock size={14} className="text-yellow-400 drop-shadow-lg" /></div>
+      )}
       {/* Multi-media count */}
       {item.media.length > 1 && (
         <span className="absolute bottom-1.5 right-1.5 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded-full">+{item.media.length - 1}</span>
@@ -53,9 +60,10 @@ function Thumb({ item }: { item: ContentItem }) {
 }
 
 function Section({
-  title, icon, count, color, items, defaultOpen,
+  title, icon, count, color, items, defaultOpen, revenue,
 }: {
-  title: string; icon: React.ReactNode; count: number; color: string; items: ContentItem[]; defaultOpen?: boolean;
+  title: string; icon: React.ReactNode; count: number; color: string;
+  items: ContentItem[]; defaultOpen?: boolean; revenue?: number;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   if (items.length === 0) return null;
@@ -65,6 +73,11 @@ function Section({
         {icon}
         <span className={`text-sm font-semibold ${color}`}>{title}</span>
         <span className="text-xs text-white/40">{count}</span>
+        {revenue != null && revenue > 0 && (
+          <span className="text-xs text-emerald-400 font-bold flex items-center gap-0.5 ml-1">
+            <DollarSign size={10} />{revenue.toFixed(0)}
+          </span>
+        )}
         <ChevronDown size={14} className={`ml-auto text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -87,7 +100,6 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
   const pending = dmItems.filter((i) => i.status === "awaiting");
   const free = dmItems.filter((i) => i.status === "free");
 
-  // Group by chatter
   const chatterMap = new Map<string, ContentItem[]>();
   for (const item of dmItems) {
     const key = item.chatterName || "Unassigned";
@@ -96,7 +108,6 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
     chatterMap.set(key, arr);
   }
   const chatters = [...chatterMap.entries()].sort((a, b) => {
-    // Sort by sold count desc, then total desc
     const aSold = a[1].filter((i) => i.status === "selling").length;
     const bSold = b[1].filter((i) => i.status === "selling").length;
     return bSold - aSold || b[1].length - a[1].length;
@@ -121,7 +132,8 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
       {view === "status" && (
         <>
           <Section title="Sold" icon={<CheckCircle size={14} className="text-emerald-400" />}
-            count={sold.length} color="text-emerald-400" items={sold} defaultOpen={true} />
+            count={sold.length} color="text-emerald-400" items={sold} defaultOpen={true}
+            revenue={sold.reduce((s, i) => s + ((i.priceCents || 0) / 100), 0)} />
           <Section title="Didn't Sell" icon={<XCircle size={14} className="text-red-400" />}
             count={didntSell.length} color="text-red-400" items={didntSell} defaultOpen={didntSell.length <= 50} />
           <Section title="Pending" icon={<Clock size={14} className="text-yellow-400" />}
@@ -137,6 +149,9 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
         <>
           {chatters.map(([name, chatterItems]) => {
             const chSold = chatterItems.filter((i) => i.status === "selling").length;
+            const chRevenue = chatterItems
+              .filter((i) => i.status === "selling")
+              .reduce((s, i) => s + ((i.priceCents || 0) / 100), 0);
             const isBot = name !== "Unassigned";
             return (
               <Section key={name}
@@ -145,6 +160,7 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
                 count={chatterItems.length} color={isBot ? "text-purple-400" : "text-white/40"}
                 items={chatterItems}
                 defaultOpen={chSold > 0}
+                revenue={chRevenue}
               />
             );
           })}
