@@ -121,11 +121,47 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
     wakeUpBuckets[String(mins)] = coldWakeUps.filter((t) => t <= cutoff).length;
   }
 
+  // 5) Inactivity duration buckets — how long each replying fan was dormant BEFORE this message
+  const reactivationBuckets: Record<string, number> = { "3d": 0, "7d": 0, "15d": 0, "30d": 0 };
+
+  if (responderChatIds.length > 0) {
+    // For each replying fan, find their last message before this mass message
+    const lastActivityByChat = await prisma.rawChatMessage.groupBy({
+      by: ["chatId"],
+      where: {
+        creatorId,
+        chatId: { in: responderChatIds },
+        sentAt: { lt: T0 },
+      },
+      _max: { sentAt: true },
+    });
+
+    const lastActivityMap = new Map(lastActivityByChat.map((r) => [r.chatId, r._max.sentAt]));
+
+    for (const chatId of responderChatIds) {
+      const lastSeen = lastActivityMap.get(chatId);
+      let inactiveDays: number;
+      if (!lastSeen) {
+        // Never chatted before = 30d (max bucket)
+        inactiveDays = 30;
+      } else {
+        inactiveDays = Math.floor((T0.getTime() - lastSeen.getTime()) / 86400_000);
+        if (inactiveDays > 30) inactiveDays = 30; // Cap at 30d
+      }
+
+      if (inactiveDays >= 30) reactivationBuckets["30d"]++;
+      if (inactiveDays >= 15) reactivationBuckets["15d"]++;
+      if (inactiveDays >= 7) reactivationBuckets["7d"]++;
+      if (inactiveDays >= 3) reactivationBuckets["3d"]++;
+    }
+  }
+
   return {
     totalReplied: firstInboundByChat.length,
     coldFanCount: coldWakeUps.length,
     wakeUpBuckets,
     chatterDMs: chatterDMsBuckets,
+    reactivationBuckets,
   };
 }
 
@@ -171,6 +207,7 @@ export const wakeUpRate = task({
             wakeUpBuckets: result.wakeUpBuckets,
             chatterDMs: result.chatterDMs,
             purchaseBuckets: purchases,
+            reactivationBuckets: result.reactivationBuckets,
             // Legacy columns
             wakeUp30m: result.wakeUpBuckets["30"] ?? 0,
             wakeUp1h: result.wakeUpBuckets["60"] ?? 0,
@@ -185,8 +222,9 @@ export const wakeUpRate = task({
         });
 
         const b = result.wakeUpBuckets;
+        const r = result.reactivationBuckets;
         const totalPurchases = purchases["1440"] || 0;
-        console.log(`[WakeUp] ${push.id}: 30m=${b["30"]} 1h=${b["60"]} 3h=${b["180"]} (${result.totalReplied} replied, ${totalPurchases} purchases)`);
+        console.log(`[WakeUp] ${push.id}: 30m=${b["30"]} 1h=${b["60"]} 3h=${b["180"]} (${result.totalReplied} replied, ${totalPurchases} purchases, reactivated: 3d=${r["3d"]} 7d=${r["7d"]} 15d=${r["15d"]} 30d=${r["30d"]})`);
         computed++;
       } catch (e: any) {
         console.error(`[WakeUp] ${push.id}: ${e.message}`);

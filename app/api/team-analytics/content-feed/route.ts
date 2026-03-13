@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
           buckets: (c as any).wakeUpBuckets ?? null,
           chatterDMs: (c as any).chatterDMs ?? null,
           purchaseBuckets: (c as any).purchaseBuckets ?? null,
+          reactivationBuckets: (c as any).reactivationBuckets ?? null,
         } : null,
       };
     });

@@ -98,6 +98,7 @@ export async function GET(req: NextRequest) {
         wakeUp3h: c.wakeUp3h,
         wakeUp6h: c.wakeUp6h,
         wakeUp24h: c.wakeUp24h,
+        reactivationBuckets: c.reactivationBuckets as Record<string, number> | null,
         isCanceled: c.isCanceled, status,
         source: c.source, // "mass_message" | "wall_post" | "direct_message"
         type: (c.mediaCount > 0 ? "content" : "bump") as "content" | "bump",
