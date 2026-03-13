@@ -177,6 +177,9 @@ export const wakeUpRate = task({
     const where: any = {
       mediaCount: { gt: 0 },
       sentAt: { lt: minAge, gt: maxAge },
+      // Wake-up only makes sense for broadcast content (mass msgs + wall posts)
+      // DMs go to 1 person — counting all inbound traffic as "replies" is wrong
+      source: { in: ["mass_message", "wall_post"] },
     };
     if (!payload.recompute) where.wakeUpComputed = false;
     if (payload.creatorId) where.creatorId = payload.creatorId;
