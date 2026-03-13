@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const maxDuration = 60;
  * One-off: copies raw JSON from RawChatMessage → OutboundCreative
  * for DM records created by webhook without raw stored.
  * Matches on (creatorId, externalId = ofMessageId).
+ * Idempotent — safe to re-run (only touches rows where raw IS NULL).
  */
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -16,9 +18,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Find DM OutboundCreatives with null raw
+  // Find DM OutboundCreatives with database NULL raw
+  // Use Prisma.DbNull to distinguish from JSON null value
   const dmsMissingRaw = await prisma.outboundCreative.findMany({
-    where: { source: "direct_message", raw: { equals: null } },
+    where: { source: "direct_message", raw: { equals: Prisma.DbNull } },
     select: { id: true, creatorId: true, externalId: true },
     take: 500,
   });
