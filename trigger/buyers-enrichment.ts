@@ -4,9 +4,10 @@
  * Mass messages: counts "message" transactions for that creator in a time window.
  * DMs: EXACT match using (creatorId, fanId, amount, window) — fan ID from raw.toUserId.
  *
- * Runs every 15 min via schedule. Two passes:
+ * Runs every 10 min via schedule. Three passes:
  *   1) Fresh: PPVs with purchasedCount = null (never computed)
  *   2) Recompute: all recent PPVs to update running totals
+ *   3) Verify: cross-check Transaction totals vs purchasedCount — auto-correct mismatches
  */
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
@@ -166,12 +167,78 @@ export const buyersEnrichment = task({
   },
 });
 
+/**
+ * Pass 3: Verification — find PPVs where purchasedCount=0 but transactions exist.
+ * This catches sales that landed between enrichment runs. Auto-corrects mismatches.
+ */
+export const buyersVerify = task({
+  id: "buyers-verify",
+  retry: { maxAttempts: 1 },
+  run: async () => {
+    const now = new Date();
+    const since = new Date(now.getTime() - 48 * 3600_000); // 48h window
+
+    // All paid PPVs with purchasedCount=0 in the last 48h
+    const zeros = await prisma.outboundCreative.findMany({
+      where: {
+        isFree: false,
+        mediaCount: { gt: 0 },
+        purchasedCount: 0,
+        sentAt: { gt: since },
+      },
+      select: {
+        id: true, creatorId: true, sentAt: true, source: true,
+        priceCents: true, externalId: true, raw: true,
+      },
+      take: 300,
+    });
+
+    if (zeros.length === 0) {
+      return { verified: 0, corrected: 0, message: "All counts match" };
+    }
+
+    let corrected = 0;
+
+    for (const ppv of zeros) {
+      try {
+        let liveCount: number;
+        const sentAt = new Date(ppv.sentAt);
+
+        if (ppv.source === "direct_message") {
+          const rawObj = ppv.raw as Record<string, any> | null;
+          const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+          liveCount = await countDmPurchase(ppv.creatorId, sentAt, ppv.priceCents, toUserId, now);
+        } else {
+          liveCount = await countMassPurchases(ppv.creatorId, sentAt, now);
+        }
+
+        if (liveCount > 0) {
+          await prisma.outboundCreative.update({
+            where: { id: ppv.id },
+            data: { purchasedCount: liveCount },
+          });
+          console.log(`[Verify] CORRECTED ${ppv.externalId} (${ppv.source}): 0→${liveCount}`);
+          corrected++;
+        }
+      } catch (e: any) {
+        console.error(`[Verify] ${ppv.externalId}: ${e.message}`);
+      }
+    }
+
+    return { verified: zeros.length, corrected };
+  },
+});
+
 export const buyersEnrichmentScheduled = schedules.task({
   id: "buyers-enrichment-scheduled",
-  cron: "*/15 * * * *",
+  cron: "*/10 * * * *",
   run: async () => {
+    // Pass 1: Fresh — PPVs never enriched
     await buyersEnrichment.triggerAndWait({ limit: 200, recompute: false });
-    const result = await buyersEnrichment.triggerAndWait({ limit: 200, recompute: true });
-    return result;
+    // Pass 2: Recompute — update running totals
+    const recompute = await buyersEnrichment.triggerAndWait({ limit: 200, recompute: true });
+    // Pass 3: Verify — catch mismatches where purchasedCount=0 but transactions exist
+    const verify = await buyersVerify.triggerAndWait({});
+    return { recompute, verify };
   },
 });
