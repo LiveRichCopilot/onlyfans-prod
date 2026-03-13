@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
 
     // ── Real-time purchase counts from transactions (source of truth) ──
     // For PPVs where purchasedCount is null (enrichment job hasn't run yet),
-    // query the Transaction table directly so Jay sees data immediately.
+    // query the Transaction table directly so data shows immediately.
     const ppvsNeedingLiveCount = creatives.filter(
       (c) => !c.isFree && c.priceCents && c.priceCents > 0 && c.purchasedCount == null
     );
@@ -139,16 +139,36 @@ export async function GET(req: NextRequest) {
       for (const ppv of ppvsNeedingLiveCount) {
         try {
           const sentAt = new Date(ppv.sentAt);
-          const maxWindow = new Date(Math.min(sentAt.getTime() + 24 * 3600_000, now.getTime()));
-          const count = await prisma.transaction.count({
-            where: {
-              creatorId: ppv.creatorId,
-              type: { contains: "message" },
-              amount: { gt: 0 },
-              date: { gt: sentAt, lte: maxWindow },
-            },
-          });
-          if (count > 0) livePurchaseCounts.set(ppv.id, count);
+          const maxWindow = new Date(Math.min(sentAt.getTime() + 48 * 3600_000, now.getTime()));
+
+          if (ppv.source === "direct_message") {
+            // DM: exact fan-level match using raw.toUserId
+            const rawObj = ppv.raw as Record<string, any> | null;
+            const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+            if (toUserId) {
+              const fan = await prisma.fan.findFirst({ where: { ofapiFanId: toUserId }, select: { id: true } });
+              if (fan) {
+                const priceDollars = ppv.priceCents! / 100;
+                const count = await prisma.transaction.count({
+                  where: {
+                    creatorId: ppv.creatorId, fanId: fan.id,
+                    type: { contains: "message" }, amount: { gte: priceDollars - 0.02, lte: priceDollars + 0.02 },
+                    date: { gt: sentAt, lte: maxWindow },
+                  },
+                });
+                if (count > 0) livePurchaseCounts.set(ppv.id, 1);
+              }
+            }
+          } else {
+            // Mass message / wall post: aggregate count
+            const count = await prisma.transaction.count({
+              where: {
+                creatorId: ppv.creatorId, type: { contains: "message" },
+                amount: { gt: 0 }, date: { gt: sentAt, lte: maxWindow },
+              },
+            });
+            if (count > 0) livePurchaseCounts.set(ppv.id, count);
+          }
         } catch { /* skip */ }
       }
     }

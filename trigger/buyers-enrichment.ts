@@ -1,9 +1,8 @@
 /**
  * Buyers Enrichment Task — Transaction-based (source of truth)
  *
- * Uses the Transaction table to count purchases for PPV OutboundCreatives.
- * For mass messages: counts "message" transactions in 24h window after send.
- * For DMs: matches by creator + fan chat + price + time window.
+ * Mass messages: counts "message" transactions for that creator in a time window.
+ * DMs: EXACT match using (creatorId, fanId, amount, window) — fan ID from raw.toUserId.
  *
  * Runs every 15 min via schedule. Two passes:
  *   1) Fresh: PPVs with purchasedCount = null (never computed)
@@ -16,50 +15,67 @@ const prisma = new PrismaClient({
   datasources: { db: { url: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "" } },
 });
 
-async function countPurchasesForCreative(
-  creatorId: string,
-  sentAt: Date,
-  source: string,
-  priceCents: number | null,
-  now: Date
+/**
+ * DM PPV: exact attribution via (creatorId, fanId, price match, time window)
+ * raw.toUserId → Fan.ofapiFanId → Transaction.fanId
+ */
+async function countDmPurchase(
+  creatorId: string, sentAt: Date, priceCents: number | null, rawToUserId: string | null, now: Date
 ): Promise<number> {
-  const maxWindow24h = new Date(sentAt.getTime() + 24 * 60 * 60_000);
-  const upperBound = maxWindow24h.getTime() > now.getTime() ? now : maxWindow24h;
+  if (!rawToUserId) return 0; // Can't attribute without fan ID
 
-  if (source === "direct_message") {
-    // DM PPV: find the next PPV DM for this creator to cap the window
-    const nextPPV = await prisma.outboundCreative.findFirst({
+  // Find our Fan record for this OF user
+  const fan = await prisma.fan.findFirst({
+    where: { ofapiFanId: rawToUserId },
+    select: { id: true },
+  });
+  if (!fan) return 0;
+
+  const maxWindow = new Date(Math.min(sentAt.getTime() + 48 * 3600_000, now.getTime()));
+  const priceDollars = priceCents ? priceCents / 100 : null;
+
+  // Exact match: same creator, same fan, "message" type, matching price, within window
+  if (priceDollars && priceDollars > 0) {
+    // Allow small tolerance for rounding (±$0.02)
+    const exactMatch = await prisma.transaction.count({
       where: {
         creatorId,
-        source: "direct_message",
-        isFree: false,
-        sentAt: { gt: sentAt },
-      },
-      orderBy: { sentAt: "asc" },
-      select: { sentAt: true },
-    });
-    const windowEnd = nextPPV
-      ? new Date(Math.min(nextPPV.sentAt.getTime(), upperBound.getTime()))
-      : upperBound;
-
-    // Count "message" transactions for this creator in the window
-    const count = await prisma.transaction.count({
-      where: {
-        creatorId,
+        fanId: fan.id,
         type: { contains: "message" },
-        amount: { gt: 0 },
-        date: { gt: sentAt, lte: windowEnd },
+        amount: { gte: priceDollars - 0.02, lte: priceDollars + 0.02 },
+        date: { gt: sentAt, lte: maxWindow },
       },
     });
-    return count;
+    if (exactMatch > 0) return 1; // DM is 1:1, so purchased = 0 or 1
   }
 
-  // Mass message / wall post: same logic as wake-up-rate purchaseBuckets
-  const nextPPV = await prisma.outboundCreative.findFirst({
+  // Fallback: any "message" purchase from this fan in the window (different price = possible)
+  const anyMatch = await prisma.transaction.count({
     where: {
       creatorId,
-      isFree: false,
-      sentAt: { gt: sentAt },
+      fanId: fan.id,
+      type: { contains: "message" },
+      amount: { gt: 0 },
+      date: { gt: sentAt, lte: maxWindow },
+    },
+  });
+  return anyMatch > 0 ? 1 : 0;
+}
+
+/**
+ * Mass message / wall post: count all "message" transactions in window
+ * (one message goes to many fans — aggregate count)
+ */
+async function countMassPurchases(
+  creatorId: string, sentAt: Date, now: Date
+): Promise<number> {
+  const maxWindow24h = new Date(sentAt.getTime() + 24 * 3600_000);
+  const upperBound = maxWindow24h.getTime() > now.getTime() ? now : maxWindow24h;
+
+  // Cap window at next PPV for this creator (avoid double-counting)
+  const nextPPV = await prisma.outboundCreative.findFirst({
+    where: {
+      creatorId, isFree: false, sentAt: { gt: sentAt },
       source: { in: ["mass_message", "wall_post"] },
     },
     orderBy: { sentAt: "asc" },
@@ -69,7 +85,7 @@ async function countPurchasesForCreative(
     ? new Date(Math.min(nextPPV.sentAt.getTime(), upperBound.getTime()))
     : upperBound;
 
-  const count = await prisma.transaction.count({
+  return prisma.transaction.count({
     where: {
       creatorId,
       type: { contains: "message" },
@@ -77,7 +93,6 @@ async function countPurchasesForCreative(
       date: { gt: sentAt, lte: windowEnd },
     },
   });
-  return count;
 }
 
 export const buyersEnrichment = task({
@@ -87,16 +102,12 @@ export const buyersEnrichment = task({
     const limit = payload.limit || 100;
     const now = new Date();
 
-    // Find PPVs to enrich
     const where: any = {
       isFree: false,
       mediaCount: { gt: 0 },
-      // Only look at content from last 7 days (transactions are synced with 24h lookback)
-      sentAt: { gt: new Date(now.getTime() - 7 * 24 * 60 * 60_000) },
+      sentAt: { gt: new Date(now.getTime() - 7 * 24 * 3600_000) },
     };
-    if (!payload.recompute) {
-      where.purchasedCount = null; // Only uncomputed
-    }
+    if (!payload.recompute) where.purchasedCount = null;
     if (payload.creatorId) where.creatorId = payload.creatorId;
 
     const creatives = await prisma.outboundCreative.findMany({
@@ -105,7 +116,7 @@ export const buyersEnrichment = task({
       take: limit,
       select: {
         id: true, creatorId: true, sentAt: true, source: true,
-        priceCents: true, externalId: true,
+        priceCents: true, externalId: true, raw: true,
       },
     });
 
@@ -115,16 +126,26 @@ export const buyersEnrichment = task({
 
     let enriched = 0;
     let errors = 0;
+    let dmExact = 0;
 
     for (const creative of creatives) {
       try {
-        const count = await countPurchasesForCreative(
-          creative.creatorId,
-          new Date(creative.sentAt),
-          creative.source,
-          creative.priceCents,
-          now
-        );
+        let count: number;
+
+        if (creative.source === "direct_message") {
+          // Extract fan OF ID from raw JSON
+          const rawObj = creative.raw as Record<string, any> | null;
+          const toUserId = rawObj?.toUserId ? String(rawObj.toUserId) : null;
+          count = await countDmPurchase(
+            creative.creatorId, new Date(creative.sentAt),
+            creative.priceCents, toUserId, now
+          );
+          if (count > 0) dmExact++;
+        } else {
+          count = await countMassPurchases(
+            creative.creatorId, new Date(creative.sentAt), now
+          );
+        }
 
         await prisma.outboundCreative.update({
           where: { id: creative.id },
@@ -141,7 +162,7 @@ export const buyersEnrichment = task({
       }
     }
 
-    return { enriched, errors, total: creatives.length };
+    return { enriched, errors, total: creatives.length, dmExact };
   },
 });
 
@@ -149,9 +170,7 @@ export const buyersEnrichmentScheduled = schedules.task({
   id: "buyers-enrichment-scheduled",
   cron: "*/15 * * * *",
   run: async () => {
-    // First pass: fresh PPVs with no purchasedCount
     await buyersEnrichment.triggerAndWait({ limit: 200, recompute: false });
-    // Second pass: recompute recent to update running totals
     const result = await buyersEnrichment.triggerAndWait({ limit: 200, recompute: true });
     return result;
   },
