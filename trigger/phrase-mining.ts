@@ -9,7 +9,9 @@
 import { task } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: { db: { url: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "" } },
+});
 
 const KIMI_BASE = "https://api.moonshot.ai/v1/chat/completions";
 const BATCH_SIZE = 10; // Process 10 SaleContexts per run

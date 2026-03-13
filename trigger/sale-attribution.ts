@@ -11,7 +11,9 @@
 import { task, schedules } from "@trigger.dev/sdk";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: { db: { url: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "" } },
+});
 
 const WINDOW_MINUTES = 30; // Pull messages from 30 min before sale
 const BATCH_SIZE = 50; // Process 50 transactions per run
