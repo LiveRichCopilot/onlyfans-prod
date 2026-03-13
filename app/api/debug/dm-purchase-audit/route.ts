@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
-  const since = new Date(now.getTime() - 24 * 3600_000);
+  const days = parseInt(req.nextUrl.searchParams.get("days") || "1");
+  const since = new Date(now.getTime() - days * 24 * 3600_000);
 
   // 1. What transaction types exist in the DB?
   const distinctTypes = await prisma.$queryRaw`
@@ -54,11 +55,27 @@ export async function GET(req: NextRequest) {
     let allFanTxs: any[] = [];
     let allCreatorMsgTxs: any[] = [];
 
+    // OFAPI tells us purchase status directly via canPurchase flag
+    const canPurchase = rawObj?.canPurchase;
+    const isOpened = rawObj?.isOpened;
+
     if (toUserId) {
       fanRecord = await prisma.fan.findFirst({
         where: { ofapiFanId: toUserId },
         select: { id: true, ofapiFanId: true, name: true },
       });
+
+      // Auto-create fan if missing
+      if (!fanRecord) {
+        try {
+          fanRecord = await prisma.fan.create({
+            data: { ofapiFanId: toUserId, creatorId: dm.creatorId, name: rawObj?.toUser?.name || null, lifetimeSpend: 0 },
+            select: { id: true, ofapiFanId: true, name: true },
+          });
+        } catch {
+          fanRecord = await prisma.fan.findFirst({ where: { ofapiFanId: toUserId }, select: { id: true, ofapiFanId: true, name: true } });
+        }
+      }
 
       if (fanRecord) {
         const priceDollars = dm.priceCents! / 100;
@@ -124,10 +141,15 @@ export async function GET(req: NextRequest) {
       exactMatches: matchingTxs,
       allFanTxsInWindow: allFanTxs,
       allCreatorMsgTxs: allCreatorMsgTxs.length,
+      canPurchase,
+      isOpened,
+      ofapiSaysUnpurchased: canPurchase === true,
+      ofapiSaysPurchased: canPurchase === false,
       diagnosis: !toUserId ? "NO_RAW_TOUSERID"
         : !fanRecord ? "FAN_NOT_FOUND"
         : matchingTxs.length > 0 ? "MATCH_FOUND"
         : allFanTxs.length > 0 ? "FAN_HAS_TXS_BUT_TYPE_OR_PRICE_MISMATCH"
+        : canPurchase === false ? "OFAPI_SAYS_PURCHASED_BUT_NO_TX"
         : "NO_TRANSACTIONS_IN_WINDOW",
     });
   }
