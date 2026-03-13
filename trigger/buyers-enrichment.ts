@@ -25,12 +25,27 @@ async function countDmPurchase(
 ): Promise<number> {
   if (!rawToUserId) return 0; // Can't attribute without fan ID
 
-  // Find our Fan record for this OF user
-  const fan = await prisma.fan.findFirst({
+  // Find our Fan record for this OF user — create if missing
+  let fan = await prisma.fan.findFirst({
     where: { ofapiFanId: rawToUserId },
     select: { id: true },
   });
-  if (!fan) return 0;
+  if (!fan) {
+    // Create stub fan so future transaction syncs can link properly
+    try {
+      fan = await prisma.fan.create({
+        data: { ofapiFanId: rawToUserId, creatorId, lifetimeSpend: 0 },
+        select: { id: true },
+      });
+    } catch {
+      // Race condition or unique constraint — try finding again
+      fan = await prisma.fan.findFirst({
+        where: { ofapiFanId: rawToUserId },
+        select: { id: true },
+      });
+    }
+    if (!fan) return 0;
+  }
 
   const maxWindow = new Date(Math.min(sentAt.getTime() + 48 * 3600_000, now.getTime()));
   const priceDollars = priceCents ? priceCents / 100 : null;

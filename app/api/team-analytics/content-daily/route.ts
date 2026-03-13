@@ -154,7 +154,10 @@ export async function GET(req: NextRequest) {
             const rawObj = ppv.raw as Record<string, any> | null;
             const toUserId = rawObj?.toUser?.id ? String(rawObj.toUser.id) : (rawObj?.toUserId ? String(rawObj.toUserId) : null);
             if (toUserId) {
-              const fan = await prisma.fan.findFirst({ where: { ofapiFanId: toUserId }, select: { id: true } });
+              let fan = await prisma.fan.findFirst({ where: { ofapiFanId: toUserId }, select: { id: true } });
+              if (!fan) {
+                try { fan = await prisma.fan.create({ data: { ofapiFanId: toUserId, creatorId: ppv.creatorId, lifetimeSpend: 0 }, select: { id: true } }); } catch { fan = await prisma.fan.findFirst({ where: { ofapiFanId: toUserId }, select: { id: true } }); }
+              }
               if (fan) {
                 const priceDollars = ppv.priceCents! / 100;
                 const count = await prisma.transaction.count({
