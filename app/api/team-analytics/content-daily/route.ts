@@ -47,6 +47,36 @@ export async function GET(req: NextRequest) {
     });
     const creatorMap = Object.fromEntries(creators.map((c) => [c.id, c]));
 
+    // ── Chatter attribution for DMs ──
+    // Load shift schedules + overrides, then resolve who was on shift when each DM was sent
+    const shifts = await prisma.scheduleShift.findMany({
+      where: { creatorId: { in: creatorIds } },
+      select: { creatorId: true, chatterEmail: true, chatterName: true, dayOfWeek: true, shiftType: true },
+    });
+    const overrides = await prisma.assignmentOverride.findMany({
+      where: { creatorId: { in: creatorIds }, startAt: { lte: new Date() }, endAt: { gte: since } },
+      select: { creatorId: true, chatterEmail: true, startAt: true, endAt: true },
+    });
+    function resolveChatter(cId: string, sentAt: Date): string | null {
+      // Override takes priority
+      for (const o of overrides) {
+        if (o.creatorId === cId && sentAt >= o.startAt && sentAt <= o.endAt) return o.chatterEmail;
+      }
+      // Convert to UK time to determine shift
+      const ukDate = new Date(sentAt.toLocaleString("en-US", { timeZone: "Europe/London" }));
+      const ukHour = ukDate.getHours();
+      let dayOfWeek = ukDate.getDay(); // 0=Sun
+      let shiftType: string;
+      if (ukHour >= 7 && ukHour < 15) shiftType = "morning";
+      else if (ukHour >= 15 && ukHour < 23) shiftType = "afternoon";
+      else {
+        shiftType = "night";
+        if (ukHour < 7) dayOfWeek = (dayOfWeek + 6) % 7; // night shift started previous day
+      }
+      const match = shifts.find((s) => s.creatorId === cId && s.dayOfWeek === dayOfWeek && s.shiftType === shiftType);
+      return match?.chatterName || match?.chatterEmail || null;
+    }
+
     // Group by date (UK timezone)
     const dailyMap = new Map<string, {
       date: string; massMessages: number; dms: number; wallPosts: number; withMedia: number; bumps: number;
@@ -102,6 +132,7 @@ export async function GET(req: NextRequest) {
         isCanceled: c.isCanceled, status,
         source: c.source, // "mass_message" | "wall_post" | "direct_message"
         type: (c.mediaCount > 0 ? "content" : "bump") as "content" | "bump",
+        chatterName: c.source === "direct_message" ? resolveChatter(c.creatorId, new Date(c.sentAt)) : null,
         media: c.media, insight: c.insight,
       };
     });

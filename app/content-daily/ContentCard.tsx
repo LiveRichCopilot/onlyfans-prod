@@ -18,7 +18,7 @@ export type ContentItem = {
   wakeUp1h: number | null; wakeUp3h: number | null; wakeUp6h: number | null; wakeUp24h: number | null;
   reactivationBuckets: Record<string, number> | null;
   isCanceled: boolean; status: "selling" | "stagnant" | "awaiting" | "free" | "unsent";
-  source: string; type: "content" | "bump"; media: MediaItem[]; insight: InsightData;
+  source: string; type: "content" | "bump"; chatterName: string | null; media: MediaItem[]; insight: InsightData;
 };
 
 export function fN(n: number): string {
@@ -88,6 +88,7 @@ export default function ContentCard({ item }: { item: ContentItem }) {
               {item.source === "direct_message" ? "DM" : item.source === "wall_post" ? "Wall Post" : "Mass Msg"}
             </span>
           </div>
+          {item.chatterName && <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-medium">{item.chatterName}</span>}
           {item.status === "selling" && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">Sold</span>}
           {item.status === "stagnant" && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium">Didn&apos;t Sell</span>}
           {item.status === "awaiting" && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">PPV</span>}
