@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import {
   Eye, Send, Image as ImageIcon, MessageSquare, BarChart3,
   Zap, TrendingUp, Calendar, ChevronDown,
-  AlertTriangle, Filter, Trophy,
+  AlertTriangle, Filter, Trophy, Search, X,
 } from "lucide-react";
 import ContentCard, { KpiCard, fN, type ContentItem } from "./ContentCard";
 import HourlyBreakdown from "./HourlyBreakdown";
@@ -37,6 +37,8 @@ export default function ContentDailyPage() {
   const [sourceFilter, setSourceFilter] = useState<string>("mass_message");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState(new Set<string>());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -72,6 +74,14 @@ export default function ContentDailyPage() {
     return [...names.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [items]);
 
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return creatorNames.filter(([key, name]) =>
+      name.toLowerCase().includes(q) || key.toLowerCase().includes(q)
+    );
+  }, [searchQuery, creatorNames]);
+
   const filtered = useMemo(() => {
     let f = items;
     if (creatorFilter !== "all") f = f.filter((i) => (i.creator.ofUsername || i.creator.name) === creatorFilter);
@@ -103,54 +113,76 @@ export default function ContentDailyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050508] overflow-y-auto">
+    <div className="min-h-screen bg-[#050508] overflow-y-auto" onClick={() => searchOpen && setSearchOpen(false)}>
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-teal-600/10 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px]" />
       </div>
       <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
         {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <BarChart3 size={22} className="text-teal-400" /> Content Daily
+        <header className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
+              <BarChart3 size={20} className="text-teal-400" /> Content Daily
             </h1>
-            <p className="text-white/50 text-sm">Mass messages, DMs, wall posts — all outbound content with media</p>
-          </div>
-          <div className="flex gap-2 items-center flex-wrap">
-            <div className="glass-panel rounded-xl p-1 flex items-center gap-1">
-              <MessageSquare size={12} className="text-white/40 ml-2" />
-              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
-                className="bg-transparent text-xs text-white border-none outline-none px-1 py-1.5 cursor-pointer">
-                <option value="all" className="bg-[#111]">All Content</option>
-                <option value="mass_message" className="bg-[#111]">Mass Messages</option>
-                <option value="direct_message" className="bg-[#111]">DMs</option>
-                <option value="wall_post" className="bg-[#111]">Wall Posts</option>
-              </select>
-            </div>
-            <div className="glass-panel rounded-xl p-1 flex items-center gap-1">
-              <Filter size={12} className="text-white/40 ml-2" />
-              <select value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)}
-                className="bg-transparent text-xs text-white border-none outline-none px-1 py-1.5 cursor-pointer">
-                <option value="all" className="bg-[#111]">All Models</option>
-                {creatorNames.map(([key, name]) => (
-                  <option key={key} value={key} className="bg-[#111]">{name}</option>
-                ))}
-              </select>
-            </div>
             <div className="flex gap-1 glass-panel rounded-xl p-1">
               {[1, 3, 7, 14, 30].map((d) => (
                 <button key={d} onClick={() => setDays(d)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${days === d ? "bg-teal-500/20 text-teal-400" : "text-white/50 hover:text-white/80"}`}>
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${days === d ? "bg-teal-500/20 text-teal-400" : "text-white/50 hover:text-white/80"}`}>
                   {d}d
                 </button>
               ))}
             </div>
           </div>
+
+          {/* Search + Filters row */}
+          <div className="flex gap-2 items-stretch flex-wrap">
+            {/* Model Search */}
+            <div className="relative flex-1 min-w-[180px]">
+              <div className="glass-panel rounded-xl flex items-center gap-2 px-3 h-10">
+                <Search size={14} className="text-white/40 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search model..."
+                  value={creatorFilter !== "all" ? creatorNames.find(([k]) => k === creatorFilter)?.[1] || searchQuery : searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); if (creatorFilter !== "all") setCreatorFilter("all"); }}
+                  onFocus={() => setSearchOpen(true)}
+                  className="bg-transparent text-sm text-white border-none outline-none w-full placeholder:text-white/30"
+                />
+                {(creatorFilter !== "all" || searchQuery) && (
+                  <button onClick={() => { setCreatorFilter("all"); setSearchQuery(""); setSearchOpen(false); }} className="text-white/40 hover:text-white/70">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {/* Search dropdown */}
+              {searchOpen && searchQuery.trim() && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 glass-card rounded-xl border border-white/10 max-h-60 overflow-y-auto z-50">
+                  {searchResults.map(([key, name]) => (
+                    <button key={key} onClick={() => { setCreatorFilter(key); setSearchQuery(""); setSearchOpen(false); }}
+                      className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0">
+                      {name} <span className="text-white/30 text-xs">@{key}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Source Filter */}
+            <div className="glass-panel rounded-xl flex items-center gap-1 px-2 h-10">
+              <MessageSquare size={13} className="text-white/40" />
+              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+                className="bg-transparent text-sm text-white border-none outline-none px-1 py-1.5 cursor-pointer appearance-none">
+                <option value="all" className="bg-[#111]">All</option>
+                <option value="mass_message" className="bg-[#111]">Mass</option>
+                <option value="direct_message" className="bg-[#111]">DMs</option>
+                <option value="wall_post" className="bg-[#111]">Wall</option>
+              </select>
+            </div>
+          </div>
         </header>
 
         {/* Status Filter Tabs */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
           {([
             ["all", "All"],
             ["ppv", "PPV Only"],
@@ -167,7 +199,7 @@ export default function ContentDailyPage() {
             };
             return (
               <button key={key} onClick={() => setStatusFilter(key)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === key
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap shrink-0 ${statusFilter === key
                   ? key === "sold" ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30"
                   : key === "didnt_sell" ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/30"
                   : "bg-teal-500/20 text-teal-400 ring-1 ring-teal-500/30"
@@ -180,7 +212,7 @@ export default function ContentDailyPage() {
 
         {/* KPIs */}
         {kpis && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
             <KpiCard icon={<MessageSquare size={14} />} label="Messages" value={kpis.totalMessages} />
             <KpiCard icon={<ImageIcon size={14} />} label="With Media" value={kpis.totalWithMedia} />
             <KpiCard icon={<Send size={14} />} label="Total Sent" value={fN(kpis.totalSent)} />
@@ -251,9 +283,10 @@ export default function ContentDailyPage() {
                 </thead>
                 <tbody>
                   {leaderboard.map((m, i) => (
-                    <tr key={m.ofUsername || m.name} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                      <td className="py-2 pr-4 text-white/40">{i + 1}</td>
-                      <td className="py-2 pr-4 text-teal-400 font-medium">{m.name}</td>
+                    <tr key={m.ofUsername || m.name} onClick={() => { setCreatorFilter(m.ofUsername || m.name); setSearchQuery(""); }}
+                      className="border-b border-white/[0.03] hover:bg-white/[0.02] cursor-pointer active:bg-teal-500/10">
+                      <td className="py-2.5 pr-3 text-white/40">{i + 1}</td>
+                      <td className="py-2.5 pr-3 text-teal-400 font-medium">{m.name}</td>
                       <td className="py-2 px-2 text-right text-white font-semibold">{m.massMessages}</td>
                       <td className="py-2 px-2 text-right text-white/80">{m.withMedia}</td>
                       <td className="py-2 px-2 text-right text-white/50">{m.bumps}</td>
@@ -325,20 +358,19 @@ export default function ContentDailyPage() {
               return (
                 <div key={dateStr} className="glass-card rounded-2xl overflow-hidden">
                   <button onClick={() => toggle(dateStr)}
-                    className="w-full flex items-center justify-between p-4 text-left">
-                    <div className="flex items-center gap-3">
-                      <Calendar size={16} className="text-teal-400" />
-                      <span className="text-base text-white font-semibold">{dateStr}</span>
-                      <span className="text-sm text-white/50">{dayItems.length} total</span>
-                      {massCount > 0 && <span className="text-xs text-white/60">{massCount} mass</span>}
-                      {dmCount > 0 && <span className="text-xs text-purple-400">{dmCount} DMs</span>}
-                      {wallCount > 0 && <span className="text-xs text-blue-400">{wallCount} wall</span>}
+                    className="w-full flex items-center justify-between p-3 sm:p-4 text-left">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                      <Calendar size={14} className="text-teal-400" />
+                      <span className="text-sm sm:text-base text-white font-semibold">{dateStr}</span>
+                      <span className="text-xs text-white/50">{dayItems.length} total</span>
+                      {massCount > 0 && <span className="text-[10px] sm:text-xs text-white/60">{massCount} mass</span>}
+                      {dmCount > 0 && <span className="text-[10px] sm:text-xs text-purple-400">{dmCount} DMs</span>}
+                      {wallCount > 0 && <span className="text-[10px] sm:text-xs text-blue-400">{wallCount} wall</span>}
                     </div>
-                    <div className="flex items-center gap-3">
-                      {selling > 0 && <span className="text-xs text-emerald-400">{selling} sold</span>}
-                      {stagnant > 0 && <span className="text-xs text-red-400">{stagnant} didn't sell</span>}
-                      {freeCount > 0 && <span className="text-xs text-white/40">{freeCount} free</span>}
-                      <ChevronDown size={16} className={`text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                      {selling > 0 && <span className="text-[10px] sm:text-xs text-emerald-400">{selling} sold</span>}
+                      {stagnant > 0 && <span className="text-[10px] sm:text-xs text-red-400">{stagnant} unsold</span>}
+                      <ChevronDown size={14} className={`text-white/50 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                     </div>
                   </button>
                   {isOpen && (
