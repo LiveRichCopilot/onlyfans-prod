@@ -64,11 +64,11 @@ export default function PerformancePage() {
                 <NavBar />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 <div className="max-w-4xl mx-auto">
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center justify-between mb-6 sm:mb-8">
                         <div>
-                            <h1 className="text-2xl font-bold text-white">Chatter Performance</h1>
+                            <h1 className="text-xl sm:text-2xl font-bold text-white">Chatter Performance</h1>
                             <p className="text-white/40 text-sm mt-1">
                                 Live scores updated every 15 minutes
                             </p>
@@ -103,9 +103,9 @@ export default function PerformancePage() {
                                     key={record.id}
                                     className={`rounded-xl border p-4 ${scoreBg(record.liveScore)} transition-all hover:scale-[1.01]`}
                                 >
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3 sm:gap-4">
                                         {/* Rank */}
-                                        <div className="text-2xl font-bold text-white/20 w-8 text-center">
+                                        <div className="text-xl sm:text-2xl font-bold text-white/20 w-6 sm:w-8 text-center shrink-0">
                                             {i + 1}
                                         </div>
 
@@ -131,13 +131,13 @@ export default function PerformancePage() {
                                         </div>
 
                                         {/* Score */}
-                                        <div className={`text-3xl font-black ${scoreColor(record.liveScore)}`}>
+                                        <div className={`text-2xl sm:text-3xl font-black shrink-0 ${scoreColor(record.liveScore)}`}>
                                             {record.liveScore}
                                         </div>
                                     </div>
 
                                     {/* Stats row */}
-                                    <div className="flex gap-4 mt-3 pl-12">
+                                    <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 pl-8 sm:pl-12">
                                         <div className="text-center">
                                             <div className="text-white/80 text-sm font-semibold">
                                                 ${record.dailyEarned.toFixed(0)}

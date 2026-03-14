@@ -13,7 +13,7 @@ export default function SchedulePage() {
           <ArrowLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             <Calendar size={22} className="text-[#5B9BD5]" /> Shift Schedule
           </h1>
           <p className="text-white/40 text-sm">Drag chatters onto model shift slots</p>

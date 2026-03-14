@@ -6,6 +6,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { MobileBottomNav } from '@/components/dashboard/MobileBottomNav'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -49,7 +50,11 @@ export default async function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <div className="h-16 md:hidden" />
+          <MobileBottomNav />
+        </Providers>
       </body>
     </html>
   )

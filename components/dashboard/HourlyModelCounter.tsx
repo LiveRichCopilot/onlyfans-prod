@@ -199,9 +199,9 @@ export function HourlyModelCounter() {
     const hours = noData ? [] : Array.from({ length: data.currentHour + 1 }, (_, i) => i);
 
     return (
-        <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6">
+        <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-4 sm:p-6 mb-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <div className="flex items-center justify-between mb-4 sm:mb-5 flex-wrap gap-2 sm:gap-3">
                 <div className="flex items-center gap-3">
                     <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-400 to-teal-600 shadow-[0_0_8px_rgba(13,148,136,0.3)]" />
                     <h3 className="text-lg font-semibold text-white/85 tracking-tight">Hourly Breakdown</h3>
@@ -214,7 +214,7 @@ export function HourlyModelCounter() {
                         </button>
                         <button
                             onClick={goToday}
-                            className={`px-3 py-1.5 text-[11px] font-medium transition-colors min-w-[90px] text-center ${isToday ? "text-teal-400" : "text-white/60 hover:text-white/80"}`}
+                            className={`px-3 py-1.5 text-[11px] font-medium transition-colors min-w-[70px] sm:min-w-[90px] text-center ${isToday ? "text-teal-400" : "text-white/60 hover:text-white/80"}`}
                         >
                             {formatDateLabel(selectedDate)}
                         </button>
@@ -339,7 +339,7 @@ function ModelRow({
                                 {creator.name.charAt(0).toUpperCase()}
                             </div>
                         )}
-                        <span className="text-white/75 font-medium text-xs truncate max-w-[90px]">
+                        <span className="text-white/75 font-medium text-xs truncate max-w-[70px] sm:max-w-[90px]">
                             {creator.name}
                         </span>
                     </div>
