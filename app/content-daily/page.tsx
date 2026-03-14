@@ -168,14 +168,15 @@ export default function ContentDailyPage() {
               )}
             </div>
             {/* Source Filter */}
-            <div className="glass-panel rounded-xl flex items-center gap-1 px-2 h-10">
-              <MessageSquare size={13} className="text-white/40" />
+            <div className="relative min-w-[130px]">
+              <MessageSquare size={13} className="text-white/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
-                className="bg-transparent text-sm text-white border-none outline-none px-1 py-1.5 cursor-pointer appearance-none">
-                <option value="all" className="bg-[#111]">All</option>
-                <option value="mass_message" className="bg-[#111]">Mass</option>
+                className="w-full glass-panel rounded-xl text-sm text-white border border-white/10 outline-none pl-8 pr-8 h-10 cursor-pointer appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}>
+                <option value="all" className="bg-[#111]">All Types</option>
+                <option value="mass_message" className="bg-[#111]">Mass Msgs</option>
                 <option value="direct_message" className="bg-[#111]">DMs</option>
-                <option value="wall_post" className="bg-[#111]">Wall</option>
+                <option value="wall_post" className="bg-[#111]">Wall Posts</option>
               </select>
             </div>
           </div>
