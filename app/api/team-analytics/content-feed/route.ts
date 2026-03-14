@@ -75,7 +75,9 @@ export async function GET(req: NextRequest) {
         type: c.mediaCount > 0 ? "content" : "bump",
         media: c.media,
         wakeUp: c.wakeUpComputed ? {
-          totalReplied: c.dormantBefore ?? 0,
+          totalReplied: c.totalReplied ?? 0,
+          dormantBefore: c.dormantBefore ?? 0,
+          baselineReplied: (c as any).baselineReplied ?? null,
           buckets: (c as any).wakeUpBuckets ?? null,
           chatterDMs: (c as any).chatterDMs ?? null,
           purchaseBuckets: (c as any).purchaseBuckets ?? null,

@@ -87,7 +87,7 @@ export default function WakeUpBuckets({ buckets, totalReplied, ageHours, purchas
           <span className="text-[8px] text-green-400 font-semibold">{totalPurchases} bought</span>
         )}
         <span className="text-[8px] text-white/60">
-          {formatNum(coldReplied)} cold fans replied · {formatNum(totalReplied)} total
+          {formatNum(coldReplied)} cold fans woke up · {formatNum(totalReplied)} total messaged
         </span>
       </div>
     </div>

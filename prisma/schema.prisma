@@ -1023,8 +1023,9 @@ model OutboundCreative {
   sentCount  Int             @default(0)
   viewedCount Int            @default(0)
   purchasedCount Int?        // From /engagement/messages/{id}/buyers
-  totalReplied   Int?        // ALL fans who replied after this content (cold + active)
+  totalReplied   Int?        // Unique fans who messaged this creator within 24h after send
   dormantBefore  Int?        // Cold fans only (hadn't chatted in 3+ days)
+  baselineReplied Int?       // Unique fans who messaged in the 24h BEFORE send (baseline for delta)
   wakeUpBuckets  Json?       // {"30":5,"60":12,"90":18,"120":22,...} cold fans woke up per 30min
   chatterDMs     Json?       // {"30":100,"60":250,...} outbound chatter DMs per 30min
   purchaseBuckets Json?      // {"60":2,"120":5,...} purchases at each 30min bucket

@@ -226,6 +226,7 @@ export async function GET(req: NextRequest) {
         // Wake-up data only valid for mass messages + wall posts, not DMs
         totalReplied: c.source !== "direct_message" ? c.totalReplied : null,
         dormantBefore: c.source !== "direct_message" ? c.dormantBefore : null,
+        baselineReplied: c.source !== "direct_message" ? (c as any).baselineReplied : null,
         wakeUp1h: c.source !== "direct_message" ? c.wakeUp1h : null,
         wakeUp3h: c.source !== "direct_message" ? c.wakeUp3h : null,
         wakeUp6h: c.source !== "direct_message" ? c.wakeUp6h : null,

@@ -390,7 +390,7 @@ function ContentCard({ item }: { item: ContentItem }) {
             item.wakeUp?.buckets ? (
               <WakeUpBuckets buckets={item.wakeUp.buckets} totalReplied={item.wakeUp.totalReplied} ageHours={ageHours} purchasedCount={item.purchasedCount} purchaseBuckets={item.wakeUp.purchaseBuckets} />
             ) : item.wakeUp ? (
-              <div className="text-[10px] text-white/50">{item.wakeUp.totalReplied} fans replied</div>
+              <div className="text-[10px] text-white/50">{item.wakeUp.totalReplied} fans messaged after send</div>
             ) : (
               <div className="text-[10px] text-white/50 italic">
                 {ageHours < 0.25 ? "Just posted" : "Computing..."}

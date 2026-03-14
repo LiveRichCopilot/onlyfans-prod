@@ -67,7 +67,7 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   const dormantCutoff = new Date(T0.getTime() - DORMANT_DAYS * 24 * 3600_000);
   const maxWindow = clampToNow(new Date(T0.getTime() + 1440 * 60_000), now);
 
-  // 1) All fans who sent an inbound message after the post
+  // 1) All fans who sent an inbound message after the post (24h window)
   const firstInboundByChat = await prisma.rawChatMessage.groupBy({
     by: ["chatId"],
     where: {
@@ -77,6 +77,18 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
     },
     _min: { sentAt: true },
   });
+
+  // 1b) Baseline: unique fans who messaged in the 24h BEFORE send (T0-24h → T0)
+  const baselineWindow = new Date(T0.getTime() - 1440 * 60_000);
+  const baselineChats = await prisma.rawChatMessage.groupBy({
+    by: ["chatId"],
+    where: {
+      creatorId,
+      isFromCreator: false,
+      sentAt: { gt: baselineWindow, lte: T0 },
+    },
+  });
+  const baselineReplied = baselineChats.length;
 
   // 2) Outbound chatter DMs after the mass message (for each bucket)
   const chatterDMsBuckets: Record<string, number> = {};
@@ -92,7 +104,7 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   if (firstInboundByChat.length === 0) {
     const emptyBuckets: Record<string, number> = {};
     for (const mins of BUCKETS) emptyBuckets[String(mins)] = 0;
-    return { totalReplied: 0, coldFanCount: 0, wakeUpBuckets: emptyBuckets, chatterDMs: chatterDMsBuckets };
+    return { totalReplied: 0, coldFanCount: 0, wakeUpBuckets: emptyBuckets, chatterDMs: chatterDMsBuckets, baselineReplied };
   }
 
   const responderChatIds = firstInboundByChat.map((r) => r.chatId);
@@ -159,6 +171,7 @@ async function computeWakeUps(creatorId: string, T0: Date, now: Date) {
   return {
     totalReplied: firstInboundByChat.length,
     coldFanCount: coldWakeUps.length,
+    baselineReplied,
     wakeUpBuckets,
     chatterDMs: chatterDMsBuckets,
     reactivationBuckets,
@@ -208,6 +221,7 @@ export const wakeUpRate = task({
           data: {
             totalReplied: result.totalReplied,
             dormantBefore: result.coldFanCount,
+            baselineReplied: result.baselineReplied,
             wakeUpBuckets: result.wakeUpBuckets,
             chatterDMs: result.chatterDMs,
             purchaseBuckets: purchases,

@@ -16,6 +16,7 @@ export type ContentItem = {
   purchasedCount: number | null;
   totalReplied: number | null;
   dormantBefore: number | null;
+  baselineReplied: number | null;
   wakeUp1h: number | null; wakeUp3h: number | null; wakeUp6h: number | null; wakeUp24h: number | null;
   reactivationBuckets: Record<string, number> | null;
   isCanceled: boolean; status: "selling" | "stagnant" | "awaiting" | "free" | "unsent";
@@ -128,30 +129,38 @@ export default function ContentCard({ item }: { item: ContentItem }) {
         )}
         {(item.totalReplied != null || item.dormantBefore != null) && (() => {
           const cold = item.dormantBefore ?? 0;
-          // totalReplied >= cold always (cold fans are a subset of all who replied)
           const replied = Math.max(item.totalReplied ?? 0, cold);
+          const baseline = item.baselineReplied;
+          const delta = baseline != null && baseline > 0 ? replied - baseline : null;
           if (replied === 0 && cold === 0) {
             return (
               <div className="mt-2 glass-inset rounded-lg p-2">
-                <div className="text-xs text-white/40">0 fans replied</div>
+                <div className="text-xs text-white/40">0 fans messaged after send</div>
               </div>
             );
           }
           return (
             <div className="mt-2 glass-inset rounded-lg p-2">
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-white/70">
-                  <span className="text-white font-bold text-sm">{replied}</span> fan{replied !== 1 ? "s" : ""} replied
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                <span className="text-white/70 group relative cursor-help">
+                  <span className="text-white font-bold text-sm">{replied}</span> fan{replied !== 1 ? "s" : ""} messaged after send
+                  <span className="hidden group-hover:block absolute bottom-full left-0 mb-1 w-56 p-2 rounded-lg bg-black/90 border border-white/10 text-[11px] text-white/60 z-50 leading-relaxed">
+                    Unique fans who sent any DM within 24h after this was sent. Not necessarily replies to this message.
+                  </span>
                 </span>
-                {cold > 0 && (
+                {delta != null && (
+                  <span className={`font-bold text-sm ${delta > 0 ? "text-teal-400" : delta < 0 ? "text-red-400" : "text-white/30"}`}>
+                    {delta > 0 ? "+" : ""}{delta} vs prev 24h
+                  </span>
+                )}
+              </div>
+              {cold > 0 && (
+                <div className="flex items-center gap-3 text-xs mt-1">
                   <span className="text-teal-400">
                     <span className="font-bold text-sm">{cold}</span> were cold (3d+ inactive)
                   </span>
-                )}
-                {replied > 0 && cold === 0 && (
-                  <span className="text-white/40">all were already active</span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           );
         })()}
