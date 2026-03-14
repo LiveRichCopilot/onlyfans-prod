@@ -163,9 +163,9 @@ export default function ReportsPage() {
                             </button>
                         )}
                     </div>
-                    {searchOpen && searchQuery.trim() && searchResults.length > 0 && (
+                    {searchOpen && (searchResults.length > 0 || (!searchQuery.trim() && creators.length > 0)) && (
                         <div className="absolute top-full left-0 right-0 mt-1 glass-card rounded-xl border border-white/10 max-h-60 overflow-y-auto z-50">
-                            {searchResults.map((c) => (
+                            {(searchQuery.trim() ? searchResults : creators).map((c) => (
                                 <button key={c.id} onClick={() => { setCreatorFilter(c.id); setSearchQuery(""); setSearchOpen(false); }}
                                     className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0">
                                     {c.name || "Unknown"}

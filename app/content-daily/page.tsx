@@ -155,10 +155,10 @@ export default function ContentDailyPage() {
                   </button>
                 )}
               </div>
-              {/* Search dropdown */}
-              {searchOpen && searchQuery.trim() && searchResults.length > 0 && (
+              {/* Dropdown — shows filtered results when typing, or ALL models on focus */}
+              {searchOpen && (searchResults.length > 0 || (!searchQuery.trim() && creatorNames.length > 0)) && (
                 <div className="absolute top-full left-0 right-0 mt-1 glass-card rounded-xl border border-white/10 max-h-60 overflow-y-auto z-50">
-                  {searchResults.map(([key, name]) => (
+                  {(searchQuery.trim() ? searchResults : creatorNames).map(([key, name]) => (
                     <button key={key} onClick={() => { setCreatorFilter(key); setSearchQuery(""); setSearchOpen(false); }}
                       className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0">
                       {name} <span className="text-white/30 text-xs">@{key}</span>

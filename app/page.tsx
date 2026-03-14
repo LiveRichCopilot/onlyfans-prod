@@ -1,7 +1,7 @@
 "use client";
 
 import { Settings, AlertCircle } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 // @ts-ignore: Next relies on Vercel install
 import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
@@ -20,6 +20,7 @@ export default function AgencyDashboard() {
     const [creators, setCreators] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState<TimeRange | null>(null);
+    const [modelFilter, setModelFilter] = useState<string>("all");
 
     const fetchCreators = useCallback((range?: TimeRange) => {
         setLoading(true);
@@ -57,6 +58,11 @@ export default function AgencyDashboard() {
         } catch (err) { console.error("Session fetch failed", err); setIsAuthenticatingId(null); }
     };
 
+    const filteredCreators = useMemo(() => {
+        if (modelFilter === "all") return creators;
+        return creators.filter((c: any) => c.id === modelFilter);
+    }, [creators, modelFilter]);
+
     return (
         <div className="flex min-h-screen text-white/90 overflow-hidden relative">
             <Sidebar creators={creators} loading={loading} onAddAccount={() => setShowAddModal(true)} />
@@ -74,9 +80,26 @@ export default function AgencyDashboard() {
                     </div>
                 </header>
 
+                {/* Model Picker — prominent dropdown for managers */}
+                {creators.length > 1 && (
+                    <div className="mb-4 sm:mb-6">
+                        <select
+                            value={modelFilter}
+                            onChange={(e) => setModelFilter(e.target.value)}
+                            className="w-full glass-panel rounded-2xl px-4 py-3.5 text-base sm:text-sm font-medium text-white bg-transparent border border-white/10 outline-none cursor-pointer appearance-none"
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px center' }}
+                        >
+                            <option value="all" className="bg-[#111]">All Models</option>
+                            {creators.map((c: any) => (
+                                <option key={c.id} value={c.id} className="bg-[#111]">{c.name || c.ofUsername || "Unknown"}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4 px-2">
-                        <h2 className="text-lg font-semibold text-white/80">Live Chatter Performance</h2>
+                        <h2 className="text-sm sm:text-lg font-semibold text-white/80">{modelFilter !== "all" ? (creators.find((c: any) => c.id === modelFilter)?.name || "Model") : "Live Chatter Performance"}</h2>
                         {timeRange && (
                             <span className="text-xs text-teal-400/60 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">{timeRange.label}</span>
                         )}
@@ -104,10 +127,10 @@ export default function AgencyDashboard() {
                                 ))}
                             </>
                         )}
-                        {creators.map((c) => (
+                        {filteredCreators.map((c: any) => (
                             <CreatorCard key={c.id} creator={c} isAuthenticatingId={isAuthenticatingId} onConnectOF={handleConnectOF} onRefresh={() => fetchCreators()} />
                         ))}
-                        {creators.length === 0 && !loading && (
+                        {filteredCreators.length === 0 && !loading && (
                             <div className="glass-panel p-8 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 flex flex-col items-center justify-center text-center">
                                 <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4"><AlertCircle size={32} className="text-teal-500/50" /></div>
                                 <h3 className="text-xl font-medium text-white/90 mb-2">No Accounts Linked</h3>
