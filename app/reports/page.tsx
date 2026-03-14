@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowLeft, Download, FileText, BarChart3 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { ArrowLeft, Download, FileText, BarChart3, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type Report = {
@@ -44,6 +44,8 @@ export default function ReportsPage() {
     const [loading, setLoading] = useState(true);
     const [days, setDays] = useState(30);
     const [creatorFilter, setCreatorFilter] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchOpen, setSearchOpen] = useState(false);
 
     useEffect(() => {
         fetchReports();
@@ -70,6 +72,14 @@ export default function ReportsPage() {
         new Map(reports.map((r) => [r.creatorId, { id: r.creatorId, name: r.creatorName }])).values()
     );
 
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) return [];
+        const q = searchQuery.toLowerCase();
+        return creators.filter((c) =>
+            (c.name || "").toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+        );
+    }, [searchQuery, creators]);
+
     const fmt = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     const pct = (n: number) => `${n.toFixed(1)}%`;
 
@@ -82,10 +92,10 @@ export default function ReportsPage() {
     const totalNewSubs = filteredReports.reduce((s, r) => s + r.newSubs, 0);
 
     return (
-        <div className="min-h-screen text-white/90 p-4 md:p-8 max-w-[1800px] mx-auto">
+        <div className="min-h-screen text-white/90 p-4 md:p-8 max-w-[1800px] mx-auto" onClick={() => searchOpen && setSearchOpen(false)}>
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+                <div className="flex items-center gap-3 sm:gap-4">
                     <button
                         onClick={() => router.push("/")}
                         className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition text-white/50 hover:text-white border border-white/5"
@@ -93,10 +103,10 @@ export default function ReportsPage() {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-                            <BarChart3 size={28} className="text-teal-400" /> HistoricalSalesUTC0
+                        <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2 sm:gap-3">
+                            <BarChart3 size={22} className="text-teal-400 shrink-0" /> <span className="truncate">Historical Sales</span>
                         </h1>
-                        <p className="text-sm text-white/50 mt-1">
+                        <p className="text-xs sm:text-sm text-white/50 mt-1">
                             {filteredReports.length} rows &middot; {creators.length} creators &middot; Last {days} days
                         </p>
                     </div>
@@ -104,14 +114,14 @@ export default function ReportsPage() {
                 <div className="flex items-center gap-2">
                     <a
                         href={`/api/reports/creator-daily?days=${days}&format=csv${creatorFilter ? `&creatorId=${creatorFilter}` : ""}`}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium transition border border-white/10"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium transition border border-white/10 text-sm"
                     >
                         <Download size={16} /> CSV
                     </a>
                     <a
                         href={`/api/reports/creator-daily?days=${days}&format=pdf${creatorFilter ? `&creatorId=${creatorFilter}` : ""}`}
                         target="_blank"
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium transition border border-white/10"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium transition border border-white/10 text-sm"
                     >
                         <FileText size={16} /> PDF
                     </a>
@@ -119,59 +129,78 @@ export default function ReportsPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-3 mb-6">
-                {[7, 14, 30, 60, 90].map((d) => (
-                    <button
-                        key={d}
-                        onClick={() => setDays(d)}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-                            days === d
-                                ? "bg-teal-500/15 text-teal-400 border border-teal-500/30"
-                                : "text-white/40 hover:text-white/60 border border-transparent"
-                        }`}
-                    >
-                        {d}d
-                    </button>
-                ))}
-                <select
-                    value={creatorFilter}
-                    onChange={(e) => setCreatorFilter(e.target.value)}
-                    className="ml-auto bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500 focus:outline-none transition appearance-none cursor-pointer"
-                >
-                    <option value="">All Creators</option>
-                    {creators.map((c) => (
-                        <option key={c.id} value={c.id} className="bg-gray-900">
-                            {c.name || "Unknown"}
-                        </option>
+            <div className="flex flex-wrap gap-3 mb-6 items-center" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+                    {[7, 14, 30, 60, 90].map((d) => (
+                        <button
+                            key={d}
+                            onClick={() => setDays(d)}
+                            className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap ${
+                                days === d
+                                    ? "bg-teal-500/15 text-teal-400 border border-teal-500/30"
+                                    : "text-white/40 hover:text-white/60 border border-transparent"
+                            }`}
+                        >
+                            {d}d
+                        </button>
                     ))}
-                </select>
+                </div>
+                {/* Model Search */}
+                <div className="relative ml-auto min-w-[160px]">
+                    <div className="glass-panel rounded-xl flex items-center gap-2 px-3 h-9 border border-white/10">
+                        <Search size={14} className="text-white/40 shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Search model..."
+                            value={creatorFilter ? (creators.find((c) => c.id === creatorFilter)?.name || searchQuery) : searchQuery}
+                            onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); if (creatorFilter) setCreatorFilter(""); }}
+                            onFocus={() => setSearchOpen(true)}
+                            className="bg-transparent text-sm text-white border-none outline-none w-full placeholder:text-white/30"
+                        />
+                        {(creatorFilter || searchQuery) && (
+                            <button onClick={() => { setCreatorFilter(""); setSearchQuery(""); setSearchOpen(false); }} className="text-white/40 hover:text-white/70">
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                    {searchOpen && searchQuery.trim() && searchResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 glass-card rounded-xl border border-white/10 max-h-60 overflow-y-auto z-50">
+                            {searchResults.map((c) => (
+                                <button key={c.id} onClick={() => { setCreatorFilter(c.id); setSearchQuery(""); setSearchOpen(false); }}
+                                    className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0">
+                                    {c.name || "Unknown"}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-                <div className="glass-card rounded-2xl p-4">
-                    <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Total Gross</div>
-                    <div className="text-2xl font-bold text-white">{fmt(totalGross)}</div>
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4 mb-6">
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                    <div className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider mb-1">Total Gross</div>
+                    <div className="text-lg sm:text-2xl font-bold text-white">{fmt(totalGross)}</div>
                 </div>
-                <div className="glass-card rounded-2xl p-4">
-                    <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Subscriptions</div>
-                    <div className="text-2xl font-bold text-teal-400">{fmt(totalSubs)}</div>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                    <div className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider mb-1">Subs</div>
+                    <div className="text-lg sm:text-2xl font-bold text-teal-400">{fmt(totalSubs)}</div>
                 </div>
-                <div className="glass-card rounded-2xl p-4">
-                    <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Tips</div>
-                    <div className="text-2xl font-bold text-purple-400">{fmt(totalTips)}</div>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                    <div className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider mb-1">Tips</div>
+                    <div className="text-lg sm:text-2xl font-bold text-purple-400">{fmt(totalTips)}</div>
                 </div>
-                <div className="glass-card rounded-2xl p-4">
-                    <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Messages</div>
-                    <div className="text-2xl font-bold text-pink-400">{fmt(totalMessages)}</div>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                    <div className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider mb-1">Messages</div>
+                    <div className="text-lg sm:text-2xl font-bold text-pink-400">{fmt(totalMessages)}</div>
                 </div>
-                <div className="glass-card rounded-2xl p-4">
-                    <div className="text-xs text-white/40 uppercase tracking-wider mb-1">Refunds</div>
-                    <div className="text-2xl font-bold text-red-400">{fmt(totalRefunds)}</div>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                    <div className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider mb-1">Refunds</div>
+                    <div className="text-lg sm:text-2xl font-bold text-red-400">{fmt(totalRefunds)}</div>
                 </div>
-                <div className="glass-card rounded-2xl p-4">
-                    <div className="text-xs text-white/40 uppercase tracking-wider mb-1">New Fans</div>
-                    <div className="text-2xl font-bold text-blue-400">{totalNewSubs.toLocaleString()}</div>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                    <div className="text-[10px] sm:text-xs text-white/40 uppercase tracking-wider mb-1">New Fans</div>
+                    <div className="text-lg sm:text-2xl font-bold text-blue-400">{totalNewSubs.toLocaleString()}</div>
                 </div>
             </div>
 

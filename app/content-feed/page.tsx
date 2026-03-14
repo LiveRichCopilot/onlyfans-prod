@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock } from "lucide-react";
+import { Eye, Send, Image as ImageIcon, MessageSquare, Play, DollarSign, Users, Info, Clock, Search, X } from "lucide-react";
 import WakeUpBuckets from "./WakeUpBuckets";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
@@ -45,6 +45,8 @@ export default function ContentFeedPage() {
   const [filter, setFilter] = useState<string>("all");
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [days, setDays] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -116,6 +118,14 @@ export default function ContentFeedPage() {
     return deduped;
   }, [items, filter, creatorFilter]);
 
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return creators.filter((c) =>
+      c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+    );
+  }, [searchQuery, creators]);
+
   // Group by date
   const grouped = useMemo(() => {
     const map = new Map<string, ContentItem[]>();
@@ -128,15 +138,15 @@ export default function ContentFeedPage() {
   }, [filtered]);
 
   return (
-    <div className="min-h-screen bg-[#050508] overflow-y-auto">
+    <div className="min-h-screen bg-[#050508] overflow-y-auto" onClick={() => searchOpen && setSearchOpen(false)}>
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-teal-600/10 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-1">Content Feed</h1>
-        <p className="text-white/50 text-sm mb-6">Mass messages, PPVs, and bump messages across all creators</p>
+        <h1 className="text-lg sm:text-2xl font-bold mb-1">Content Feed</h1>
+        <p className="text-white/50 text-xs sm:text-sm mb-4 sm:mb-6">Mass messages, PPVs, and bump messages across all creators</p>
 
         {summary && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -157,24 +167,42 @@ export default function ContentFeedPage() {
         </div>
 
         {/* Filters row */}
-        <div className="flex gap-2 mb-6 flex-wrap items-center">
-          {/* Creator picker */}
-          <select
-            value={creatorFilter}
-            onChange={(e) => setCreatorFilter(e.target.value)}
-            className="glass-panel rounded-xl px-3 py-1.5 text-xs font-medium bg-transparent text-white/80 border-none outline-none cursor-pointer"
-          >
-            <option value="all" className="bg-[#111]">All Creators</option>
-            {creators.map((c) => (
-              <option key={c.id} value={c.id} className="bg-[#111]">{c.name}</option>
-            ))}
-          </select>
+        <div className="flex gap-2 mb-6 flex-wrap items-center" onClick={(e) => e.stopPropagation()}>
+          {/* Model Search */}
+          <div className="relative min-w-[160px] flex-shrink-0">
+            <div className="glass-panel rounded-xl flex items-center gap-2 px-3 h-9">
+              <Search size={14} className="text-white/40 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search model..."
+                value={creatorFilter !== "all" ? (creators.find((c) => c.id === creatorFilter)?.name || searchQuery) : searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); if (creatorFilter !== "all") setCreatorFilter("all"); }}
+                onFocus={() => setSearchOpen(true)}
+                className="bg-transparent text-xs text-white border-none outline-none w-full placeholder:text-white/30"
+              />
+              {(creatorFilter !== "all" || searchQuery) && (
+                <button onClick={() => { setCreatorFilter("all"); setSearchQuery(""); setSearchOpen(false); }} className="text-white/40 hover:text-white/70">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {searchOpen && searchQuery.trim() && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 glass-card rounded-xl border border-white/10 max-h-60 overflow-y-auto z-50">
+                {searchResults.map((c) => (
+                  <button key={c.id} onClick={() => { setCreatorFilter(c.id); setSearchQuery(""); setSearchOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0">
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Type filter */}
-          <div className="flex gap-1 glass-panel rounded-xl p-1">
+          <div className="flex gap-1 glass-panel rounded-xl p-1 overflow-x-auto scrollbar-hide">
             {(["all", "mass", "dm", "wall", "bump"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filter === f ? "bg-teal-500/20 text-teal-400" : "text-white/50 hover:text-white/80"}`}>
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${filter === f ? "bg-teal-500/20 text-teal-400" : "text-white/50 hover:text-white/80"}`}>
                 {f === "all" ? "All" : f === "mass" ? "Mass Msgs" : f === "dm" ? "DMs" : f === "wall" ? "Wall Posts" : "Bumps"}
               </button>
             ))}

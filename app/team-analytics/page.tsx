@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, BarChart2, ArrowLeft, HelpCircle, ChevronDown } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { RefreshCw, BarChart2, ArrowLeft, HelpCircle, ChevronDown, Search, X } from "lucide-react";
 import Link from "next/link";
 import { KpiStatsRow } from "@/components/team-analytics/KpiStatsRow";
 import { PerformanceTrendChart } from "@/components/team-analytics/PerformanceTrendChart";
@@ -38,6 +38,8 @@ export default function TeamAnalytics() {
   const [days, setDays] = useState(7);
   const [creatorFilter, setCreatorFilter] = useState<string>("all");
   const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [shiftReportTarget, setShiftReportTarget] = useState<{ email: string; creatorId?: string } | null>(null);
   const [contentDateRange, setContentDateRange] = useState<DateRange>({
@@ -46,6 +48,14 @@ export default function TeamAnalytics() {
     label: "7d",
     days: 7,
   });
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return creators.filter((c) =>
+      c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+    );
+  }, [searchQuery, creators]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +88,7 @@ export default function TeamAnalytics() {
   const d = data || {};
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6" onClick={() => searchOpen && setSearchOpen(false)}>
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -92,18 +102,36 @@ export default function TeamAnalytics() {
             <p className="text-white/40 text-sm">Chatter performance dashboard</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Creator Filter */}
-          <select
-            value={creatorFilter}
-            onChange={(e) => setCreatorFilter(e.target.value)}
-            className="glass-button rounded-xl px-3 py-1.5 text-xs font-medium text-white/70 bg-transparent border border-white/10 appearance-none cursor-pointer max-w-[180px] truncate"
-          >
-            <option value="all" className="bg-[#111]">All Creators</option>
-            {creators.map(c => (
-              <option key={c.id} value={c.id} className="bg-[#111]">{c.name}</option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+          {/* Model Search */}
+          <div className="relative min-w-[160px]">
+            <div className="glass-button rounded-xl flex items-center gap-2 px-3 h-9 border border-white/10">
+              <Search size={14} className="text-white/40 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search model..."
+                value={creatorFilter !== "all" ? (creators.find((c) => c.id === creatorFilter)?.name || searchQuery) : searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); if (creatorFilter !== "all") setCreatorFilter("all"); }}
+                onFocus={() => setSearchOpen(true)}
+                className="bg-transparent text-xs text-white border-none outline-none w-full placeholder:text-white/30"
+              />
+              {(creatorFilter !== "all" || searchQuery) && (
+                <button onClick={() => { setCreatorFilter("all"); setSearchQuery(""); setSearchOpen(false); }} className="text-white/40 hover:text-white/70">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {searchOpen && searchQuery.trim() && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 glass-card rounded-xl border border-white/10 max-h-60 overflow-y-auto z-50">
+                {searchResults.map((c) => (
+                  <button key={c.id} onClick={() => { setCreatorFilter(c.id); setSearchQuery(""); setSearchOpen(false); }}
+                    className="w-full text-left px-4 py-3 text-sm text-white hover:bg-white/5 border-b border-white/5 last:border-0">
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Time Range */}
           {RANGES.map(r => (
             <button key={r.days} onClick={() => {
