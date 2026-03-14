@@ -140,8 +140,8 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                 </div>
                             )}
                             <div>
-                                <div className="text-white font-semibold text-lg leading-tight group-hover:text-teal-400 transition-colors drop-shadow-md truncate max-w-[180px]">{c.name || "Unknown Profile"}</div>
-                                <div className="text-xs text-teal-400 font-mono mt-0.5 drop-shadow-sm truncate max-w-[180px]">@{displayHandle}</div>
+                                <div className="text-white font-semibold text-base sm:text-lg leading-tight group-hover:text-teal-400 transition-colors drop-shadow-md truncate max-w-[140px] sm:max-w-[180px]">{c.name || "Unknown Profile"}</div>
+                                <div className="text-[11px] sm:text-xs text-teal-400 font-mono mt-0.5 drop-shadow-sm truncate max-w-[140px] sm:max-w-[180px]">@{displayHandle}</div>
                             </div>
                         </div>
 
@@ -223,26 +223,26 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                     )}
 
                     {/* Revenue */}
-                    <div className="flex items-end justify-between">
-                        <div>
-                            <div className="flex items-baseline space-x-2">
-                                <span className={`text-2xl md:text-3xl font-bold tracking-tighter text-white`}>
+                    <div className="flex items-end justify-between gap-2">
+                        <div className="min-w-0">
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tighter text-white truncate">
                                     ${(c.todayRev || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
-                                <span className="text-sm text-white/40">today</span>
+                                <span className="text-xs sm:text-sm text-white/40 shrink-0">today</span>
                             </div>
-                            <div className="flex items-baseline space-x-2 mt-1">
-                                <span className={`text-lg font-semibold text-white/60`}>
+                            <div className="flex items-baseline gap-1.5 mt-1">
+                                <span className="text-base sm:text-lg font-semibold text-white/60">
                                     ${(c.hourlyRev || 0).toFixed(2)}
                                 </span>
-                                <span className="text-xs text-white/30">/ hr</span>
-                                {c.txCount > 0 && <span className="text-[10px] text-teal-400/60 ml-1">{c.txCount} txns</span>}
+                                <span className="text-[10px] sm:text-xs text-white/30">/ hr</span>
+                                {c.txCount > 0 && <span className="text-[10px] text-teal-400/60">{c.txCount} txns</span>}
                             </div>
                         </div>
-                        <div className="text-right space-y-1">
+                        <div className="text-right space-y-1 shrink-0">
                             {yesterdayRev > 0 && (
                                 <div>
-                                    <span className="text-sm font-medium text-white/45">
+                                    <span className="text-xs sm:text-sm font-medium text-white/45">
                                         ${yesterdayRev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                     <span className="text-[10px] text-white/30 ml-1">yesterday</span>
@@ -251,8 +251,8 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                             {c.topFans?.length > 0 && (
                                 <div>
                                     <div className="text-[9px] text-white/40 uppercase tracking-wider">Top fan</div>
-                                    <div className="text-xs text-amber-400 font-semibold">@{c.topFans[0].username}</div>
-                                    <div className="text-xs text-amber-400/70">${c.topFans[0].spend.toFixed(2)}</div>
+                                    <div className="text-[11px] sm:text-xs text-amber-400 font-semibold truncate max-w-[100px]">@{c.topFans[0].username}</div>
+                                    <div className="text-[11px] sm:text-xs text-amber-400/70">${c.topFans[0].spend.toFixed(2)}</div>
                                 </div>
                             )}
                         </div>

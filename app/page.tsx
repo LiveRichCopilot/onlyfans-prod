@@ -62,15 +62,15 @@ export default function AgencyDashboard() {
             <Sidebar creators={creators} loading={loading} onAddAccount={() => setShowAddModal(true)} />
 
             <main className="flex-1 p-4 md:p-8 md:pl-4 overflow-y-auto z-10 h-screen custom-scrollbar relative pb-8">
-                <header className="flex justify-between items-center mb-8 glass-panel p-6 rounded-3xl sticky top-0 z-20 border-white/10">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-white/95 mb-1">Agency Overview</h1>
-                        <p className="text-sm text-white/60 font-medium">Monitoring {creators.length} creators globally.</p>
+                <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8 glass-panel p-4 sm:p-6 rounded-3xl sm:sticky sm:top-0 z-20 border-white/10">
+                    <div className="min-w-0">
+                        <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white/95 mb-0.5 sm:mb-1">Agency Overview</h1>
+                        <p className="text-xs sm:text-sm text-white/60 font-medium">Monitoring {creators.length} creators</p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 sm:gap-3 items-center flex-shrink-0">
                         <TimeRangeSelector onChange={handleTimeRangeChange} currentRange={timeRange} />
-                        <button onClick={() => setShowAddModal(true)} className="glass-button px-5 py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden">+ Add</button>
-                        <button className="glass-button px-5 py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white"><Settings size={16} /><span className="hidden md:inline">Settings</span></button>
+                        <button onClick={() => setShowAddModal(true)} className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden">+ Add</button>
+                        <button className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white"><Settings size={16} /><span className="hidden md:inline">Settings</span></button>
                     </div>
                 </header>
 

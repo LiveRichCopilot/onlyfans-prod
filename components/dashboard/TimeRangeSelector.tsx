@@ -39,7 +39,8 @@ export function TimeRangeSelector({ onChange, currentRange }: Props) {
             {open && (
                 <>
                     <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-80 z-40 glass-panel rounded-2xl border border-white/10 shadow-2xl bg-gray-900/95 backdrop-blur-xl overflow-hidden">
+                    {/* Mobile: fixed centered. Desktop: absolute right-aligned */}
+                    <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto top-20 sm:top-full sm:right-0 sm:mt-2 w-auto sm:w-80 z-40 glass-panel rounded-2xl border border-white/10 shadow-2xl bg-gray-900/95 backdrop-blur-xl overflow-hidden max-h-[70vh] overflow-y-auto">
                         <TimezoneBar selected={timezone} onSelect={setTimezone} />
                         <RangeTabs active={tab} onSelect={setTab} />
                         <div className="p-3">
