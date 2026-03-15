@@ -127,6 +127,23 @@ export async function GET() {
         });
       }
 
+      // Live sessions — chatter clocked into this model's Hubstaff project
+      // but has no schedule shift or override (still should show as wired)
+      const liveForThis = livePerCreator.get(c.id);
+      if (liveForThis) {
+        for (const resolved of liveForThis) {
+          if (seen.has(resolved)) continue;
+          seen.add(resolved);
+          chatters.push({
+            email: resolved,
+            name: nameMap.get(resolved) || resolved.split("@")[0],
+            source: "live" as const,
+            detail: "Clocked in",
+            isLive: true,
+          });
+        }
+      }
+
       return { ...c, chatters };
     });
 
