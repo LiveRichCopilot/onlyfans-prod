@@ -80,7 +80,7 @@ export function WiringPanel() {
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-3 mr-2">
             <span className="flex items-center gap-1"><span className="w-3 h-0.5 rounded bg-teal-400" /><span className="text-[9px] text-white/30">LIVE</span></span>
-            <span className="flex items-center gap-1"><span className="w-3 h-0.5 rounded bg-white/20" /><span className="text-[9px] text-white/30">ASSIGNED</span></span>
+            <span className="flex items-center gap-1"><span className="w-3 h-0.5 rounded bg-gradient-to-r from-teal-400 via-amber-400 to-red-400" /><span className="text-[9px] text-white/30">NOT CLOCKED IN</span></span>
           </div>
           <button onClick={() => setShowAssign(!showAssign)} className="glass-button rounded-xl px-2.5 py-1 text-[10px] font-medium text-teal-400 hover:text-teal-300 flex items-center gap-1">
             <Plus size={10} /> Assign

@@ -27,14 +27,27 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
   return (
     <div className="overflow-x-auto px-2 py-3">
       <div className="relative" style={{ width: totalW, height: totalH, minWidth: "100%" }}>
+        {/* SVG gradient defs — shared across all wires */}
+        <svg width={0} height={0} className="absolute">
+          <defs>
+            <linearGradient id="wire-missing" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2dd4bf" />
+              <stop offset="50%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#ef4444" />
+            </linearGradient>
+          </defs>
+        </svg>
+
         {nodes.map((node, i) => {
           const x = i * COL_W + 8;
           const hasChatters = node.chatters.length > 0;
           const hasLive = node.chatters.some(c => c.isLive);
           const hasOverride = node.chatters.some(c => c.source === "override");
+          // Scheduled but nobody live = teal/red gradient border
+          const hasOnlyScheduled = hasChatters && !hasLive && !hasOverride;
           const borderColor = hasOverride ? "border-orange-500/30 bg-orange-500/5"
             : hasLive ? "border-teal-500/30 bg-teal-500/5"
-            : hasChatters ? "border-white/10 bg-white/[0.02]"
+            : hasOnlyScheduled ? "border-amber-500/30 bg-amber-500/[0.04]"
             : "border-red-500/20 bg-red-500/5";
 
           return (
@@ -53,6 +66,7 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
                   {node.ofUsername && <div className="text-[9px] text-white/25 truncate">@{node.ofUsername}</div>}
                 </div>
                 {hasLive && <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 bg-teal-400" />}
+                {hasOnlyScheduled && <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0 bg-amber-400" />}
               </div>
 
               {/* Wires + chatter cards */}
@@ -62,7 +76,8 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
                     {node.chatters.map((ch, ci) => {
                       const cx = (COL_W - 8) / 2;
                       const endY = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP) + CHATTER_H / 2;
-                      const wireColor = ch.source === "override" ? "#f97316" : ch.isLive ? "#2dd4bf" : "rgba(255,255,255,0.12)";
+                      // Live = solid teal, Override = orange, Not clocked in = teal→amber→red gradient
+                      const wireStroke = ch.source === "override" ? "#f97316" : ch.isLive ? "#2dd4bf" : "url(#wire-missing)";
 
                       const d = node.chatters.length === 1
                         ? `M ${cx} 0 L ${cx} ${endY}`
@@ -70,16 +85,22 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
 
                       return (
                         <g key={ch.email}>
-                          <path d={d} fill="none" stroke={wireColor} strokeWidth={1.5} opacity={ch.isLive ? 0.5 : 0.3} />
+                          <path d={d} fill="none" stroke={wireStroke} strokeWidth={1.5} opacity={ch.isLive ? 0.5 : 0.6} />
                           {ch.isLive && (
                             <>
-                              <circle r="2.5" fill={wireColor}>
+                              <circle r="2.5" fill="#2dd4bf">
                                 <animateMotion dur="2s" repeatCount="indefinite" path={d} />
                               </circle>
-                              <circle r="5" fill={wireColor} opacity={0.12}>
+                              <circle r="5" fill="#2dd4bf" opacity={0.12}>
                                 <animateMotion dur="2s" repeatCount="indefinite" path={d} />
                               </circle>
                             </>
+                          )}
+                          {/* Not clocked in: slow pulsing dot traveling down the gradient wire */}
+                          {!ch.isLive && ch.source === "assigned" && (
+                            <circle r="2" fill="#f59e0b" opacity={0.5}>
+                              <animateMotion dur="4s" repeatCount="indefinite" path={d} />
+                            </circle>
                           )}
                         </g>
                       );
@@ -92,8 +113,8 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
                     const top = WIRE_TOP + ci * (CHATTER_H + CHATTER_GAP);
                     const cardBorder = isOvr ? "border-orange-500/20 bg-orange-500/[0.03]"
                       : ch.isLive ? "border-teal-500/20 bg-teal-500/[0.03]"
-                      : "border-white/10 bg-white/[0.02]";
-                    const detailColor = isOvr ? "#f9731660" : ch.isLive ? "#2dd4bf60" : "rgba(255,255,255,0.2)";
+                      : "border-amber-500/20 bg-amber-500/[0.04]";
+                    const detailColor = isOvr ? "#f9731660" : ch.isLive ? "#2dd4bf60" : "#f59e0b70";
 
                     return (
                       <div key={ch.email} className={`absolute left-0 right-0 rounded-xl border px-2 py-1.5 flex items-center gap-1.5 group ${cardBorder}`} style={{ top, height: CHATTER_H }}>
@@ -102,11 +123,14 @@ export function WiringGraph({ nodes, onDisconnect }: { nodes: WiringNode[]; onDi
                           {ch.isLive && (
                             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#0a0a0f] animate-pulse" />
                           )}
+                          {!ch.isLive && ch.source === "assigned" && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border border-[#0a0a0f]" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="text-[10px] font-medium text-white/90 truncate">{ch.name}</div>
                           <div className="text-[8px] truncate" style={{ color: detailColor }}>
-                            {ch.isLive ? `LIVE · ${ch.detail}` : ch.detail}
+                            {ch.isLive ? `LIVE · ${ch.detail}` : `NOT CLOCKED IN · ${ch.detail}`}
                           </div>
                         </div>
                         {onDisconnect && (
