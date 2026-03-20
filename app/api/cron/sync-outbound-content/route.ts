@@ -6,35 +6,10 @@ import { ofapiRequest } from "@/lib/ofapi-core";
 export const dynamic = "force-dynamic";
 export const maxDuration = 55;
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const OFAPI_BASE = "https://app.onlyfansapi.com";
-const MEDIA_BUCKET = "content-media";
+// Media is cached lazily by proxy-media on first access — no OFAPI downloads during sync
 
-async function downloadAndPersist(accountId: string, creatorId: string, creativeId: string, sourceUrl: string, mediaId: string, contentType?: string): Promise<string | null> {
-  const apiKey = (process.env.OFAPI_API_KEY || "").trim();
-  if (!apiKey || !SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
-  try {
-    const res = await fetch(`${OFAPI_BASE}/api/${accountId}/media/download/${sourceUrl}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return null;
-    const blob = await res.arrayBuffer();
-    const path = `${creatorId}/${creativeId}/${mediaId}.jpg`;
-    const upRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-        "Content-Type": res.headers.get("content-type") || contentType || "image/jpeg",
-        "x-upsert": "true",
-      },
-      body: blob,
-    });
-    if (!upRes.ok) return null;
-    return `${SUPABASE_URL}/storage/v1/object/public/${MEDIA_BUCKET}/${path}`;
-  } catch { return null; }
-}
+// Media downloads removed — proxy-media caches on first access instead of
+// downloading every file during sync (saves thousands of OFAPI credits/day)
 
 /**
  * GET /api/cron/sync-outbound-content
@@ -268,20 +243,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Fire media persistence in background (Trigger.dev handles Supabase uploads)
-    if (totalMedia > 0) {
-      try {
-        const triggerUrl = "https://api.trigger.dev/api/v1/tasks/media-persistence/trigger";
-        const triggerKey = process.env.TRIGGER_SECRET_KEY || "";
-        if (triggerKey) {
-          fetch(triggerUrl, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${triggerKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ payload: { limit: Math.min(totalMedia * 2, 200) } }),
-          }).catch(() => {}); // fire and forget
-        }
-      } catch {}
-    }
+    // Media is cached lazily by proxy-media on first user access — no bulk downloads
 
     return NextResponse.json({ ok: true, upserted: totalUpserted, media: totalMedia });
   } catch (err: any) {

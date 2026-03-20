@@ -1,40 +1,99 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
 const OFAPI_BASE = "https://app.onlyfansapi.com";
+const MEDIA_BUCKET = "content-media";
 
 // Cache one active creator account name to avoid DB hit on every media request
 let cachedAccount: { name: string; ts: number } | null = null;
 const ACCOUNT_CACHE_TTL = 300_000; // 5 min
 
+/** Extract a stable cache key from an OF CDN URL (path only, no signed tokens) */
+function getCacheKey(url: string): string {
+    try {
+        const parsed = new URL(url);
+        // OF CDN path is stable; query params are signed tokens that change
+        return crypto.createHash("sha256").update(parsed.pathname).digest("hex").slice(0, 32);
+    } catch {
+        return crypto.createHash("sha256").update(url).digest("hex").slice(0, 32);
+    }
+}
+
+/** Try to serve from Supabase Storage cache */
+async function serveCached(cacheKey: string): Promise<Response | null> {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) return null;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${MEDIA_BUCKET}/proxy-cache/${cacheKey}`;
+    try {
+        const res = await fetch(publicUrl, { method: "HEAD", signal: AbortSignal.timeout(3000) });
+        if (res.ok) return Response.redirect(publicUrl, 302);
+    } catch { /* not cached */ }
+    return null;
+}
+
+/** Upload to Supabase Storage cache (fire-and-forget) */
+function cacheInStorage(cacheKey: string, body: ArrayBuffer, contentType: string) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) return;
+    const path = `proxy-cache/${cacheKey}`;
+    fetch(`${supabaseUrl}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": contentType,
+            "x-upsert": "true",
+        },
+        body: body,
+    }).catch(() => {});
+}
+
+async function resolveAccountName(creatorId: string | null): Promise<string | null> {
+    if (creatorId) {
+        const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
+        if (creator?.ofapiCreatorId) return creator.ofapiCreatorId;
+    }
+    if (cachedAccount && Date.now() - cachedAccount.ts < ACCOUNT_CACHE_TTL) {
+        return cachedAccount.name;
+    }
+    const anyCreator = await prisma.creator.findFirst({
+        where: { active: true, ofapiCreatorId: { not: null } },
+        select: { ofapiCreatorId: true },
+    });
+    if (anyCreator?.ofapiCreatorId) {
+        cachedAccount = { name: anyCreator.ofapiCreatorId, ts: Date.now() };
+        return anyCreator.ofapiCreatorId;
+    }
+    return null;
+}
+
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const targetUrl = searchParams.get("url");
-    const creatorId = searchParams.get("creatorId");
+    const creatorId = searchParams.get("creatorId") || null;
 
     if (!targetUrl) {
         return new NextResponse("Missing url parameter", { status: 400 });
     }
 
     // Supabase Storage URLs are permanent — fetch directly, no OFAPI needed
-    const isSupabaseUrl = targetUrl.includes(".supabase.co/storage/");
-    if (isSupabaseUrl) {
+    if (targetUrl.includes(".supabase.co/storage/")) {
         try {
             const response = await fetch(targetUrl, {
-                headers: { "Accept": "image/*, video/*, audio/*, */*" },
+                headers: { Accept: "image/*, video/*, audio/*, */*" },
             });
             if (response.ok) {
-                const contentType = response.headers.get("Content-Type") || "application/octet-stream";
-                const contentLength = response.headers.get("Content-Length");
-                const headers: HeadersInit = {
-                    "Content-Type": contentType,
-                    "Cache-Control": "public, max-age=31536000, immutable",
-                    "Access-Control-Allow-Origin": "*",
-                };
-                if (contentLength) headers["Content-Length"] = contentLength;
-                return new NextResponse(response.body as any, { status: 200, headers });
+                return new NextResponse(response.body as any, {
+                    status: 200,
+                    headers: {
+                        "Content-Type": response.headers.get("Content-Type") || "application/octet-stream",
+                        "Cache-Control": "public, max-age=31536000, immutable",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                });
             }
         } catch (e: any) {
             console.warn("[proxy] Supabase fetch error:", e.message);
@@ -44,55 +103,40 @@ export async function GET(request: NextRequest) {
     const apiKey = process.env.OFAPI_API_KEY;
     const isOfUrl = targetUrl.includes("onlyfans.com");
 
-    // For OnlyFans CDN URLs, ALWAYS route through OFAPI download
-    // Direct fetch from Vercel gets 403 because OF CDN is IP-locked
+    // For OF CDN URLs: check cache first, then OFAPI, then persist to cache
     if (apiKey && isOfUrl) {
+        const cacheKey = getCacheKey(targetUrl);
+
+        // 1. Check Supabase Storage cache — skip OFAPI entirely if cached
+        const cached = await serveCached(cacheKey);
+        if (cached) return cached;
+
+        // 2. Not cached — download via OFAPI
         try {
-            let accountName: string | null = null;
-
-            // If creatorId provided, use that specific creator
-            if (creatorId) {
-                const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
-                accountName = creator?.ofapiCreatorId || creator?.telegramId || null;
-            }
-
-            // If no creatorId, use any active creator (all share the same OFAPI access)
-            if (!accountName) {
-                if (cachedAccount && Date.now() - cachedAccount.ts < ACCOUNT_CACHE_TTL) {
-                    accountName = cachedAccount.name;
-                } else {
-                    const anyCreator = await prisma.creator.findFirst({
-                        where: { active: true, ofapiCreatorId: { not: null } },
-                        select: { ofapiCreatorId: true },
-                    });
-                    if (anyCreator?.ofapiCreatorId) {
-                        accountName = anyCreator.ofapiCreatorId;
-                        cachedAccount = { name: accountName, ts: Date.now() };
-                    }
-                }
-            }
-
+            const accountName = await resolveAccountName(creatorId);
             if (accountName) {
                 const downloadUrl = `${OFAPI_BASE}/api/${accountName}/media/download/${targetUrl}`;
                 const response = await fetch(downloadUrl, {
-                    headers: {
-                        "Authorization": `Bearer ${apiKey}`,
-                        "Accept": "image/*, video/*, audio/*, */*",
-                    },
+                    headers: { Authorization: `Bearer ${apiKey}`, Accept: "image/*, video/*, audio/*, */*" },
                 });
 
                 if (response.ok) {
                     const contentType = response.headers.get("Content-Type") || "application/octet-stream";
-                    const contentLength = response.headers.get("Content-Length");
-                    const headers: HeadersInit = {
-                        "Content-Type": contentType,
-                        "Cache-Control": "public, max-age=3600",
-                        "Access-Control-Allow-Origin": "*",
-                    };
-                    if (contentLength) headers["Content-Length"] = contentLength;
-                    return new NextResponse(response.body as any, { status: 200, headers });
+                    // Read body so we can both cache and respond
+                    const body = await response.arrayBuffer();
+
+                    // 3. Cache in Supabase Storage (fire-and-forget, won't block response)
+                    cacheInStorage(cacheKey, body, contentType);
+
+                    return new NextResponse(body, {
+                        status: 200,
+                        headers: {
+                            "Content-Type": contentType,
+                            "Cache-Control": "public, max-age=86400",
+                            "Access-Control-Allow-Origin": "*",
+                        },
+                    });
                 }
-                // Log but don't fail — fall through to direct attempt
                 console.warn(`[proxy] OFAPI download ${response.status} for ${targetUrl.substring(0, 60)}...`);
             }
         } catch (e: any) {
@@ -104,32 +148,24 @@ export async function GET(request: NextRequest) {
     try {
         const response = await fetch(targetUrl, {
             headers: {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "image/*, video/*, audio/*, */*",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                Accept: "image/*, video/*, audio/*, */*",
             },
         });
 
         if (!response.ok) {
-            // For OF URLs that failed both paths, return a transparent 1px placeholder instead of error
-            if (isOfUrl) {
-                return new NextResponse(null, {
-                    status: 204,
-                    headers: { "Cache-Control": "no-cache" },
-                });
-            }
+            if (isOfUrl) return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-cache" } });
             return new NextResponse(`Failed to fetch media: ${response.statusText}`, { status: response.status });
         }
 
-        const contentType = response.headers.get("Content-Type") || "application/octet-stream";
-        const contentLength = response.headers.get("Content-Length");
-        const headers: HeadersInit = {
-            "Content-Type": contentType,
-            "Cache-Control": response.headers.get("Cache-Control") || "public, max-age=86400",
-            "Access-Control-Allow-Origin": "*",
-        };
-        if (contentLength) headers["Content-Length"] = contentLength;
-
-        return new NextResponse(response.body as any, { status: 200, headers });
+        return new NextResponse(response.body as any, {
+            status: 200,
+            headers: {
+                "Content-Type": response.headers.get("Content-Type") || "application/octet-stream",
+                "Cache-Control": response.headers.get("Cache-Control") || "public, max-age=86400",
+                "Access-Control-Allow-Origin": "*",
+            },
+        });
     } catch (e: any) {
         console.error("[proxy] error:", e.message);
         return new NextResponse(`Media proxy internal error: ${e.message}`, { status: 500 });
