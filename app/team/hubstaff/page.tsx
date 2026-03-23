@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { Users, RefreshCw, Trash2, Plus, CheckCircle, XCircle, Link2 } from "lucide-react";
+import { HubstaffStatsSection } from "@/components/hubstaff/HubstaffStatsSection";
 
 type MappedCreator = { creatorId: string; creatorName: string };
 type HubstaffMember = { hubstaffUserId: string; name: string; email: string; status: string; mappedCreators: MappedCreator[] };
@@ -10,6 +12,7 @@ type Config = { configured: boolean; organizationId?: string; syncEnabled?: bool
 type Creator = { id: string; name: string | null; ofUsername?: string | null };
 
 export default function HubstaffAdmin() {
+  const { t } = useLanguage();
   const [config, setConfig] = useState<Config | null>(null);
   const [members, setMembers] = useState<HubstaffMember[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
@@ -120,203 +123,201 @@ export default function HubstaffAdmin() {
     load();
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#050508] flex items-center justify-center">
-      <RefreshCw className="w-6 h-6 text-teal-400 animate-spin" />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 md:p-6">
+        <RefreshCw className="w-8 h-8 text-teal-400 animate-spin" />
+      </div>
+    );
+  }
 
   const totalMappings = mappings.length;
   const mappedMembers = members.filter(m => m.mappedCreators.length > 0).length;
 
   return (
-    <div className="min-h-screen bg-[#050508] p-6 max-w-4xl mx-auto space-y-6">
-      <header className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-blue-700 flex items-center justify-center">
-          <Link2 size={20} className="text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Hubstaff Integration</h1>
-          <p className="text-white/50 text-sm">Auto-sync chatter clock-in from Hubstaff</p>
+    <div className="min-h-screen text-white/90 p-4 md:p-6">
+      <header className="glass-panel rounded-2xl p-4 mb-4 border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-blue-700 flex items-center justify-center">
+            <Link2 size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white/95">{t("hubstaffIntegration")}</h1>
+            <p className="text-xs sm:text-sm text-white/50 mt-0.5">{t("hubstaffDesc")}</p>
+          </div>
         </div>
       </header>
 
-      {/* Setup Section */}
-      {!config?.configured && (
-        <div className="glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <XCircle size={18} className="text-amber-400" /> Setup Required
-          </h2>
-          <div className="space-y-3">
-            <input
-              value={setupOrg}
-              onChange={e => setSetupOrg(e.target.value)}
-              placeholder="Organization ID (e.g. 517938)"
-              className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm"
-            />
-            <textarea
-              value={setupToken}
-              onChange={e => setSetupToken(e.target.value.replace(/[\s\n\r]+/g, ""))}
-              onPaste={e => {
-                e.preventDefault();
-                const pasted = e.clipboardData.getData("text").replace(/[\s\n\r]+/g, "");
-                setSetupToken(pasted);
-              }}
-              placeholder="Paste your Hubstaff refresh token here..."
-              rows={3}
-              className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono break-all"
-            />
-            <button onClick={handleSetup} className="glass-prominent rounded-xl px-6 py-2.5 text-white font-medium text-sm">
-              Connect Hubstaff
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Status Card */}
-      {config?.configured && (
-        <div className="glass-card rounded-3xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={18} className="text-teal-400" />
-              <span className="text-white font-medium">Connected</span>
-              <span className="text-white/60 text-sm">Org: {config.organizationId}</span>
-            </div>
-            <div className="text-xs text-white/60">
-              Last sync: {config.lastSyncAt ? new Date(config.lastSyncAt).toLocaleString("en-GB", { timeZone: "Europe/London" }) : "Never"}
-            </div>
-          </div>
-
-          {config.tokenExpiresAt && (
-            <div className="text-xs text-white/40">
-              Token expires: {new Date(config.tokenExpiresAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
-              {new Date(config.tokenExpiresAt) < new Date() && (
-                <span className="text-red-400 font-semibold ml-2">EXPIRED</span>
-              )}
+      <div className="glass-panel rounded-3xl overflow-hidden border-white/10 flex flex-col min-h-[calc(100vh-12rem)]">
+        <div className="flex flex-col lg:flex-row gap-4 p-4 md:p-6 flex-1 min-h-0 overflow-auto">
+          {/* Left: Stats (when configured) */}
+          {config?.configured && (
+            <div className="lg:w-[380px] shrink-0">
+              <HubstaffStatsSection />
             </div>
           )}
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleSyncNow}
-              disabled={syncing}
-              className="glass-button rounded-xl px-4 py-2 text-sm text-teal-400 font-medium flex items-center gap-1.5 disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-              {syncing ? "Syncing..." : "Sync Now"}
-            </button>
-            <button
-              onClick={() => setShowUpdateToken(!showUpdateToken)}
-              className="glass-button rounded-xl px-4 py-2 text-sm text-white/60 font-medium"
-            >
-              Update Token
-            </button>
-          </div>
-
-          {syncResult && (
-            <div className={`text-xs px-3 py-2 rounded-lg ${syncResult.startsWith("Synced") ? "bg-teal-500/10 text-teal-400" : "bg-red-500/10 text-red-400"}`}>
-              {syncResult}
-            </div>
-          )}
-
-          {showUpdateToken && (
-            <div className="space-y-3 border-t border-white/5 pt-4">
-              <p className="text-white/60 text-sm font-medium">Paste new Hubstaff refresh token:</p>
-              <textarea
-                value={updateToken}
-                onChange={e => setUpdateToken(e.target.value.replace(/[\s\n\r]+/g, ""))}
-                onPaste={e => {
-                  e.preventDefault();
-                  const pasted = e.clipboardData.getData("text").replace(/[\s\n\r]+/g, "");
-                  setUpdateToken(pasted);
-                }}
-                placeholder="eyJ0eXAiOiJKV1Qi..."
-                rows={3}
-                className="w-full glass-inset rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono break-all"
-              />
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleUpdateToken}
-                  disabled={!updateToken.trim()}
-                  className="glass-prominent rounded-xl px-6 py-2.5 text-white font-medium text-sm disabled:opacity-30"
-                >
-                  Update Token
-                </button>
-                <button
-                  onClick={() => { setShowUpdateToken(false); setUpdateStatus(null); }}
-                  className="text-white/40 text-sm hover:text-white/60"
-                >
-                  Cancel
-                </button>
-              </div>
-              {updateStatus && (
-                <div className={`text-xs px-3 py-2 rounded-lg ${updateStatus.includes("updated") ? "bg-teal-500/10 text-teal-400" : updateStatus.includes("Failed") || updateStatus.includes("Error") ? "bg-red-500/10 text-red-400" : "bg-white/5 text-white/50"}`}>
-                  {updateStatus}
+          {/* Right: Setup, Status, Mappings */}
+          <div className="flex-1 min-w-0 space-y-4">
+            {!config?.configured && (
+              <div className="glass-card rounded-2xl p-6 space-y-4">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <XCircle size={18} className="text-amber-400" /> {t("hubstaffSetupRequired")}
+                </h2>
+                <div className="space-y-3">
+                  <input
+                    value={setupOrg}
+                    onChange={e => setSetupOrg(e.target.value)}
+                    placeholder="Organization ID (e.g. 517938)"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm"
+                  />
+                  <textarea
+                    value={setupToken}
+                    onChange={e => setSetupToken(e.target.value.replace(/[\s\n\r]+/g, ""))}
+                    onPaste={e => {
+                      e.preventDefault();
+                      setSetupToken(e.clipboardData.getData("text").replace(/[\s\n\r]+/g, ""));
+                    }}
+                    placeholder="Paste your Hubstaff refresh token here..."
+                    rows={3}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono break-all"
+                  />
+                  <button onClick={handleSetup} className="glass-prominent rounded-xl px-6 py-2.5 text-white font-medium text-sm">
+                    {t("hubstaffConnect")}
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Current Mappings */}
-      {totalMappings > 0 && (
-        <div className="glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Users size={18} className="text-teal-400" /> Active Mappings ({totalMappings})
-          </h2>
-          <div className="space-y-2">
-            {mappings.map(m => (
-              <div key={m.id} className="flex items-center justify-between glass-inset rounded-xl px-4 py-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-white text-sm font-medium">{m.hubstaffName || m.hubstaffUserId}</span>
-                  <span className="text-white/30">&rarr;</span>
-                  <span className="text-teal-400 text-sm">{m.chatterEmail}</span>
-                  {m.creator?.name && (
-                    <>
-                      <span className="text-white/30">&rarr;</span>
-                      <span className="text-amber-400 text-sm">{m.creator.name}</span>
-                    </>
-                  )}
-                  {!m.creatorId && (
-                    <span className="text-red-400/60 text-xs bg-red-500/10 px-2 py-0.5 rounded-full">No model assigned</span>
-                  )}
-                </div>
-                <button onClick={() => removeMapping(m.id)} className="text-red-400/60 hover:text-red-400 transition shrink-0 ml-2">
-                  <Trash2 size={16} />
-                </button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* All Hubstaff Members — map to multiple creators */}
-      {config?.configured && (
-        <div className="glass-card rounded-3xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Plus size={18} className="text-white/60" /> Hubstaff Members
-            {members.length > 0 && (
-              <span className="text-white/40 text-sm font-normal ml-1">
-                ({mappedMembers}/{members.length} mapped)
-              </span>
             )}
-          </h2>
-          {membersError && (
-            <div className="text-xs px-3 py-2 rounded-lg bg-red-500/10 text-red-400">
-              Failed to load members: {membersError}
-            </div>
-          )}
-          <div className="space-y-2">
-            {members.map(m => (
-              <MemberRow key={m.hubstaffUserId} member={m} creators={creators} onMap={addMapping} />
-            ))}
-            {members.length === 0 && !membersError && (
-              <p className="text-white/40 text-sm">No members found in Hubstaff org</p>
+
+            {config?.configured && (
+              <>
+                <div className="glass-card rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className="text-teal-400" />
+                      <span className="text-white font-medium">{t("hubstaffConnected")}</span>
+                      <span className="text-white/50 text-sm">Org: {config.organizationId}</span>
+                    </div>
+                    <div className="text-xs text-white/50">
+                      Last sync: {config.lastSyncAt ? new Date(config.lastSyncAt).toLocaleString("en-GB", { timeZone: "Europe/London" }) : "Never"}
+                    </div>
+                  </div>
+                  {config.tokenExpiresAt && (
+                    <div className="text-xs text-white/40">
+                      Token expires: {new Date(config.tokenExpiresAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}
+                      {new Date(config.tokenExpiresAt) < new Date() && (
+                        <span className="text-red-400 font-semibold ml-2">EXPIRED</span>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={handleSyncNow}
+                      disabled={syncing}
+                      className="glass-button rounded-xl px-4 py-2 text-sm text-teal-400 font-medium flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+                      {syncing ? "Syncing..." : t("hubstaffSyncNow")}
+                    </button>
+                    <button
+                      onClick={() => setShowUpdateToken(!showUpdateToken)}
+                      className="glass-button rounded-xl px-4 py-2 text-sm text-white/60 font-medium"
+                    >
+                      Update Token
+                    </button>
+                  </div>
+                  {syncResult && (
+                    <div className={`text-xs px-3 py-2 rounded-lg ${syncResult.startsWith("Synced") ? "bg-teal-500/10 text-teal-400" : "bg-red-500/10 text-red-400"}`}>
+                      {syncResult}
+                    </div>
+                  )}
+                  {showUpdateToken && (
+                    <div className="space-y-3 border-t border-white/5 pt-4">
+                      <p className="text-white/60 text-sm font-medium">Paste new Hubstaff refresh token:</p>
+                      <textarea
+                        value={updateToken}
+                        onChange={e => setUpdateToken(e.target.value.replace(/[\s\n\r]+/g, ""))}
+                        onPaste={e => { e.preventDefault(); setUpdateToken(e.clipboardData.getData("text").replace(/[\s\n\r]+/g, "")); }}
+                        placeholder="eyJ0eXAiOiJKV1Qi..."
+                        rows={3}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm resize-none font-mono break-all"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button onClick={handleUpdateToken} disabled={!updateToken.trim()} className="glass-prominent rounded-xl px-6 py-2.5 text-white font-medium text-sm disabled:opacity-30">
+                          Update Token
+                        </button>
+                        <button onClick={() => { setShowUpdateToken(false); setUpdateStatus(null); }} className="text-white/40 text-sm hover:text-white/60">
+                          Cancel
+                        </button>
+                      </div>
+                      {updateStatus && (
+                        <div className={`text-xs px-3 py-2 rounded-lg ${updateStatus.includes("updated") ? "bg-teal-500/10 text-teal-400" : updateStatus.includes("Failed") || updateStatus.includes("Error") ? "bg-red-500/10 text-red-400" : "bg-white/5 text-white/50"}`}>
+                          {updateStatus}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {totalMappings > 0 && (
+                  <div className="glass-card rounded-2xl p-6 space-y-4">
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Users size={18} className="text-teal-400" /> {t("hubstaffActiveMappings")} ({totalMappings})
+                    </h2>
+                    <div className="space-y-2">
+                      {mappings.map(m => (
+                        <div key={m.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <span className="text-white text-sm font-medium">{m.hubstaffName || m.hubstaffUserId}</span>
+                            <span className="text-white/30">&rarr;</span>
+                            <span className="text-teal-400 text-sm">{m.chatterEmail}</span>
+                            {m.creator?.name && (
+                              <>
+                                <span className="text-white/30">&rarr;</span>
+                                <span className="text-amber-400 text-sm">{m.creator.name}</span>
+                              </>
+                            )}
+                            {!m.creatorId && (
+                              <span className="text-red-400/60 text-xs bg-red-500/10 px-2 py-0.5 rounded-full">No model assigned</span>
+                            )}
+                          </div>
+                          <button onClick={() => removeMapping(m.id)} className="text-red-400/60 hover:text-red-400 transition shrink-0 ml-2">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="glass-card rounded-2xl p-6 space-y-4">
+                  <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Plus size={18} className="text-white/60" /> {t("hubstaffMembers")}
+                    {members.length > 0 && (
+                      <span className="text-white/40 text-sm font-normal ml-1">
+                        ({mappedMembers}/{members.length} mapped)
+                      </span>
+                    )}
+                  </h2>
+                  {membersError && (
+                    <div className="text-xs px-3 py-2 rounded-lg bg-red-500/10 text-red-400">
+                      Failed to load members: {membersError}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {members.map(m => (
+                      <MemberRow key={m.hubstaffUserId} member={m} creators={creators} onMap={addMapping} />
+                    ))}
+                    {members.length === 0 && !membersError && (
+                      <p className="text-white/40 text-sm">No members found in Hubstaff org</p>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -329,7 +330,6 @@ function MemberRow({ member, creators, onMap }: {
   const [email, setEmail] = useState(member.email || "");
   const [selectedCreator, setSelectedCreator] = useState("");
 
-  // Filter out creators already mapped to this member
   const mappedIds = new Set(member.mappedCreators.map(mc => mc.creatorId));
   const availableCreators = creators.filter(c => !mappedIds.has(c.id));
 
@@ -340,21 +340,14 @@ function MemberRow({ member, creators, onMap }: {
   }
 
   return (
-    <div className="glass-inset rounded-xl px-4 py-3 space-y-2">
+    <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3 space-y-2">
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-white text-sm font-medium min-w-[140px]">{member.name}</span>
-
-        {/* Existing mapped creators as badges */}
         {member.mappedCreators.map(mc => (
-          <span
-            key={mc.creatorId}
-            className="text-[10px] bg-teal-500/15 text-teal-400 px-2 py-0.5 rounded-full border border-teal-500/20"
-          >
+          <span key={mc.creatorId} className="text-[10px] bg-teal-500/15 text-teal-400 px-2 py-0.5 rounded-full border border-teal-500/20">
             {mc.creatorName}
           </span>
         ))}
-
-        {/* Add more mapping controls */}
         <div className="flex items-center gap-2 ml-auto">
           <input
             value={email}

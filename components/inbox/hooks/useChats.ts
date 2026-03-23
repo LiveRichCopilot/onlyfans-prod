@@ -134,13 +134,22 @@ export function useChats() {
                 : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10`;
 
         fetch(`${baseUrl}&offset=0`)
-            .then((res) => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
+            .then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    setChatsError(data.error || data.message || `HTTP ${res.status}`);
+                    setLoading(false);
+                    return null;
+                }
+                if (data.error) {
+                    setChatsError(data.error);
+                    setLoading(false);
+                    return null;
+                }
+                return data;
             })
             .then(async (data) => {
-                if (activeCreatorSelectionRef.current !== selectionKey) return;
-                if (data.error) throw new Error(data.error);
+                if (data === null || activeCreatorSelectionRef.current !== selectionKey) return;
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
                 const enrich = enrichWithAvatarsRef.current;
                 const firstPage = sortByRecent(enrich(mapRawChats(rawArray)));

@@ -33,6 +33,22 @@ import {
 export default async function SystemTrackingPage() {
   const stats = await getSystemStats();
 
+  if (!stats) {
+    return (
+      <div className="min-h-screen bg-[#050510] text-white flex items-center justify-center p-8">
+        <div className="max-w-md text-center glass-panel rounded-2xl p-8 border border-amber-500/20">
+          <Database size={48} className="text-amber-400/80 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-white/90 mb-2">Database unavailable</h1>
+          <p className="text-sm text-white/50 mb-4">
+            The database connection failed. Check <code className="text-amber-400/80">POSTGRES_URL</code> in .env
+            and that the circuit breaker has reset (wait 5–10 min after auth errors).
+          </p>
+          <a href="/" className="text-teal-400 hover:underline text-sm">← Back to dashboard</a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050510] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

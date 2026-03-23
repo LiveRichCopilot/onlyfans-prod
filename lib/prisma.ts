@@ -21,8 +21,11 @@ function appendPoolParams(url: string): string {
     if (!url) return url;
     try {
         const u = new URL(url);
+        // Cap connections in dev to avoid circuit breaker (too many auth failures from hot reload)
+        const limit = process.env.NODE_ENV === 'development' ? 2 : undefined;
+        if (limit) u.searchParams.set('connection_limit', String(limit));
         // Only override if connection_limit is 1 (Vercel default)
-        if (u.searchParams.get('connection_limit') === '1') {
+        else if (u.searchParams.get('connection_limit') === '1') {
             u.searchParams.set('connection_limit', '5');
         }
         // Ensure pool_timeout is reasonable

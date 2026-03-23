@@ -1,9 +1,16 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2, Calendar, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/lib/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
+
+function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  if (href === "/team") return pathname === "/team";
+  return pathname === href || pathname.startsWith(href + "/");
+}
 
 type Creator = {
     id: string;
@@ -22,6 +29,18 @@ type Props = {
 
 export function Sidebar({ creators, loading, onAddAccount }: Props) {
     const { t } = useLanguage();
+    const pathname = usePathname() ?? "";
+
+    const navLink = (href: string, children: React.ReactNode) => {
+        const active = isNavActive(pathname, href);
+        return (
+            <li className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition cursor-pointer ${
+                active ? "bg-white/10 text-white border border-white/10" : "text-white/60 hover:text-white hover:bg-white/5 border border-transparent"
+            }`}>
+                {children}
+            </li>
+        );
+    };
     return (
         <aside className="w-72 h-[calc(100vh-2rem)] my-4 ml-4 glass-panel rounded-3xl p-6 flex flex-col border-gray-800 overflow-y-auto">
             <div className="flex items-center justify-between gap-2 mb-6">
@@ -72,59 +91,17 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                 <div>
                     <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">{t("management")}</div>
                     <ul className="space-y-1">
-                        <Link href="/">
-                            <li className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition border border-white/10"><LayoutGrid size={16} /> {t("dashboard")}</li>
-                        </Link>
-                        <Link href="/inbox">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <MessageSquare size={16} /> {t("liveInbox")}
-                                <span className="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-purple-500/30 font-bold tracking-wider">{t("new")}</span>
-                            </li>
-                        </Link>
-                        <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Activity size={16} /> {t("realtimeFeed")}</li>
-                        <Link href="/team">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Users size={16} /> {t("teamManagement")}
-                            </li>
-                        </Link>
-                        <Link href="/team-analytics">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <BarChart2 size={16} /> {t("teamAnalytics")}
-                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span>
-                            </li>
-                        </Link>
-                        <Link href="/schedule">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Calendar size={16} /> {t("shiftSchedule")}
-                                <span className="bg-[#5B9BD5]/20 text-[#5B9BD5] text-[10px] px-1.5 py-0.5 rounded ml-auto border border-[#5B9BD5]/30 font-bold tracking-wider">{t("new")}</span>
-                            </li>
-                        </Link>
-                        <Link href="/content-daily">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <ImageIcon size={16} /> {t("contentDaily")}
-                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span>
-                            </li>
-                        </Link>
-                        <Link href="/content-feed">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <BarChart2 size={16} /> {t("contentFeed")}
-                            </li>
-                        </Link>
-                        <Link href="/performance">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Zap size={16} /> {t("performance")}
-                            </li>
-                        </Link>
-                        <Link href="/team/hubstaff">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Link2 size={16} /> {t("hubstaff")}
-                            </li>
-                        </Link>
-                        <Link href="/system">
-                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Database size={16} /> {t("systemIntelligence")}
-                            </li>
-                        </Link>
+                        <Link href="/">{navLink("/", <><LayoutGrid size={16} /> {t("dashboard")}</>)}</Link>
+                        <Link href="/inbox">{navLink("/inbox", <><MessageSquare size={16} /> {t("liveInbox")}<span className="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-purple-500/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
+                        <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer"><Activity size={16} /> {t("realtimeFeed")}</li>
+                        <Link href="/team">{navLink("/team", <><Users size={16} /> {t("teamManagement")}</>)}</Link>
+                        <Link href="/team-analytics">{navLink("/team-analytics", <><BarChart2 size={16} /> {t("teamAnalytics")}<span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
+                        <Link href="/schedule">{navLink("/schedule", <><Calendar size={16} /> {t("shiftSchedule")}<span className="bg-[#5B9BD5]/20 text-[#5B9BD5] text-[10px] px-1.5 py-0.5 rounded ml-auto border border-[#5B9BD5]/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
+                        <Link href="/content-daily">{navLink("/content-daily", <><ImageIcon size={16} /> {t("contentDaily")}<span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
+                        <Link href="/content-feed">{navLink("/content-feed", <><BarChart2 size={16} /> {t("contentFeed")}</>)}</Link>
+                        <Link href="/performance">{navLink("/performance", <><Zap size={16} /> {t("performance")}</>)}</Link>
+                        <Link href="/team/hubstaff">{navLink("/team/hubstaff", <><Link2 size={16} /> {t("hubstaff")}</>)}</Link>
+                        <Link href="/system">{navLink("/system", <><Database size={16} /> {t("systemIntelligence")}</>)}</Link>
                     </ul>
                 </div>
             </nav>

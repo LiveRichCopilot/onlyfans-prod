@@ -1,7 +1,16 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getSystemStats() {
-  const [
+export async function getSystemStats(): Promise<{
+  totalFans: number;
+  totalTransactions: number;
+  connectedCreators: number;
+  aiClassifications: number;
+  intentEvents: number;
+  fanFacts: number;
+  tables: { name: string; purpose: string; count: number }[];
+} | null> {
+  try {
+    const [
     totalFans,
     totalTransactions,
     connectedCreators,
@@ -36,8 +45,7 @@ export async function getSystemStats() {
     prisma.chatQAReview.count(),
     prisma.verificationToken.count(),
   ]);
-
-  return {
+    return {
     totalFans,
     totalTransactions,
     connectedCreators,
@@ -60,5 +68,9 @@ export async function getSystemStats() {
       { name: "Account", purpose: "OAuth provider links", count: accountCount },
       { name: "VerificationToken", purpose: "Email verification tokens", count: verificationTokenCount },
     ],
-  };
+    };
+  } catch (e) {
+    console.error("[getSystemStats] DB error:", (e as Error)?.message);
+    return null;
+  }
 }
