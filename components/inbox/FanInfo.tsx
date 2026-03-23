@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
 import type { Chat } from "./types";
 import type { FanData } from "./FanSidebar";
 
@@ -29,6 +30,7 @@ function stageLabel(stage: string | null): string {
 }
 
 export function FanInfo({ chat, fanData, loading }: Props) {
+    const { t } = useLanguage();
     const spend = fanData?.totalSpend ?? chat.totalSpend ?? 0;
     const intel = fanData?.intelligence;
 
@@ -123,15 +125,15 @@ export function FanInfo({ chat, fanData, loading }: Props) {
                             <div className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-2">Buy Patterns</div>
                             <div className="space-y-2.5 text-sm">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/50">Favorite day</span>
+                                    <span className="text-white/50">{t("favoriteDay")}</span>
                                     <span className="text-white/80">{fanData.buyPatterns.favoriteDayOfWeek}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/50">Favorite time</span>
+                                    <span className="text-white/50">{t("favoriteTime")}</span>
                                     <span className="text-white/80">{fanData.buyPatterns.favoriteHour}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-white/50">Buys every</span>
+                                    <span className="text-white/50">{t("buysEvery")}</span>
                                     <span className="text-white/80">~{fanData.buyPatterns.avgDaysBetweenPurchases}d</span>
                                 </div>
                                 {fanData.buyPatterns.typeBreakdown.length > 0 && (
@@ -160,7 +162,7 @@ export function FanInfo({ chat, fanData, loading }: Props) {
             )}
 
             <div className="flex justify-center items-center bg-white/5 -mx-4 -mb-4 mt-4 px-4 py-2 rounded-b-2xl border-t border-white/5">
-                <span className="text-[10px] text-white/20">Based on conversation history and purchase activity</span>
+                <span className="text-[10px] text-white/20">{t("basedOnHistory")}</span>
             </div>
         </div>
     );

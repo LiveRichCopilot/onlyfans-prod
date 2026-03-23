@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { X, Mail, CheckCircle, AlertCircle } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type Props = {
     onClose: () => void;
@@ -11,6 +12,7 @@ type Props = {
 type InviteResult = { email: string; ok: boolean; msg: string };
 
 export function InviteMemberModal({ onClose, onInvite }: Props) {
+    const { t } = useLanguage();
     const [emails, setEmails] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -27,7 +29,7 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
 
     const handleSubmit = async () => {
         if (parsed.length === 0) {
-            setError("Enter at least one valid email address");
+            setError(t("enterValidEmail"));
             return;
         }
         setLoading(true);
@@ -40,9 +42,9 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
             try {
                 // Default to AGENT (Chatter) — no access until role + accounts assigned
                 await onInvite(email, "AGENT");
-                inviteResults.push({ email, ok: true, msg: "Invited" });
+                inviteResults.push({ email, ok: true, msg: t("invited") });
             } catch (err: any) {
-                inviteResults.push({ email, ok: false, msg: err.message || "Failed" });
+                inviteResults.push({ email, ok: false, msg: err.message || t("inviteFailed") });
             }
         }
 
@@ -63,16 +65,15 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
                 </button>
 
                 <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                    <Mail size={20} className="text-teal-400" /> Invite Team Members
+                    <Mail size={20} className="text-teal-400" /> {t("inviteTeamMembers")}
                 </h2>
                 <p className="text-sm text-white/50 mb-6">
-                    Paste emails below. They&apos;ll be able to log in but won&apos;t see
-                    anything until you assign their role and accounts.
+                    {t("inviteModalDesc")}
                 </p>
 
                 <div className="mb-6">
                     <label className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-1.5 block">
-                        Email Addresses
+                        {t("emailAddresses")}
                     </label>
                     <textarea
                         value={emails}
@@ -120,8 +121,8 @@ export function InviteMemberModal({ onClose, onInvite }: Props) {
                     className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold transition disabled:opacity-50"
                 >
                     {loading
-                        ? `Inviting ${parsed.length}...`
-                        : `Invite ${parsed.length || ""} Member${parsed.length !== 1 ? "s" : ""}`}
+                        ? t("invitingCount", { count: parsed.length })
+                        : parsed.length === 0 ? t("inviteMember") : parsed.length === 1 ? t("inviteMemberCount", { count: 1 }) : t("inviteMembersCount", { count: parsed.length })}
                 </button>
             </div>
         </div>

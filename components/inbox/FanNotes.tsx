@@ -135,7 +135,7 @@ export function FanNotes({ facts, loading, fanOfapiId, creatorId, onUpdate }: Pr
                         </div>
                     ) : !showAdd ? (
                         <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center mb-3">
-                            <p className="text-xs text-white/40">No notes saved yet.</p>
+                            <p className="text-xs text-white/40">{t("noNotesSavedYet")}</p>
                         </div>
                     ) : null}
 
@@ -144,7 +144,7 @@ export function FanNotes({ facts, loading, fanOfapiId, creatorId, onUpdate }: Pr
                         <div className="border border-white/[0.08] rounded-xl p-3 bg-white/[0.02] space-y-3">
                             {/* Quick key buttons */}
                             <div>
-                                <div className="text-[10px] text-white/40 font-semibold uppercase tracking-wider mb-1.5">Quick add</div>
+                                <div className="text-[10px] text-white/40 font-semibold uppercase tracking-wider mb-1.5">{t("quickAdd")}</div>
                                 <div className="flex flex-wrap gap-1.5">
                                     {QUICK_KEYS.filter(k => !existingKeys.has(k)).map(key => (
                                         <button

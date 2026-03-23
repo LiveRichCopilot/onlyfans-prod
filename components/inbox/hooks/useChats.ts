@@ -17,6 +17,8 @@ export function useChats() {
     const [selectedCreatorId, setSelectedCreatorId] = useState<string>("all");
     const [chats, setChats] = useState<Chat[]>([]);
     const [loading, setLoading] = useState(true);
+    const [chatsError, setChatsError] = useState<string | null>(null);
+    const [retryKey, setRetryKey] = useState(0);
 
     // Spend bucket filter
     const [spendBucket, setSpendBucket] = useState(0);
@@ -34,6 +36,7 @@ export function useChats() {
 
     // Guard: track which creator selection is active to prevent stale appends
     const activeCreatorSelectionRef = useRef<string>("");
+    const enrichWithAvatarsRef = useRef<(list: Chat[]) => Chat[]>(() => []);
 
     // --- Temperature tick ---
     useEffect(() => {
@@ -44,9 +47,9 @@ export function useChats() {
     // --- Fetch connected creators ---
     useEffect(() => {
         fetch("/api/creators")
-            .then((res) => res.json())
+            .then((res) => (res.ok ? res.json() : res.json().then(() => ({ creators: [] }))))
             .then((data) => setCreators(data.creators || []))
-            .catch(console.error);
+            .catch(() => setCreators([]));
     }, []);
 
     // Enrich chats with creator avatars/names (pure — returns new array, never mutates)
@@ -66,6 +69,7 @@ export function useChats() {
         },
         [creators],
     );
+    enrichWithAvatarsRef.current = enrichWithAvatars;
 
     // --- Spend bucket filter ---
     useEffect(() => {
@@ -116,6 +120,7 @@ export function useChats() {
     useEffect(() => {
         if (!selectedCreatorId) return;
         setLoading(true);
+        setChatsError(null);
         setChats([]);
         setChatOffset(0);
         setHasMoreChats(true);
@@ -129,11 +134,16 @@ export function useChats() {
                 : `/api/inbox/chats?creatorId=${selectedCreatorId}&limit=10`;
 
         fetch(`${baseUrl}&offset=0`)
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
             .then(async (data) => {
                 if (activeCreatorSelectionRef.current !== selectionKey) return;
+                if (data.error) throw new Error(data.error);
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
-                const firstPage = sortByRecent(enrichWithAvatars(mapRawChats(rawArray)));
+                const enrich = enrichWithAvatarsRef.current;
+                const firstPage = sortByRecent(enrich(mapRawChats(rawArray)));
                 setChats(firstPage);
                 setLoading(false);
 
@@ -146,7 +156,8 @@ export function useChats() {
                         const nextData = await res.json();
                         if (activeCreatorSelectionRef.current !== selectionKey) break;
                         const nextRaw = Array.isArray(nextData.chats) ? nextData.chats : nextData.chats?.data || [];
-                        const nextChats = enrichWithAvatars(mapRawChats(nextRaw));
+                        const nextEnrich = enrichWithAvatarsRef.current;
+                        const nextChats = nextEnrich(mapRawChats(nextRaw));
                         if (nextChats.length > 0) {
                             setChats((prev) => {
                                 if (activeCreatorSelectionRef.current !== selectionKey) return prev;
@@ -166,9 +177,10 @@ export function useChats() {
             })
             .catch((err) => {
                 console.error("Failed to fetch chats", err);
+                setChatsError(err?.message || "Failed to load chats");
                 setLoading(false);
             });
-    }, [selectedCreatorId]);
+    }, [selectedCreatorId, retryKey]);
 
     // Re-enrich chats when creators load after chats
     useEffect(() => {
@@ -194,7 +206,7 @@ export function useChats() {
             .then((res) => res.json())
             .then((data) => {
                 const rawArray = Array.isArray(data.chats) ? data.chats : data.chats?.data || [];
-                const newChats = enrichWithAvatars(mapRawChats(rawArray));
+                const newChats = enrichWithAvatarsRef.current(mapRawChats(rawArray));
                 if (newChats.length > 0) {
                     setChats((prev) => {
                         const existingIds = new Set(prev.map((c) => c.id));
@@ -210,7 +222,7 @@ export function useChats() {
                 console.error("Failed to load more chats", err);
                 setLoadingMoreChats(false);
             });
-    }, [loadingMoreChats, hasMoreChats, selectedCreatorId, chatOffset, enrichWithAvatars]);
+    }, [loadingMoreChats, hasMoreChats, selectedCreatorId, chatOffset]);
 
     // --- Select creator (resets filters) ---
     const handleSelectCreator = useCallback((id: string) => {
@@ -219,6 +231,11 @@ export function useChats() {
         setSpendBucket(0);
         setOnlineOnly(false);
         setSpendFilteredChats(null);
+    }, []);
+
+    const retryChats = useCallback(() => {
+        setChatsError(null);
+        setRetryKey((k) => k + 1);
     }, []);
 
     return {
@@ -235,6 +252,8 @@ export function useChats() {
         spendFilteredChats,
         hasMoreChats: spendFilteredChats ? false : hasMoreChats,
         tempTick,
+        chatsError,
+        retryChats,
         handleSelectCreator,
         handleLoadMoreChats,
     };

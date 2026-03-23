@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { NavBar } from "@/components/inbox/NavBar";
 
 type PerformanceRecord = {
     id: string;
@@ -72,10 +71,6 @@ export default function PerformancePage() {
 
     return (
         <div className="flex h-screen text-white/90 overflow-hidden" style={{ backgroundColor: "#2d2d2d" }}>
-            <div className="hidden md:block">
-                <NavBar />
-            </div>
-
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                 <div className="max-w-4xl mx-auto">
                     <div className="flex items-center justify-between mb-4 sm:mb-6">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type Suggestion = {
     id: string;
@@ -36,6 +37,7 @@ const PRICE_COLORS: Record<string, string> = {
 };
 
 export function ContentSuggestions({ fanOfapiId, creatorId }: Props) {
+    const { t } = useLanguage();
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [loading, setLoading] = useState(false);
     const [totalTagged, setTotalTagged] = useState(0);
@@ -69,8 +71,8 @@ export function ContentSuggestions({ fanOfapiId, creatorId }: Props) {
     if (totalTagged === 0) {
         return (
             <div className="text-center py-4">
-                <p className="text-white/30 text-xs">No tagged vault content yet</p>
-                <p className="text-white/20 text-[10px] mt-1">Tag vault media to enable smart suggestions</p>
+                <p className="text-white/30 text-xs">{t("noTaggedVaultContent")}</p>
+                <p className="text-white/20 text-[10px] mt-1">{t("tagVaultToEnable")}</p>
             </div>
         );
     }
@@ -78,8 +80,8 @@ export function ContentSuggestions({ fanOfapiId, creatorId }: Props) {
     if (suggestions.length === 0) {
         return (
             <div className="text-center py-4">
-                <p className="text-white/30 text-xs">No matching content for this fan</p>
-                <p className="text-white/20 text-[10px] mt-1">{totalTagged} vault items tagged</p>
+                <p className="text-white/30 text-xs">{t("noMatchingContent")}</p>
+                <p className="text-white/20 text-[10px] mt-1">{t("vaultItemsTagged", { count: totalTagged })}</p>
             </div>
         );
     }
@@ -87,7 +89,7 @@ export function ContentSuggestions({ fanOfapiId, creatorId }: Props) {
     return (
         <div className="space-y-2">
             <div className="text-[10px] font-bold tracking-widest text-purple-400 px-1">
-                SUGGESTED FOR THIS FAN
+                {t("suggestedForThisFan")}
             </div>
             {suggestions.slice(0, 5).map((s) => (
                 <div
@@ -123,7 +125,7 @@ export function ContentSuggestions({ fanOfapiId, creatorId }: Props) {
                     </div>
                     {s.alreadySent && (
                         <div className="mt-1.5 text-[10px] text-red-400 font-medium">
-                            Already sent to this fan
+                            {t("alreadySentToFan")}
                         </div>
                     )}
                 </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import type { ClassificationResult } from "@/lib/ai-classifier";
 
 type Props = {
@@ -23,18 +24,19 @@ function intentColor(tag: string): string {
     return "#94A3B8"; // gray
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, t: (k: string, v?: Record<string, string | number>) => string): string {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) return t("timeAgoJustNow");
+    if (mins < 60) return t("timeAgoMinutes", { m: mins });
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
+    if (hrs < 24) return t("timeAgoHours", { h: hrs });
     const days = Math.floor(hrs / 24);
-    return `${days}d ago`;
+    return t("timeAgoDays", { d: days });
 }
 
 export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastAnalyzedAt, messagesAnalyzed, persistedResult, onClassified }: Props) {
+    const { t } = useLanguage();
     const [classifying, setClassifying] = useState(false);
     const [result, setResult] = useState<ClassificationResult | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -108,22 +110,22 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                 {classifying ? (
                     <>
                         <div className="w-4 h-4 rounded-full border-2 border-violet-400/30 border-t-violet-400 animate-spin" />
-                        <span>Scanning chat history...</span>
+                        <span>{t("scanningChatHistory")}</span>
                     </>
                 ) : displayResult
-                    ? "Update analysis"
-                    : hasBeenAnalyzed ? "Update analysis" : "Analyze Fan with AI"}
+                    ? t("updateAnalysis")
+                    : hasBeenAnalyzed ? t("updateAnalysis") : t("analyzeFanWithAi")}
             </button>
 
             {/* Loading subtitle */}
             {classifying && (
-                <p className="text-[10px] text-violet-400/50 text-center mt-1.5">Reading messages and building fan profile — takes 5-15s</p>
+                <p className="text-[10px] text-violet-400/50 text-center mt-1.5">{t("readingMessagesProfile")}</p>
             )}
 
             {/* Analysis metadata (only when no card is showing) */}
             {hasBeenAnalyzed && !displayResult && !classifying && (
                 <p className="text-[10px] text-white/25 text-center mt-1.5">
-                    {messagesAnalyzed ? `${messagesAnalyzed} messages analyzed` : "Analyzed"} · {timeAgo(lastAnalyzedAt!)}
+                    {messagesAnalyzed ? t("messagesAnalyzed", { count: messagesAnalyzed }) : t("analyzed")} · {timeAgo(lastAnalyzedAt!, t)}
                 </p>
             )}
 
@@ -151,14 +153,14 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                             </span>
                         )}
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/10">
-                            {Math.round(displayResult.confidence * 100)}% confident
+                            {t("confident", { p: Math.round(displayResult.confidence * 100) })}
                         </span>
                     </div>
 
                     {/* Do Not Forget bullets */}
                     {displayResult.doNotForget.length > 0 && (
                         <div>
-                            <div className="text-[9px] text-amber-400/60 font-semibold uppercase tracking-wider mb-1">Do Not Forget</div>
+                            <div className="text-[9px] text-amber-400/60 font-semibold uppercase tracking-wider mb-1">{t("doNotForget")}</div>
                             <ul className="space-y-0.5">
                                 {displayResult.doNotForget.map((item, i) => (
                                     <li key={i} className="text-[11px] text-white/60 flex items-start gap-1.5">
@@ -173,14 +175,14 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     {/* Personal facts (top-level) */}
                     {(displayResult.nickname || displayResult.job || displayResult.location || displayResult.relationshipStatus || displayResult.pets.length > 0 || displayResult.hobbies.length > 0) && (
                         <div>
-                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Personal Info</div>
+                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">{t("personalInfo")}</div>
                             <div className="grid grid-cols-2 gap-1">
-                                {displayResult.nickname && <InfoChip label="Name" value={displayResult.nickname} />}
-                                {displayResult.job && <InfoChip label="Job" value={displayResult.job} />}
-                                {displayResult.location && <InfoChip label="Location" value={displayResult.location} />}
-                                {displayResult.relationshipStatus && <InfoChip label="Status" value={displayResult.relationshipStatus} />}
-                                {displayResult.pets.length > 0 && <InfoChip label="Pets" value={displayResult.pets.join(", ")} />}
-                                {displayResult.hobbies.length > 0 && <InfoChip label="Hobbies" value={displayResult.hobbies.join(", ")} />}
+                                {displayResult.nickname && <InfoChip label={t("labelName")} value={displayResult.nickname} />}
+                                {displayResult.job && <InfoChip label={t("labelJob")} value={displayResult.job} />}
+                                {displayResult.location && <InfoChip label={t("labelLocation")} value={displayResult.location} />}
+                                {displayResult.relationshipStatus && <InfoChip label={t("labelStatus")} value={displayResult.relationshipStatus} />}
+                                {displayResult.pets.length > 0 && <InfoChip label={t("labelPets")} value={displayResult.pets.join(", ")} />}
+                                {displayResult.hobbies.length > 0 && <InfoChip label={t("labelHobbies")} value={displayResult.hobbies.join(", ")} />}
                             </div>
                         </div>
                     )}
@@ -188,7 +190,7 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     {/* Suggested questions (when facts are missing) */}
                     {displayResult.suggestedQuestions.length > 0 && (
                         <div>
-                            <div className="text-[9px] text-cyan-400/60 font-semibold uppercase tracking-wider mb-1">Ask Next</div>
+                            <div className="text-[9px] text-cyan-400/60 font-semibold uppercase tracking-wider mb-1">{t("askNext")}</div>
                             <ul className="space-y-0.5">
                                 {displayResult.suggestedQuestions.map((q, i) => (
                                     <li key={i} className="text-[11px] text-cyan-400/70 italic">&ldquo;{q}&rdquo;</li>
@@ -200,7 +202,7 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     {/* Intent tags */}
                     {displayResult.intentTags.length > 0 && (
                         <div>
-                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Intent Signals</div>
+                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">{t("intentSignals")}</div>
                             <div className="space-y-1">
                                 {displayResult.intentTags
                                     .sort((a, b) => b.confidence - a.confidence)
@@ -228,7 +230,7 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     {/* Emotional drivers */}
                     {displayResult.emotionalDrivers.length > 0 && (
                         <div>
-                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">Emotional Drivers</div>
+                            <div className="text-[9px] text-white/30 font-semibold uppercase tracking-wider mb-1">{t("emotionalDrivers")}</div>
                             <div className="flex flex-wrap gap-1">
                                 {displayResult.emotionalDrivers.map(d => (
                                     <span key={d} className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -256,16 +258,16 @@ export function AiClassifyButton({ creatorId, chatId, fanOfapiId, fanName, lastA
                     {/* Analysis metadata */}
                     {displayResult.analysis && (
                         <div className="pt-2 border-t border-white/[0.06] flex flex-wrap gap-x-3 gap-y-0.5">
-                            <span className="text-[9px] text-white/20">{displayResult.analysis.totalMessagesUsed} msgs analyzed</span>
+                            <span className="text-[9px] text-white/20">{t("msgsAnalyzed", { n: displayResult.analysis.totalMessagesUsed })}</span>
                             {displayResult.analysis.apiCallsMade > 0 && (
-                                <span className="text-[9px] text-white/20">{displayResult.analysis.apiCallsMade} API calls</span>
+                                <span className="text-[9px] text-white/20">{t("apiCalls", { n: displayResult.analysis.apiCallsMade })}</span>
                             )}
                             {displayResult.analysis.runtimeMs > 0 && (
-                                <span className="text-[9px] text-white/20">{Math.round(displayResult.analysis.runtimeMs / 1000)}s runtime</span>
+                                <span className="text-[9px] text-white/20">{t("runtimeSeconds", { s: Math.round(displayResult.analysis.runtimeMs / 1000) })}</span>
                             )}
-                            {displayResult.analysis.isIncremental && <span className="text-[9px] text-teal-400/40">incremental</span>}
+                            {displayResult.analysis.isIncremental && <span className="text-[9px] text-teal-400/40">{t("incremental")}</span>}
                             {lastAnalyzedAt && (
-                                <span className="text-[9px] text-white/20">{timeAgo(lastAnalyzedAt)}</span>
+                                <span className="text-[9px] text-white/20">{timeAgo(lastAnalyzedAt, t)}</span>
                             )}
                         </div>
                     )}

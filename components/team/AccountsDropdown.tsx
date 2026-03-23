@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Check, ChevronDown, Users } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type Creator = {
     id: string;
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
+    const { t } = useLanguage();
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -49,10 +51,12 @@ export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
     const count = selectedIds.length;
     const label =
         count === 0
-            ? "Assign Accounts"
+            ? t("assignAccounts")
             : count === creators.length
-              ? "All Accounts"
-              : `${count} Account${count !== 1 ? "s" : ""}`;
+              ? t("allAccounts")
+              : count === 1
+                ? t("accountCount", { count: 1 })
+                : t("accountsCount", { count });
 
     return (
         <div className="relative" ref={ref}>
@@ -89,7 +93,7 @@ export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
                                     <Check size={12} className="text-black" />
                                 )}
                             </div>
-                            <span className="text-sm font-medium text-white/80">Select all</span>
+                            <span className="text-sm font-medium text-white/80">{t("selectAll")}</span>
                         </button>
 
                         {creators.map((c) => {
@@ -119,7 +123,7 @@ export function AccountsDropdown({ creators, selectedIds, onChange }: Props) {
                                         </div>
                                     )}
                                     <span className="text-sm text-white/80 truncate">
-                                        {c.name || "Unknown"}
+                                        {c.name || t("unknown")}
                                     </span>
                                 </button>
                             );

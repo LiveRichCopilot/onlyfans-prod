@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+
 type Props = {
     creators: any[];
     selectedCreatorId: string;
@@ -7,12 +9,13 @@ type Props = {
 };
 
 export function CreatorAvatarBar({ creators, selectedCreatorId, onSelect }: Props) {
+    const { t } = useLanguage();
     const selectedCreator = creators.find(c => c.id === selectedCreatorId);
 
     return (
         <div className="flex flex-col items-center py-4 px-2 gap-3 border-r border-white/10 bg-black/20">
             {/* "Chatting for" label + active creator */}
-            <div className="text-[9px] text-white/40 uppercase tracking-widest mb-1">Chatting for</div>
+            <div className="text-[9px] text-white/40 uppercase tracking-widest mb-1">{t("chattingFor")}</div>
             {selectedCreator && (
                 <div className="relative mb-2">
                     {selectedCreator.avatarUrl ? (
@@ -35,7 +38,7 @@ export function CreatorAvatarBar({ creators, selectedCreatorId, onSelect }: Prop
                 onClick={() => {/* could reset to all-creators view */}}
                 className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-purple-500/30 hover:bg-purple-400 transition-colors"
             >
-                All
+                {t("all")}
             </button>
 
             {/* Creator circles */}

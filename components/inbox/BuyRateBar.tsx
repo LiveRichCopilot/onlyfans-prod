@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+
 type Props = {
     purchasedCount: number;
     totalPpv: number;
@@ -10,6 +12,7 @@ type Props = {
 };
 
 export function BuyRateBar({ purchasedCount, totalPpv, buyRate, highestPrice, lowestPrice, totalRevenue }: Props) {
+    const { t } = useLanguage();
     if (totalPpv === 0) return null;
 
     return (
@@ -37,11 +40,11 @@ export function BuyRateBar({ purchasedCount, totalPpv, buyRate, highestPrice, lo
             <div className="flex gap-2">
                 <div className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2">
                     <div className="text-sm font-bold text-white">${highestPrice.toLocaleString()}</div>
-                    <div className="text-[10px] text-white/40">Highest price</div>
+                    <div className="text-[10px] text-white/40">{t("highestPrice")}</div>
                 </div>
                 <div className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2">
                     <div className="text-sm font-bold text-white">${lowestPrice.toLocaleString()}</div>
-                    <div className="text-[10px] text-white/40">Lowest price</div>
+                    <div className="text-[10px] text-white/40">{t("lowestPrice")}</div>
                 </div>
                 {totalRevenue > 0 && (
                     <div className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl px-3 py-2">

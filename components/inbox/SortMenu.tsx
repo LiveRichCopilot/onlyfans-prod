@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 
-const sortOptions = [
-    { value: "recent", label: "Recently Active" },
-    { value: "oldest_activity", label: "Oldest Activity" },
-    { value: "top_spenders", label: "Top Spenders" },
-    { value: "least_spent", label: "Least Spent" },
-    { value: "newest_fans", label: "Newest Fans" },
-    { value: "oldest_fans", label: "Oldest Fans" },
-];
+const SORT_VALUES = ["recent", "oldest_activity", "top_spenders", "least_spent", "newest_fans", "oldest_fans"] as const;
 
 type Props = {
     sortBy: string;
@@ -18,16 +12,26 @@ type Props = {
     onUnreadFirstChange: (value: boolean) => void;
 };
 
+const SORT_LABEL_KEYS: Record<string, string> = {
+    recent: "recentlyActive",
+    oldest_activity: "oldestActivity",
+    top_spenders: "topSpenders",
+    least_spent: "leastSpent",
+    newest_fans: "newestFans",
+    oldest_fans: "oldestFans",
+};
+
 export function SortMenu({ sortBy, onSortChange, unreadFirst, onUnreadFirstChange }: Props) {
+    const { t } = useLanguage();
     const [open, setOpen] = useState(false);
-    const currentLabel = sortOptions.find(o => o.value === sortBy)?.label || "Recently Active";
+    const currentLabel = t(SORT_LABEL_KEYS[sortBy] as any) || t("recentlyActive");
 
     return (
         <div className="relative">
             <button
                 onClick={() => setOpen(!open)}
                 className={`p-2 rounded-xl transition-colors border ${open ? "bg-teal-500/10 border-teal-500/30 text-teal-400" : "bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white"}`}
-                title={`Sort: ${currentLabel}`}
+                title={`${t("sortBy")}: ${currentLabel}`}
             >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 5h10" /><path d="M11 9h7" /><path d="M11 13h4" />
@@ -41,7 +45,7 @@ export function SortMenu({ sortBy, onSortChange, unreadFirst, onUnreadFirstChang
                     <div className="absolute right-0 top-full mt-2 w-64 z-40 glass-panel rounded-2xl border border-white/10 p-4 shadow-2xl bg-gray-900/95 backdrop-blur-xl">
                         {/* Unread First Toggle */}
                         <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
-                            <span className="text-sm text-white/80">Show unread fans first</span>
+                            <span className="text-sm text-white/80">{t("showUnreadFirst")}</span>
                             <button
                                 onClick={() => onUnreadFirstChange(!unreadFirst)}
                                 className={`w-10 h-5 rounded-full transition-colors relative ${unreadFirst ? "bg-purple-500" : "bg-white/20"}`}
@@ -51,15 +55,15 @@ export function SortMenu({ sortBy, onSortChange, unreadFirst, onUnreadFirstChang
                         </div>
 
                         {/* Sort Options */}
-                        <div className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2">Sort by</div>
+                        <div className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2">{t("sortBy")}</div>
                         <div className="space-y-1">
-                            {sortOptions.map(opt => (
+                            {SORT_VALUES.map(val => (
                                 <button
-                                    key={opt.value}
-                                    onClick={() => { onSortChange(opt.value); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${sortBy === opt.value ? "bg-purple-500/20 text-purple-300 font-semibold" : "text-white/70 hover:bg-white/5"}`}
+                                    key={val}
+                                    onClick={() => { onSortChange(val); setOpen(false); }}
+                                    className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${sortBy === val ? "bg-purple-500/20 text-purple-300 font-semibold" : "text-white/70 hover:bg-white/5"}`}
                                 >
-                                    {opt.label}
+                                    {t(SORT_LABEL_KEYS[val] as any)}
                                 </button>
                             ))}
                         </div>

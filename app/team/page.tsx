@@ -3,15 +3,16 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Users, Shield, UserPlus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/LanguageContext";
 import { InviteMemberModal } from "@/components/team/InviteMemberModal";
 import { AccountsDropdown } from "@/components/team/AccountsDropdown";
 
 const ASSIGNABLE_ROLES = [
-    { value: "ADMIN", label: "Admin" },
-    { value: "ACCOUNT_EXEC", label: "Team Manager" },
-    { value: "MANAGER", label: "Account Manager" },
-    { value: "AGENT", label: "Chatter" },
-    { value: "VIEWER", label: "Analyst" },
+    { value: "ADMIN", labelKey: "roleAdmin" as const },
+    { value: "ACCOUNT_EXEC", labelKey: "roleTeamManager" as const },
+    { value: "MANAGER", labelKey: "roleAccountManager" as const },
+    { value: "AGENT", labelKey: "roleChatter" as const },
+    { value: "VIEWER", labelKey: "roleAnalyst" as const },
 ];
 
 type Member = {
@@ -41,6 +42,7 @@ type Creator = {
 };
 
 export default function TeamManagement() {
+    const { t: translate } = useLanguage();
     const router = useRouter();
     const [members, setMembers] = useState<Member[]>([]);
     const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
@@ -99,7 +101,7 @@ export default function TeamManagement() {
     };
 
     const handleRemove = async (memberId: string, name: string) => {
-        if (!confirm(`Remove ${name} from the team?`)) return;
+        if (!confirm(translate("removeMemberConfirm", { name }))) return;
         await fetch("/api/team", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -121,7 +123,7 @@ export default function TeamManagement() {
         return (
             <div className="flex min-h-screen items-center justify-center text-white">
                 <div className="animate-spin w-8 h-8 rounded-full border-t-2 border-teal-500 mr-3" />
-                Loading Team...
+                {translate("loadingTeam")}
             </div>
         );
     }
@@ -139,11 +141,11 @@ export default function TeamManagement() {
                     </button>
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-                            <Users size={28} className="text-teal-400" /> Team Management
+                            <Users size={28} className="text-teal-400" /> {translate("teamManagement")}
                         </h1>
                         <p className="text-sm text-white/50 mt-1">
-                            {members.length} member{members.length !== 1 ? "s" : ""} &middot;{" "}
-                            {pendingInvites.length} pending
+                            {(members.length === 1 ? translate("membersCount", { count: 1 }) : translate("membersCountPlural", { count: members.length }))} &middot;{" "}
+                            {pendingInvites.length} {translate("pending")}
                         </p>
                     </div>
                 </div>
@@ -151,23 +153,23 @@ export default function TeamManagement() {
                     onClick={() => setShowInvite(true)}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold transition"
                 >
-                    <UserPlus size={16} /> Invite Member
+                    <UserPlus size={16} /> {translate("inviteMember")}
                 </button>
             </div>
 
             {/* Tabs */}
             <div className="flex gap-2 mb-6">
-                {(["all", "pending"] as const).map((t) => (
+                {(["all", "pending"] as const).map((tabKey) => (
                     <button
-                        key={t}
-                        onClick={() => setTab(t)}
+                        key={tabKey}
+                        onClick={() => setTab(tabKey)}
                         className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-                            tab === t
+                            tab === tabKey
                                 ? "bg-white/10 text-white border border-white/10"
                                 : "text-white/40 hover:text-white/60"
                         }`}
                     >
-                        {t === "all" ? `All (${members.length})` : `Pending (${pendingInvites.length})`}
+                        {tabKey === "all" ? `${translate("tabAll")} (${members.length})` : `${translate("tabPending")} (${pendingInvites.length})`}
                     </button>
                 ))}
             </div>
@@ -180,16 +182,16 @@ export default function TeamManagement() {
                             <thead>
                                 <tr className="border-b border-white/10">
                                     <th className="pb-4 pt-5 px-6 text-xs font-semibold text-white/40 uppercase tracking-widest">
-                                        Member
+                                        {translate("member")}
                                     </th>
                                     <th className="pb-4 pt-5 px-4 text-xs font-semibold text-white/40 uppercase tracking-widest">
-                                        Role
+                                        {translate("role")}
                                     </th>
                                     <th className="pb-4 pt-5 px-4 text-xs font-semibold text-white/40 uppercase tracking-widest">
-                                        Accounts
+                                        {translate("accounts")}
                                     </th>
                                     <th className="pb-4 pt-5 px-4 text-xs font-semibold text-white/40 uppercase tracking-widest text-right">
-                                        Actions
+                                        {translate("actions")}
                                     </th>
                                 </tr>
                             </thead>
@@ -218,7 +220,7 @@ export default function TeamManagement() {
                                         <td className="py-4 px-4">
                                             {m.role === "OWNER" ? (
                                                 <span className="flex items-center gap-1.5 bg-teal-500/10 text-teal-400 border border-teal-500/20 px-3 py-1.5 rounded-xl text-xs font-bold tracking-wider w-max">
-                                                    <Shield size={12} /> Owner
+                                                    <Shield size={12} /> {translate("owner")}
                                                 </span>
                                             ) : (
                                                 <select
@@ -228,7 +230,7 @@ export default function TeamManagement() {
                                                 >
                                                     {ASSIGNABLE_ROLES.map((r) => (
                                                         <option key={r.value} value={r.value} className="bg-gray-900">
-                                                            {r.label}
+                                                            {translate(r.labelKey)}
                                                         </option>
                                                     ))}
                                                 </select>
@@ -236,7 +238,7 @@ export default function TeamManagement() {
                                         </td>
                                         <td className="py-4 px-4">
                                             {m.role === "OWNER" || m.role === "ADMIN" ? (
-                                                <span className="text-sm text-white/50">All Accounts</span>
+                                                <span className="text-sm text-white/50">{translate("allAccounts")}</span>
                                             ) : (
                                                 <AccountsDropdown
                                                     creators={creators}
@@ -251,7 +253,7 @@ export default function TeamManagement() {
                                                     onClick={() => handleRemove(m.id, m.name)}
                                                     className="text-red-400/60 hover:text-red-400 transition flex items-center gap-1.5 text-sm ml-auto"
                                                 >
-                                                    <Trash2 size={14} /> Remove
+                                                    <Trash2 size={14} /> {translate("remove")}
                                                 </button>
                                             )}
                                         </td>
@@ -260,7 +262,7 @@ export default function TeamManagement() {
                                 {members.length === 0 && (
                                     <tr>
                                         <td colSpan={4} className="py-12 text-center text-sm text-white/40 italic">
-                                            No team members yet. Invite someone to get started.
+                                            {translate("noTeamMembers")}
                                         </td>
                                     </tr>
                                 )}
@@ -278,16 +280,16 @@ export default function TeamManagement() {
                             <thead>
                                 <tr className="border-b border-white/10">
                                     <th className="pb-4 pt-5 px-6 text-xs font-semibold text-white/40 uppercase tracking-widest">
-                                        Email
+                                        {translate("email")}
                                     </th>
                                     <th className="pb-4 pt-5 px-4 text-xs font-semibold text-white/40 uppercase tracking-widest">
-                                        Role
+                                        {translate("role")}
                                     </th>
                                     <th className="pb-4 pt-5 px-4 text-xs font-semibold text-white/40 uppercase tracking-widest">
-                                        Status
+                                        {translate("status")}
                                     </th>
                                     <th className="pb-4 pt-5 px-4 text-xs font-semibold text-white/40 uppercase tracking-widest text-right">
-                                        Actions
+                                        {translate("actions")}
                                     </th>
                                 </tr>
                             </thead>
@@ -309,7 +311,7 @@ export default function TeamManagement() {
                                         </td>
                                         <td className="py-4 px-4">
                                             <span className="text-xs text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-1 rounded">
-                                                Pending
+                                                {translate("pending")}
                                             </span>
                                         </td>
                                         <td className="py-4 px-4 text-right">
@@ -317,7 +319,7 @@ export default function TeamManagement() {
                                                 onClick={() => handleCancelInvite(inv.id)}
                                                 className="text-red-400/60 hover:text-red-400 transition text-sm"
                                             >
-                                                Cancel
+                                                {translate("cancel")}
                                             </button>
                                         </td>
                                     </tr>
@@ -325,7 +327,7 @@ export default function TeamManagement() {
                                 {pendingInvites.length === 0 && (
                                     <tr>
                                         <td colSpan={4} className="py-12 text-center text-sm text-white/40 italic">
-                                            No pending invites.
+                                            {translate("noPendingInvites")}
                                         </td>
                                     </tr>
                                 )}

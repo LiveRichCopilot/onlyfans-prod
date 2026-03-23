@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { BuyRateBar } from "./BuyRateBar";
 import { PpvFilters } from "./PpvFilters";
 import { PpvCard } from "./PpvCard";
@@ -54,6 +55,7 @@ function dateKey(dateStr: string): string {
 }
 
 export function PurchaseHistory({ creatorId, chatId }: Props) {
+    const { t } = useLanguage();
     const [ppvs, setPpvs] = useState<PpvItem[]>([]);
     const [stats, setStats] = useState<PpvStats | null>(null);
     const [loading, setLoading] = useState(false);
@@ -105,7 +107,7 @@ export function PurchaseHistory({ creatorId, chatId }: Props) {
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                     <div className="animate-spin w-6 h-6 rounded-full border-2 border-white/10 border-t-teal-500" />
-                    <span className="text-xs text-white/40">Scanning messages for PPVs...</span>
+                    <span className="text-xs text-white/40">{t("scanningForPpvs")}</span>
                 </div>
             ) : stats && stats.totalPpv > 0 ? (
                 <>

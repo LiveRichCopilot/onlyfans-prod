@@ -5,12 +5,10 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 // @ts-ignore: Next relies on Vercel install
 import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
-import { Sidebar } from "@/components/dashboard/Sidebar";
+import { emitOpenAddCreator } from "@/lib/emit-open-add-creator";
 import { useLanguage } from "@/lib/LanguageContext";
-import { LanguageSelector } from "@/components/LanguageSelector";
 import { CreatorCard } from "@/components/dashboard/CreatorCard";
 import { ModulesGrid } from "@/components/dashboard/ModulesGrid";
-import { AddCreatorModal } from "@/components/dashboard/AddCreatorModal";
 import { TimeRangeSelector } from "@/components/dashboard/TimeRangeSelector";
 import { HourlyModelCounter } from "@/components/dashboard/HourlyModelCounter";
 
@@ -18,7 +16,6 @@ type TimeRange = { start: Date; end: Date; label: string };
 
 export default function AgencyDashboard() {
     const { t } = useLanguage();
-    const [showAddModal, setShowAddModal] = useState(false);
     const [isAuthenticatingId, setIsAuthenticatingId] = useState<string | null>(null);
     const [creators, setCreators] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -67,19 +64,16 @@ export default function AgencyDashboard() {
     }, [creators, modelFilter]);
 
     return (
-        <div className="flex min-h-screen text-white/90 overflow-hidden relative">
-            <Sidebar creators={creators} loading={loading} onAddAccount={() => setShowAddModal(true)} />
-
-            <main className="flex-1 p-4 md:p-8 md:pl-4 overflow-y-auto z-10 h-screen custom-scrollbar relative pb-8">
+        <div className="text-white/90 overflow-hidden relative">
+            <main className="p-4 md:p-8 md:pl-4 overflow-y-auto z-10 min-h-screen custom-scrollbar relative pb-8">
                 <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8 glass-panel p-4 sm:p-6 rounded-3xl sm:sticky sm:top-0 z-20 border-white/10">
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white/95 mb-0.5 sm:mb-1">{t("agencyOverview")}</h1>
                         <p className="text-xs sm:text-sm text-white/60 font-medium">{t("monitoringCreators", { count: creators.length })}</p>
                     </div>
                     <div className="flex gap-2 sm:gap-3 items-center flex-shrink-0">
-                        <LanguageSelector />
                         <TimeRangeSelector onChange={handleTimeRangeChange} currentRange={timeRange} />
-                        <button onClick={() => setShowAddModal(true)} className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden">{t("add")}</button>
+                        <button onClick={emitOpenAddCreator} className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden">{t("add")}</button>
                         <button className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white"><Settings size={16} /><span className="hidden md:inline">{t("settings")}</span></button>
                     </div>
                 </header>
@@ -148,8 +142,6 @@ export default function AgencyDashboard() {
 
                 <ModulesGrid />
             </main>
-
-            {showAddModal && <AddCreatorModal onClose={() => setShowAddModal(false)} existingCreators={creators} />}
         </div>
     );
 }

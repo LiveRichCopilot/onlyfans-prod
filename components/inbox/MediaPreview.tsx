@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { Lock, Play, RefreshCw } from "lucide-react";
 
 type MediaItem = {
@@ -26,6 +27,7 @@ function buildProxyUrl(url: string, creatorId?: string): string {
 }
 
 export function MediaPreview({ media: med, isSfw, onDisableSfw, creatorId }: Props) {
+    const { t } = useLanguage();
     const [imgLoaded, setImgLoaded] = useState(false);
     const [imgError, setImgError] = useState(false);
     const [retryKey, setRetryKey] = useState(0);
@@ -94,7 +96,7 @@ export function MediaPreview({ media: med, isSfw, onDisableSfw, creatorId }: Pro
                             onClick={handleRetry}
                         >
                             <RefreshCw size={16} className="text-white/30" />
-                            <span className="text-[11px] text-white/30">Tap to retry</span>
+                            <span className="text-[11px] text-white/30">{t("tapToRetry")}</span>
                         </div>
                     ) : (
                         <img

@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+
 import { useState } from "react";
 
 type Tone = "the_tease" | "the_commander" | "the_girlfriend" | "the_brat" | "the_sweet";
@@ -18,6 +20,7 @@ type Props = {
 };
 
 export function ToneSelector({ inputText, onRewrite }: Props) {
+    const { t } = useLanguage();
     const [loading, setLoading] = useState(false);
     const [activeTone, setActiveTone] = useState<Tone | null>(null);
 
@@ -46,7 +49,7 @@ export function ToneSelector({ inputText, onRewrite }: Props) {
 
     return (
         <div className="flex items-center gap-1 px-2 py-1.5 overflow-x-auto">
-            <span className="text-[10px] text-white/30 font-medium flex-shrink-0 mr-1">Rewrite as:</span>
+            <span className="text-[10px] text-white/30 font-medium flex-shrink-0 mr-1">{t("rewriteAs")}</span>
             {TONES.map((tone) => (
                 <button
                     key={tone.id}

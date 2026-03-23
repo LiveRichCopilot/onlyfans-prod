@@ -149,7 +149,7 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
 
             {!loading && !jumpingToDate && messages.length === 0 && (
                 <div className="flex-1 flex items-center justify-center">
-                    <p className="text-sm text-white/30">No messages yet</p>
+                    <p className="text-sm text-white/30">{t("noMessagesYet")}</p>
                 </div>
             )}
 

@@ -23,18 +23,18 @@ type Props = {
 export function Sidebar({ creators, loading, onAddAccount }: Props) {
     const { t } = useLanguage();
     return (
-        <aside className="w-72 glass-panel m-4 rounded-3xl p-6 hidden md:flex flex-col z-10 border-gray-800">
-            <div className="flex items-center justify-between gap-3 mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50">
+        <aside className="w-72 h-[calc(100vh-2rem)] my-4 ml-4 glass-panel rounded-3xl p-6 flex flex-col border-gray-800 overflow-y-auto">
+            <div className="flex items-center justify-between gap-2 mb-6">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50 shrink-0">
                         OF
                     </div>
-                    <div>
-                        <div className="text-xl font-bold tracking-tight text-white/90">HQ</div>
-                        <div className="text-xs text-white/50">{t("agencyWorkspace")}</div>
+                    <div className="min-w-0">
+                        <div className="text-xl font-bold tracking-tight text-white/90 truncate">HQ</div>
+                        <div className="text-xs text-white/50 truncate">{t("agencyWorkspace")}</div>
                     </div>
                 </div>
-                <LanguageSelector />
+                <LanguageSelector variant="compact" />
             </div>
 
             <nav className="space-y-8 flex-1">
@@ -72,7 +72,9 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                 <div>
                     <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">{t("management")}</div>
                     <ul className="space-y-1">
-                        <li className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/10 text-white shadow-sm border border-white/10"><LayoutGrid size={16} /> {t("dashboard")}</li>
+                        <Link href="/">
+                            <li className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition border border-white/10"><LayoutGrid size={16} /> {t("dashboard")}</li>
+                        </Link>
                         <Link href="/inbox">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
                                 <MessageSquare size={16} /> {t("liveInbox")}
