@@ -43,5 +43,8 @@
     "ts-node": "^10.9.2",
     "typescript": "5.9.3",
     "vercel": "^50.22.0"
+  },
+  "optionalDependencies": {
+    "lightningcss-win32-x64-msvc": "^1.31.1"
   }
 }

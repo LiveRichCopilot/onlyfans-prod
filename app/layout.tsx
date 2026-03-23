@@ -33,12 +33,16 @@ export default async function RootLayout({
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user?.email) {
-        const prismaUser = await prisma.user.findUnique({
-          where: { email: user.email },
-          select: { organizationId: true, role: true },
-        })
-        if (!prismaUser || !prismaUser.organizationId || prismaUser.role === 'UNASSIGNED') {
-          redirect('/onboarding')
+        try {
+          const prismaUser = await prisma.user.findUnique({
+            where: { email: user.email },
+            select: { organizationId: true, role: true },
+          })
+          if (!prismaUser || !prismaUser.organizationId || prismaUser.role === 'UNASSIGNED') {
+            redirect('/onboarding')
+          }
+        } catch (_dbErr) {
+          // DB unreachable (e.g. missing POSTGRES_URL) — allow layout to render
         }
       }
     } catch (e: any) {
