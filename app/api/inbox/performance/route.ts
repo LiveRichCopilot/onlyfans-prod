@@ -55,6 +55,15 @@ export async function GET(request: Request) {
         return NextResponse.json({ performance: enriched });
     } catch (e: any) {
         console.error("[Performance] Error:", e);
+        const msg = String(e?.message || "").toLowerCase();
+        const code = String(e?.code || "");
+        const isDbError =
+            code.startsWith("P10") ||
+            msg.includes("connect") ||
+            msg.includes("econnrefused") ||
+            msg.includes("relation") ||
+            msg.includes("does not exist");
+        if (isDbError) return NextResponse.json({ performance: [] });
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

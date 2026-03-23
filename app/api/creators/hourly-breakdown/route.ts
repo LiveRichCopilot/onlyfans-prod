@@ -6,9 +6,21 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+    const ukNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/London" }));
+    const emptyResponse = () =>
+        NextResponse.json({
+            currentHour: ukNow().getHours(),
+            creators: [],
+            isToday: true,
+        });
     try {
         // --- Auth & role scoping ---
-        const session = await getServerSession(authOptions);
+        let session;
+        try {
+            session = await getServerSession(authOptions);
+        } catch {
+            return emptyResponse();
+        }
         const role = (session?.user as any)?.role || "UNASSIGNED";
         const userId = (session?.user as any)?.id;
 
@@ -124,6 +136,15 @@ export async function GET(req: Request) {
         return NextResponse.json({ currentHour, creators: result, isToday });
     } catch (error: any) {
         console.error("Hourly breakdown error:", error);
+        const msg = String(error?.message || "").toLowerCase();
+        const code = String(error?.code || "");
+        const isDbError =
+            code.startsWith("P10") ||
+            msg.includes("connect") ||
+            msg.includes("econnrefused") ||
+            msg.includes("relation") ||
+            msg.includes("does not exist");
+        if (isDbError) return emptyResponse();
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

@@ -1,12 +1,6 @@
 "use client";
 
-const PRESETS = [
-    { label: "20 min", value: "20m", ms: 20 * 60 * 1000 },
-    { label: "1 hour", value: "1h", ms: 60 * 60 * 1000 },
-    { label: "12 hours", value: "12h", ms: 12 * 60 * 60 * 1000 },
-    { label: "24 hours", value: "24h", ms: 24 * 60 * 60 * 1000 },
-    { label: "7 days", value: "7d", ms: 7 * 24 * 60 * 60 * 1000 },
-];
+import { useLanguage } from "@/lib/LanguageContext";
 
 type TimeRange = { start: Date; end: Date; label: string };
 
@@ -29,18 +23,27 @@ function ukDayRange(year: number, month: number, day: number): { start: Date; en
     };
 }
 
+const PRESETS = [
+    { labelKey: "preset20min" as const, value: "20m", ms: 20 * 60 * 1000 },
+    { labelKey: "preset1hour" as const, value: "1h", ms: 60 * 60 * 1000 },
+    { labelKey: "preset12hours" as const, value: "12h", ms: 12 * 60 * 60 * 1000 },
+    { labelKey: "preset24hours" as const, value: "24h", ms: 24 * 60 * 60 * 1000 },
+    { labelKey: "preset7days" as const, value: "7d", ms: 7 * 24 * 60 * 60 * 1000 },
+];
+
 export function QuickPresets({ onSelect }: Props) {
+    const { t } = useLanguage();
     const applyPreset = (preset: (typeof PRESETS)[0]) => {
         const end = new Date();
         const start = new Date(end.getTime() - preset.ms);
-        onSelect({ start, end, label: `Last ${preset.label}` });
+        onSelect({ start, end, label: `${t("last")} ${t(preset.labelKey)}` });
     };
 
     const applyToday = () => {
         const now = new Date();
         const ukNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/London" }));
         const range = ukDayRange(ukNow.getFullYear(), ukNow.getMonth(), ukNow.getDate());
-        onSelect({ start: range.start, end: now, label: "Today" });
+        onSelect({ start: range.start, end: now, label: t("todayLabel") });
     };
 
     const applyYesterday = () => {
@@ -49,7 +52,7 @@ export function QuickPresets({ onSelect }: Props) {
         const yesterday = new Date(ukNow);
         yesterday.setDate(yesterday.getDate() - 1);
         const range = ukDayRange(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-        onSelect({ start: range.start, end: range.end, label: "Yesterday" });
+        onSelect({ start: range.start, end: range.end, label: t("yesterdayLabel") });
     };
 
     const applyDate = (dateStr: string) => {
@@ -71,24 +74,24 @@ export function QuickPresets({ onSelect }: Props) {
                         onClick={() => applyPreset(p)}
                         className="py-2.5 rounded-xl text-sm font-medium text-white/70 bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white transition-colors"
                     >
-                        {p.label}
+                        {t(p.labelKey)}
                     </button>
                 ))}
                 <button
                     onClick={applyToday}
                     className="py-2.5 rounded-xl text-sm font-medium text-teal-400 bg-teal-500/10 border border-teal-500/20 hover:bg-teal-500/20 transition-colors"
                 >
-                    Today
+                    {t("todayLabel")}
                 </button>
                 <button
                     onClick={applyYesterday}
                     className="py-2.5 rounded-xl text-sm font-medium text-orange-400 bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 transition-colors"
                 >
-                    Yesterday
+                    {t("yesterdayLabel")}
                 </button>
             </div>
             <div>
-                <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 font-semibold">Jump to date</div>
+                <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1.5 font-semibold">{t("jumpToDate")}</div>
                 <input
                     type="date"
                     onChange={(e) => applyDate(e.target.value)}

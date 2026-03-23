@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import type { Chat } from "../types";
 import { mapRawChats } from "../mappers";
 
@@ -11,6 +12,7 @@ const sortByRecent = (list: Chat[]) =>
     );
 
 export function useChats() {
+    const { t } = useLanguage();
     const [creators, setCreators] = useState<any[]>([]);
     const [selectedCreatorId, setSelectedCreatorId] = useState<string>("all");
     const [chats, setChats] = useState<Chat[]>([]);
@@ -91,9 +93,9 @@ export function useChats() {
                         },
                         lastMessage: {
                             text: f.isOnline
-                                ? "Online now"
+                                ? t("onlineNow")
                                 : f.lastSeen
-                                  ? `Last seen ${new Date(f.lastSeen).toLocaleDateString()}`
+                                  ? `${t("lastSeen")} ${new Date(f.lastSeen).toLocaleDateString()}`
                                   : "",
                             createdAt: f.lastSeen || new Date().toISOString(),
                             isRead: true,
@@ -108,7 +110,7 @@ export function useChats() {
                 setLoadingSpendFilter(false);
             })
             .catch(() => setLoadingSpendFilter(false));
-    }, [spendBucket, onlineOnly, selectedCreatorId]);
+    }, [spendBucket, onlineOnly, selectedCreatorId, t]);
 
     // --- Fetch initial chat list + background-load remaining pages ---
     useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type Preference = {
     tag: string;
@@ -126,19 +127,20 @@ export function FanPreferences({ preferences, intelligence, loading, fanOfapiId,
         setShowFieldPicker(null);
     }, [fanOfapiId, creatorId, onUpdate]);
 
+    const { t } = useLanguage();
     const existingTags = new Set(preferences.map(p => p.tag));
 
     return (
         <div>
             <div className="flex justify-between items-center mb-3">
-                <h4 className="text-sm font-bold tracking-tight text-white/90">Preferences</h4>
+                <h4 className="text-sm font-bold tracking-tight text-white/90">{t("preferences")}</h4>
                 {canEdit && (
                     <button
                         onClick={() => setShowPicker(!showPicker)}
                         disabled={saving}
                         className="text-teal-400 bg-teal-500/10 px-2 py-1 rounded border border-teal-500/20 text-xs font-bold hover:bg-teal-500/20 transition-colors disabled:opacity-50"
                     >
-                        {showPicker ? "Done" : "+ Tag"}
+                        {showPicker ? t("done") : t("addTag")}
                     </button>
                 )}
             </div>
@@ -153,31 +155,34 @@ export function FanPreferences({ preferences, intelligence, loading, fanOfapiId,
                     {canEdit && (
                         <div className="space-y-2 mb-3">
                             <FieldRow
-                                label="Fan type"
+                                label={t("fanType")}
                                 value={intelligence?.fanType}
                                 options={FAN_TYPES}
                                 field="fanType"
                                 showPicker={showFieldPicker}
                                 onToggle={setShowFieldPicker}
                                 onSet={setField}
+                                notSetLabel={t("notSet")}
                             />
                             <FieldRow
-                                label="Tone"
+                                label={t("tone")}
                                 value={intelligence?.tonePreference}
                                 options={TONE_OPTIONS}
                                 field="tonePreference"
                                 showPicker={showFieldPicker}
                                 onToggle={setShowFieldPicker}
                                 onSet={setField}
+                                notSetLabel={t("notSet")}
                             />
                             <FieldRow
-                                label="Stage"
+                                label={t("stage")}
                                 value={intelligence?.stage}
                                 options={STAGE_OPTIONS}
                                 field="stage"
                                 showPicker={showFieldPicker}
                                 onToggle={setShowFieldPicker}
                                 onSet={setField}
+                                notSetLabel={t("notSet")}
                             />
                         </div>
                     )}
@@ -209,7 +214,7 @@ export function FanPreferences({ preferences, intelligence, loading, fanOfapiId,
                         </div>
                     ) : !showPicker ? (
                         <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center mb-3">
-                            <p className="text-xs text-white/40">No preference tags yet.</p>
+                            <p className="text-xs text-white/40">{t("noPreferenceTagsYet")}</p>
                         </div>
                     ) : null}
 
@@ -250,7 +255,7 @@ export function FanPreferences({ preferences, intelligence, loading, fanOfapiId,
 
 // Inline field picker row
 function FieldRow({
-    label, value, options, field, showPicker, onToggle, onSet,
+    label, value, options, field, showPicker, onToggle, onSet, notSetLabel = "Not set",
 }: {
     label: string;
     value: string | null | undefined;
@@ -259,9 +264,10 @@ function FieldRow({
     showPicker: string | null;
     onToggle: (f: string | null) => void;
     onSet: (field: string, value: string) => void;
+    notSetLabel?: string;
 }) {
     const isOpen = showPicker === field;
-    const display = value ? value.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Not set";
+    const display = value ? value.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : notSetLabel;
 
     return (
         <div>

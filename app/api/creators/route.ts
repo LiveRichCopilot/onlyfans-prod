@@ -230,10 +230,17 @@ export async function GET(request: Request) {
 
         return NextResponse.json({ creators: enrichedCreators });
     } catch (error: any) {
-        // DB unreachable (e.g. missing POSTGRES_URL) — return empty list so UI can render
+        // DB unreachable or schema missing — return empty list so UI can render
         const msg = String(error?.message || "").toLowerCase();
-        const code = error?.code || "";
-        const isDbError = code.startsWith("P10") || msg.includes("connect") || msg.includes("econnrefused") || msg.includes("connection");
+        const code = String(error?.code || "");
+        const isDbError =
+            code.startsWith("P10") ||
+            msg.includes("connect") ||
+            msg.includes("econnrefused") ||
+            msg.includes("connection") ||
+            msg.includes("relation") ||
+            msg.includes("does not exist") ||
+            msg.includes("invalid connection string");
         if (isDbError) return NextResponse.json({ creators: [] });
         console.error("Creators API error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });

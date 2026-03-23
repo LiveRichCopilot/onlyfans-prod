@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 
 type Fact = {
     key: string;
@@ -29,6 +30,7 @@ function keyLabel(key: string): string {
 }
 
 export function FanNotes({ facts, loading, fanOfapiId, creatorId, onUpdate }: Props) {
+    const { t } = useLanguage();
     const [showAdd, setShowAdd] = useState(false);
     const [newKey, setNewKey] = useState("");
     const [newValue, setNewValue] = useState("");
@@ -87,14 +89,14 @@ export function FanNotes({ facts, loading, fanOfapiId, creatorId, onUpdate }: Pr
     return (
         <div>
             <div className="flex justify-between items-center mb-3">
-                <h4 className="text-sm font-bold tracking-tight text-white/90">Notes</h4>
+                <h4 className="text-sm font-bold tracking-tight text-white/90">{t("notes")}</h4>
                 {canEdit && (
                     <button
                         onClick={() => setShowAdd(!showAdd)}
                         disabled={saving}
                         className="text-teal-400 bg-teal-500/10 px-2 py-1 rounded border border-teal-500/20 text-xs font-bold hover:bg-teal-500/20 transition-colors disabled:opacity-50"
                     >
-                        {showAdd ? "Done" : "+ Note"}
+                        {showAdd ? t("done") : t("addNote")}
                     </button>
                 )}
             </div>

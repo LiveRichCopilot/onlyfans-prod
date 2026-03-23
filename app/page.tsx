@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { startOnlyFansAuthentication } from "@onlyfansapi/auth";
 
 import { Sidebar } from "@/components/dashboard/Sidebar";
+import { useLanguage } from "@/lib/LanguageContext";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { CreatorCard } from "@/components/dashboard/CreatorCard";
 import { ModulesGrid } from "@/components/dashboard/ModulesGrid";
 import { AddCreatorModal } from "@/components/dashboard/AddCreatorModal";
@@ -15,6 +17,7 @@ import { HourlyModelCounter } from "@/components/dashboard/HourlyModelCounter";
 type TimeRange = { start: Date; end: Date; label: string };
 
 export default function AgencyDashboard() {
+    const { t } = useLanguage();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isAuthenticatingId, setIsAuthenticatingId] = useState<string | null>(null);
     const [creators, setCreators] = useState<any[]>([]);
@@ -70,13 +73,14 @@ export default function AgencyDashboard() {
             <main className="flex-1 p-4 md:p-8 md:pl-4 overflow-y-auto z-10 h-screen custom-scrollbar relative pb-8">
                 <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8 glass-panel p-4 sm:p-6 rounded-3xl sm:sticky sm:top-0 z-20 border-white/10">
                     <div className="min-w-0">
-                        <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white/95 mb-0.5 sm:mb-1">Agency Overview</h1>
-                        <p className="text-xs sm:text-sm text-white/60 font-medium">Monitoring {creators.length} creators</p>
+                        <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-white/95 mb-0.5 sm:mb-1">{t("agencyOverview")}</h1>
+                        <p className="text-xs sm:text-sm text-white/60 font-medium">{t("monitoringCreators", { count: creators.length })}</p>
                     </div>
                     <div className="flex gap-2 sm:gap-3 items-center flex-shrink-0">
+                        <LanguageSelector />
                         <TimeRangeSelector onChange={handleTimeRangeChange} currentRange={timeRange} />
-                        <button onClick={() => setShowAddModal(true)} className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden">+ Add</button>
-                        <button className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white"><Settings size={16} /><span className="hidden md:inline">Settings</span></button>
+                        <button onClick={() => setShowAddModal(true)} className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-teal-400 border border-teal-500/30 md:hidden">{t("add")}</button>
+                        <button className="glass-button px-3 sm:px-5 py-2 sm:py-2.5 font-medium rounded-xl text-sm flex items-center gap-2 text-white"><Settings size={16} /><span className="hidden md:inline">{t("settings")}</span></button>
                     </div>
                 </header>
 
@@ -89,9 +93,9 @@ export default function AgencyDashboard() {
                             className="w-full glass-panel rounded-2xl px-4 py-3.5 text-base sm:text-sm font-medium text-white bg-transparent border border-white/10 outline-none cursor-pointer appearance-none"
                             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px center' }}
                         >
-                            <option value="all" className="bg-[#111]">All Models</option>
+                            <option value="all" className="bg-[#111]">{t("allModels")}</option>
                             {creators.map((c: any) => (
-                                <option key={c.id} value={c.id} className="bg-[#111]">{c.name || c.ofUsername || "Unknown"}</option>
+                                <option key={c.id} value={c.id} className="bg-[#111]">{c.name || c.ofUsername || t("unknown")}</option>
                             ))}
                         </select>
                     </div>
@@ -99,7 +103,7 @@ export default function AgencyDashboard() {
 
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-4 px-2">
-                        <h2 className="text-sm sm:text-lg font-semibold text-white/80">{modelFilter !== "all" ? (creators.find((c: any) => c.id === modelFilter)?.name || "Model") : "Live Chatter Performance"}</h2>
+                        <h2 className="text-sm sm:text-lg font-semibold text-white/80">{modelFilter !== "all" ? (creators.find((c: any) => c.id === modelFilter)?.name || t("model")) : t("liveChatterPerformance")}</h2>
                         {timeRange && (
                             <span className="text-xs text-teal-400/60 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">{timeRange.label}</span>
                         )}
@@ -133,8 +137,8 @@ export default function AgencyDashboard() {
                         {filteredCreators.length === 0 && !loading && (
                             <div className="glass-panel p-8 rounded-3xl border-t border-t-white/20 border-l border-l-white/10 flex flex-col items-center justify-center text-center">
                                 <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4"><AlertCircle size={32} className="text-teal-500/50" /></div>
-                                <h3 className="text-xl font-medium text-white/90 mb-2">No Accounts Linked</h3>
-                                <p className="text-sm text-white/50 max-w-xs">Connect your OnlyFans account using the Add Account button.</p>
+                                <h3 className="text-xl font-medium text-white/90 mb-2">{t("noAccountsLinkedTitle")}</h3>
+                                <p className="text-sm text-white/50 max-w-xs">{t("noAccountsLinkedDesc")}</p>
                             </div>
                         )}
                     </div>

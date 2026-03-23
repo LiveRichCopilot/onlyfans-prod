@@ -2,6 +2,8 @@
 
 import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2, Calendar, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/LanguageContext";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 type Creator = {
     id: string;
@@ -19,21 +21,25 @@ type Props = {
 };
 
 export function Sidebar({ creators, loading, onAddAccount }: Props) {
+    const { t } = useLanguage();
     return (
         <aside className="w-72 glass-panel m-4 rounded-3xl p-6 hidden md:flex flex-col z-10 border-gray-800">
-            <div className="flex items-center gap-3 mb-10">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50">
-                    OF
+            <div className="flex items-center justify-between gap-3 mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-600 to-gray-700 flex items-center justify-center font-bold text-lg shadow-lg shadow-teal-900/50">
+                        OF
+                    </div>
+                    <div>
+                        <div className="text-xl font-bold tracking-tight text-white/90">HQ</div>
+                        <div className="text-xs text-white/50">{t("agencyWorkspace")}</div>
+                    </div>
                 </div>
-                <div>
-                    <div className="text-xl font-bold tracking-tight text-white/90">HQ</div>
-                    <div className="text-xs text-white/50">Agency Workspace</div>
-                </div>
+                <LanguageSelector />
             </div>
 
             <nav className="space-y-8 flex-1">
                 <div>
-                    <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">Creators</div>
+                    <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">{t("creators")}</div>
                     <ul className="space-y-2">
                         {creators.map((c) => (
                             <li key={c.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/10 transition cursor-pointer group">
@@ -48,73 +54,73 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                                         )}
                                         <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-black ${c.active ? "bg-teal-500" : "bg-gray-500"}`} />
                                     </div>
-                                    <span className="text-sm font-medium text-white/80 group-hover:text-white truncate max-w-[120px]">{c.name || "Unknown Profile"}</span>
+                                    <span className="text-sm font-medium text-white/80 group-hover:text-white truncate max-w-[120px]">{c.name || t("unknownProfile")}</span>
                                 </div>
                             </li>
                         ))}
                         {creators.length === 0 && !loading && (
-                            <li className="px-3 py-2 text-xs text-white/40 italic">No accounts linked</li>
+                            <li className="px-3 py-2 text-xs text-white/40 italic">{t("noAccountsLinked")}</li>
                         )}
                         <li className="mt-2 text-center">
                             <button onClick={onAddAccount} className="text-xs text-teal-400 font-medium hover:text-teal-300 transition">
-                                + Add Account
+                                {t("addAccount")}
                             </button>
                         </li>
                     </ul>
                 </div>
 
                 <div>
-                    <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">Management</div>
+                    <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">{t("management")}</div>
                     <ul className="space-y-1">
-                        <li className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/10 text-white shadow-sm border border-white/10"><LayoutGrid size={16} /> Dashboard</li>
+                        <li className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/10 text-white shadow-sm border border-white/10"><LayoutGrid size={16} /> {t("dashboard")}</li>
                         <Link href="/inbox">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <MessageSquare size={16} /> Live Inbox
-                                <span className="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-purple-500/30 font-bold tracking-wider">NEW</span>
+                                <MessageSquare size={16} /> {t("liveInbox")}
+                                <span className="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-purple-500/30 font-bold tracking-wider">{t("new")}</span>
                             </li>
                         </Link>
-                        <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Activity size={16} /> Real-time Feed</li>
+                        <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5"><Activity size={16} /> {t("realtimeFeed")}</li>
                         <Link href="/team">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Users size={16} /> Team Management
+                                <Users size={16} /> {t("teamManagement")}
                             </li>
                         </Link>
                         <Link href="/team-analytics">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <BarChart2 size={16} /> Team Analytics
-                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">NEW</span>
+                                <BarChart2 size={16} /> {t("teamAnalytics")}
+                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span>
                             </li>
                         </Link>
                         <Link href="/schedule">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Calendar size={16} /> Shift Schedule
-                                <span className="bg-[#5B9BD5]/20 text-[#5B9BD5] text-[10px] px-1.5 py-0.5 rounded ml-auto border border-[#5B9BD5]/30 font-bold tracking-wider">NEW</span>
+                                <Calendar size={16} /> {t("shiftSchedule")}
+                                <span className="bg-[#5B9BD5]/20 text-[#5B9BD5] text-[10px] px-1.5 py-0.5 rounded ml-auto border border-[#5B9BD5]/30 font-bold tracking-wider">{t("new")}</span>
                             </li>
                         </Link>
                         <Link href="/content-daily">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <ImageIcon size={16} /> Content Daily
-                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">NEW</span>
+                                <ImageIcon size={16} /> {t("contentDaily")}
+                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span>
                             </li>
                         </Link>
                         <Link href="/content-feed">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <BarChart2 size={16} /> Content Feed
+                                <BarChart2 size={16} /> {t("contentFeed")}
                             </li>
                         </Link>
                         <Link href="/performance">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Zap size={16} /> Performance
+                                <Zap size={16} /> {t("performance")}
                             </li>
                         </Link>
                         <Link href="/team/hubstaff">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Link2 size={16} /> Hubstaff
+                                <Link2 size={16} /> {t("hubstaff")}
                             </li>
                         </Link>
                         <Link href="/system">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
-                                <Database size={16} /> System Intelligence
+                                <Database size={16} /> {t("systemIntelligence")}
                             </li>
                         </Link>
                     </ul>

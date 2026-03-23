@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { RefreshCw, Unlink, MoreVertical, Trash2 } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { ConnectButton } from "./creator-card/ConnectButton";
 import { StatusBadge } from "./creator-card/StatusBadge";
 import { ThresholdSlider } from "./creator-card/ThresholdSlider";
@@ -15,7 +16,8 @@ type Props = {
 };
 
 export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRefresh }: Props) {
-    const displayHandle = c.ofUsername || c.name?.toLowerCase().replace(/\s+/g, "") || "unlinked";
+    const { t } = useLanguage();
+    const displayHandle = c.ofUsername || c.name?.toLowerCase().replace(/\s+/g, "") || t("unlinked");
     const headerBg = c.headerUrl ? `/api/proxy-media?url=${encodeURIComponent(c.headerUrl)}` : null;
     const isLinked = c.ofapiToken && c.ofapiToken !== "unlinked";
     const [syncing, setSyncing] = useState(false);
@@ -28,7 +30,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
         e.preventDefault();
         e.stopPropagation();
         setShowMenu(false);
-        if (!confirm(`Permanently remove ${c.name || "this creator"} from the dashboard?\n\nThis hides the card. No revenue data is lost.`)) return;
+        if (!confirm(t("removeCreatorConfirm", { name: c.name || t("thisCreator") }))) return;
         setDeleting(true);
         try {
             await fetch(`/api/creators/${c.id}`, { method: "DELETE" });
@@ -70,7 +72,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
         e.preventDefault();
         e.stopPropagation();
         setShowMenu(false);
-        if (!confirm(`Disconnect ${c.name || "this creator"} from OnlyFansAPI?\n\nThis will remove their OFAPI session and clear profile data. You'll need to re-authenticate via the Connect OF button.`)) return;
+        if (!confirm(t("disconnectConfirm", { name: c.name || t("thisCreator") }))) return;
         setDisconnecting(true);
         try {
             await fetch(`/api/creators/${c.id}`, {
@@ -140,7 +142,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                 </div>
                             )}
                             <div>
-                                <div className="text-white font-semibold text-base sm:text-lg leading-tight group-hover:text-teal-400 transition-colors drop-shadow-md truncate max-w-[140px] sm:max-w-[180px]">{c.name || "Unknown Profile"}</div>
+                                <div className="text-white font-semibold text-base sm:text-lg leading-tight group-hover:text-teal-400 transition-colors drop-shadow-md truncate max-w-[140px] sm:max-w-[180px]">{c.name || t("unknownProfile")}</div>
                                 <div className="text-[11px] sm:text-xs text-teal-400 font-mono mt-0.5 drop-shadow-sm truncate max-w-[140px] sm:max-w-[180px]">@{displayHandle}</div>
                             </div>
                         </div>
@@ -154,11 +156,11 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                     <button
                                         onClick={handleSync}
                                         disabled={syncing}
-                                        title="Sync profile"
+                                        title={t("syncProfile")}
                                         className="px-2 py-1 rounded-lg bg-amber-500/10 border border-solid border-amber-500/20 flex items-center gap-1.5 text-amber-400 text-[10px] font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50"
                                     >
                                         <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
-                                        Sync
+                                        {t("sync")}
                                     </button>
                                 )}
 
@@ -181,7 +183,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                                 className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
                                             >
                                                 <RefreshCw size={13} className={`text-teal-400 ${syncing ? "animate-spin" : ""}`} />
-                                                Force Sync Profile
+                                                {t("forceSyncProfile")}
                                             </button>
                                             <button
                                                 onClick={handleReauth}
@@ -189,7 +191,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                                 className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:bg-white/5 flex items-center gap-2.5 disabled:opacity-50 transition-colors"
                                             >
                                                 <RefreshCw size={13} className="text-blue-400" />
-                                                Re-authenticate
+                                                {t("reauthenticate")}
                                             </button>
                                             <div className="border-t border-white/10" />
                                             <button
@@ -197,7 +199,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                                 className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2.5 transition-colors"
                                             >
                                                 <Unlink size={13} />
-                                                Disconnect Account
+                                                {t("disconnectAccount")}
                                             </button>
                                             <button
                                                 onClick={handleDelete}
@@ -205,7 +207,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                                 className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2.5 transition-colors disabled:opacity-50"
                                             >
                                                 <Trash2 size={13} />
-                                                {deleting ? "Deleting..." : "Delete Creator"}
+                                                {deleting ? t("deleting") : t("deleteCreator")}
                                             </button>
                                         </div>
                                     )}
@@ -229,7 +231,7 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                 <span className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tighter text-white truncate">
                                     ${(c.todayRev || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
-                                <span className="text-xs sm:text-sm text-white/40 shrink-0">today</span>
+                                <span className="text-xs sm:text-sm text-white/40 shrink-0">{t("today")}</span>
                             </div>
                             <div className="flex items-baseline gap-1.5 mt-1">
                                 <span className="text-base sm:text-lg font-semibold text-white/60">
@@ -245,12 +247,12 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                                     <span className="text-xs sm:text-sm font-medium text-white/45">
                                         ${yesterdayRev.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
-                                    <span className="text-[10px] text-white/30 ml-1">yesterday</span>
+                                    <span className="text-[10px] text-white/30 ml-1">{t("yesterday")}</span>
                                 </div>
                             )}
                             {c.topFans?.length > 0 && (
                                 <div>
-                                    <div className="text-[9px] text-white/40 uppercase tracking-wider">Top fan</div>
+                                    <div className="text-[9px] text-white/40 uppercase tracking-wider">{t("topFan")}</div>
                                     <div className="text-[11px] sm:text-xs text-amber-400 font-semibold truncate max-w-[100px]">@{c.topFans[0].username}</div>
                                     <div className="text-[11px] sm:text-xs text-amber-400/70">${c.topFans[0].spend.toFixed(2)}</div>
                                 </div>
@@ -261,15 +263,15 @@ export function CreatorCard({ creator: c, isAuthenticatingId, onConnectOF, onRef
                     {/* Progress + Sliders */}
                     <div className="mt-4 pt-4 border-t border-white/10" onClick={(e) => e.preventDefault()}>
                         <div className="flex justify-between text-xs text-white/60 mb-2">
-                            <span>Target: ${c.target}/hr</span>
-                            <span>{c.active ? "Active" : "Offline"}</span>
+                            <span>{t("target")}: ${c.target}{t("hr")}</span>
+                            <span>{c.active ? t("active") : t("offline")}</span>
                         </div>
                         <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-4">
                             <div className={`h-full rounded-full bg-teal-500`} style={{ width: `${Math.min(((c.hourlyRev || 0) / (c.target || 100)) * 100, 100)}%` }} />
                         </div>
                         <div className="space-y-3 pt-2 border-t border-white/10">
-                            <ThresholdSlider label="Hourly Revenue Target" value={c.hourlyTarget || 100} min={10} max={500} step={10} unit="/hr" />
-                            <ThresholdSlider label="Daily Whale Alert Threshold" value={c.whaleAlertTarget || 200} min={0} max={1000} step={50} unit="/day" color="teal-600" />
+                            <ThresholdSlider label={t("hourlyRevenueTarget")} value={c.hourlyTarget || 100} min={10} max={500} step={10} unit={t("hr")} />
+                            <ThresholdSlider label={t("whaleAlertThreshold")} value={c.whaleAlertTarget || 200} min={0} max={1000} step={50} unit={t("day")} color="teal-600" />
                         </div>
                     </div>
                 </div>

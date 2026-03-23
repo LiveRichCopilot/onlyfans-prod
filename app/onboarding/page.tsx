@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Building, UserCircle } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 export default function Onboarding() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<"AGENCY" | "CREATOR" | null>(
     null
@@ -29,7 +32,7 @@ export default function Onboarding() {
 
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "Something went wrong");
+      setError(data.error || t("somethingWentWrong"));
       setLoading(false);
       return;
     }
@@ -43,12 +46,15 @@ export default function Onboarding() {
       <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/30 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="glass-panel p-10 rounded-3xl z-10 w-full max-w-2xl border-white/10 mx-4">
+      <div className="glass-panel p-10 rounded-3xl z-10 w-full max-w-2xl border-white/10 mx-4 relative">
+        <div className="absolute top-4 right-4">
+          <LanguageSelector />
+        </div>
         <h1 className="text-4xl font-bold mb-2 tracking-tight text-center">
-          Welcome to OF HQ
+          {t("welcomeToOfHq")}
         </h1>
         <p className="text-center text-white/60 mb-10">
-          How are you planning to use the platform?
+          {t("howPlanningToUse")}
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -61,9 +67,9 @@ export default function Onboarding() {
               <Building size={32} />
             </div>
             <div className="text-center">
-              <h3 className="text-xl font-bold mb-1">I run an Agency</h3>
+              <h3 className="text-xl font-bold mb-1">{t("iRunAgency")}</h3>
               <p className="text-sm text-white/50">
-                Manage creators, monitor chatters, view analytics and reports.
+                {t("agencyDesc")}
               </p>
             </div>
           </div>
@@ -77,9 +83,9 @@ export default function Onboarding() {
               <UserCircle size={32} />
             </div>
             <div className="text-center">
-              <h3 className="text-xl font-bold mb-1">I'm a Creator</h3>
+              <h3 className="text-xl font-bold mb-1">{t("imCreator")}</h3>
               <p className="text-sm text-white/50">
-                Connect your OnlyFans, view your stats, and manage content.
+                {t("creatorDesc")}
               </p>
             </div>
           </div>
@@ -89,7 +95,7 @@ export default function Onboarding() {
           <div className="mb-6">
             <input
               type="text"
-              placeholder="Agency name (e.g. LiveRich Agency)"
+              placeholder={t("agencyNamePlaceholder")}
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 transition-colors"
@@ -108,7 +114,7 @@ export default function Onboarding() {
             ${selectedRole ? "bg-white text-black hover:bg-white/90" : "bg-white/10 text-white/30 cursor-not-allowed"}
             ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          {loading ? "Setting up..." : "Continue"}
+          {loading ? t("settingUp") : t("continue")}
         </button>
       </div>
     </div>

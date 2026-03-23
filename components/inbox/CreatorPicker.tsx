@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "@/lib/LanguageContext";
+
 type Props = {
     creators: any[];
     selectedCreatorId: string;
@@ -7,6 +9,7 @@ type Props = {
 };
 
 export function CreatorPicker({ creators, selectedCreatorId, onSelect }: Props) {
+    const { t } = useLanguage();
     const linkedCount = creators.filter((c) => c.ofapiToken && c.ofapiToken !== "unlinked").length;
 
     return (
@@ -17,7 +20,7 @@ export function CreatorPicker({ creators, selectedCreatorId, onSelect }: Props) 
                 className="w-full bg-white/[0.06] text-sm text-white rounded-xl px-3 py-2.5 outline-none border border-white/[0.08] focus:border-teal-500/50 transition-colors appearance-none"
             >
                 <option value="all" className="text-black">
-                    All Creators ({linkedCount})
+                    {t("allCreators")} ({linkedCount})
                 </option>
                 {creators
                     .filter((c) => c.ofapiToken && c.ofapiToken !== "unlinked")

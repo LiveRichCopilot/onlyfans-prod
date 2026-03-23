@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Clock, ChevronDown } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { TimezoneBar } from "./time-range/TimezoneBar";
 import { RangeTabs } from "./time-range/RangeTabs";
 import { QuickPresets } from "./time-range/QuickPresets";
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function TimeRangeSelector({ onChange, currentRange }: Props) {
+    const { t } = useLanguage();
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState<"quick" | "shift" | "week">("quick");
     const [timezone, setTimezone] = useState<string>("LA");
@@ -32,7 +34,7 @@ export function TimeRangeSelector({ onChange, currentRange }: Props) {
                 className="glass-button px-4 py-2 rounded-xl text-sm flex items-center gap-2 text-white/80 border border-white/10 hover:border-teal-500/30 transition-colors"
             >
                 <Clock size={14} className="text-teal-400" />
-                <span>{currentRange?.label || "Today"}</span>
+                <span>{currentRange?.label || t("todayLabel")}</span>
                 <ChevronDown size={14} className="text-white/40" />
             </button>
 

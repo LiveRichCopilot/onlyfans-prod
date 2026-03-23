@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Download, Copy, Check } from "lucide-react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { ChatterHourlyDrilldown } from "./ChatterHourlyDrilldown";
 
 type CreatorHourly = {
@@ -46,13 +47,13 @@ function ukTodayStr() {
     return toDateStr(ukNow());
 }
 
-function formatDateLabel(dateStr: string | null) {
-    if (!dateStr) return "Today";
+function formatDateLabel(dateStr: string | null, t: (k: string) => string) {
+    if (!dateStr) return t("todayLabel");
     const today = ukTodayStr();
-    if (dateStr === today) return "Today";
+    if (dateStr === today) return t("todayLabel");
     const yd = ukNow();
     yd.setDate(yd.getDate() - 1);
-    if (dateStr === toDateStr(yd)) return "Yesterday";
+    if (dateStr === toDateStr(yd)) return t("yesterdayLabel");
     const [y, m, d] = dateStr.split("-").map(Number);
     const date = new Date(y, m - 1, d);
     return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
@@ -89,6 +90,7 @@ function copyToClipboard(data: HourlyData) {
 const stickyCol = "backdrop-blur-[40px] bg-[rgba(5,5,8,0.75)]";
 
 export function HourlyModelCounter() {
+    const { t } = useLanguage();
     const [data, setData] = useState<HourlyData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -188,9 +190,9 @@ export function HourlyModelCounter() {
             <div className="glass-panel rounded-3xl border-t border-t-white/12 border-l border-l-white/8 p-6 mb-6">
                 <div className="flex items-center gap-3 mb-3">
                     <div className="w-1.5 h-5 rounded-full bg-red-500/50" />
-                    <h3 className="text-lg font-semibold text-white/85 tracking-tight">Hourly Breakdown</h3>
+                    <h3 className="text-lg font-semibold text-white/85 tracking-tight">{t("hourlyBreakdown")}</h3>
                 </div>
-                <p className="text-sm text-red-400/70">Failed to load hourly data: {error}</p>
+                <p className="text-sm text-red-400/70">{t("failedToLoadHourly")}: {error}</p>
             </div>
         );
     }
@@ -204,25 +206,25 @@ export function HourlyModelCounter() {
             <div className="flex items-center justify-between mb-4 sm:mb-5 flex-wrap gap-2 sm:gap-3">
                 <div className="flex items-center gap-3">
                     <div className="w-1.5 h-5 rounded-full bg-gradient-to-b from-teal-400 to-teal-600 shadow-[0_0_8px_rgba(13,148,136,0.3)]" />
-                    <h3 className="text-lg font-semibold text-white/85 tracking-tight">Hourly Breakdown</h3>
+                    <h3 className="text-lg font-semibold text-white/85 tracking-tight">{t("hourlyBreakdown")}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                     {/* Date navigation */}
                     <div className="flex items-center glass-inset rounded-xl overflow-hidden">
-                        <button onClick={goBack} className="px-2 py-1.5 hover:bg-white/5 transition-colors" title="Previous day">
+                        <button onClick={goBack} className="px-2 py-1.5 hover:bg-white/5 transition-colors" title={t("previousDay")}>
                             <ChevronLeft size={14} className="text-white/50" />
                         </button>
                         <button
                             onClick={goToday}
                             className={`px-3 py-1.5 text-[11px] font-medium transition-colors min-w-[70px] sm:min-w-[90px] text-center ${isToday ? "text-teal-400" : "text-white/60 hover:text-white/80"}`}
                         >
-                            {formatDateLabel(selectedDate)}
+                            {formatDateLabel(selectedDate, t)}
                         </button>
                         <button
                             onClick={goForward}
                             disabled={isToday}
                             className="px-2 py-1.5 hover:bg-white/5 transition-colors disabled:opacity-20"
-                            title="Next day"
+                            title={t("nextDay")}
                         >
                             <ChevronRight size={14} className="text-white/50" />
                         </button>
@@ -231,22 +233,22 @@ export function HourlyModelCounter() {
                     <button
                         onClick={handleCopy}
                         className="glass-button px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-white/50 hover:text-white/80 transition-colors"
-                        title="Copy to clipboard"
+                        title={t("copyToClipboard")}
                     >
                         {copied ? <Check size={12} className="text-teal-400" /> : <Copy size={12} />}
-                        <span className="text-[10px] font-medium">{copied ? "Copied" : "Copy"}</span>
+                        <span className="text-[10px] font-medium">{copied ? t("copied") : t("copy")}</span>
                     </button>
                     {/* Export */}
                     <button
                         onClick={() => data && exportCsv(data, selectedDate)}
                         className="glass-button px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-white/50 hover:text-white/80 transition-colors"
-                        title="Export as CSV"
+                        title={t("exportAsCsv")}
                     >
                         <Download size={12} />
-                        <span className="text-[10px] font-medium">Export</span>
+                        <span className="text-[10px] font-medium">{t("export")}</span>
                     </button>
                     <div className="glass-inset px-3 py-1 rounded-xl">
-                        <span className="text-[10px] text-white/40 font-mono tracking-wider">UK TIME</span>
+                        <span className="text-[10px] text-white/40 font-mono tracking-wider">{t("ukTime")}</span>
                     </div>
                 </div>
             </div>
@@ -255,8 +257,8 @@ export function HourlyModelCounter() {
             {noData ? (
                 <p className="text-sm text-white/30">
                     {isToday
-                        ? "No hourly data yet today. Revenue will appear here as transactions come in."
-                        : `No data for ${formatDateLabel(selectedDate)}.`}
+                        ? t("noHourlyDataToday")
+                        : t("noDataForDate", { date: formatDateLabel(selectedDate, t) })}
                 </p>
             ) : (
                 /* Table */
@@ -265,7 +267,7 @@ export function HourlyModelCounter() {
                         <thead>
                             <tr>
                                 <th className={`text-left text-white/35 text-[10px] font-semibold uppercase tracking-wider pb-2 px-3 sticky left-0 z-10 min-w-[140px] ${stickyCol}`}>
-                                    Model
+                                    {t("model")}
                                 </th>
                                 {hours.map((h) => (
                                     <th key={h} className="text-center text-white/25 text-[10px] font-mono pb-2 px-1 min-w-[52px]">
@@ -273,7 +275,7 @@ export function HourlyModelCounter() {
                                     </th>
                                 ))}
                                 <th className={`text-right text-white/35 text-[10px] font-semibold uppercase tracking-wider pb-2 px-3 sticky right-0 z-10 min-w-[80px] ${stickyCol}`}>
-                                    Total
+                                    {t("total")}
                                 </th>
                             </tr>
                         </thead>
@@ -299,7 +301,7 @@ export function HourlyModelCounter() {
             {/* Hint */}
             {!noData && (
                 <p className="text-[10px] text-white/20 mt-3 px-1">
-                    Click a model row to see chatter breakdown{!isToday && " \u00b7 Viewing historical data"}
+                    {t("clickModelRowHint")}{!isToday && ` · ${t("viewingHistorical")}`}
                 </p>
             )}
         </div>

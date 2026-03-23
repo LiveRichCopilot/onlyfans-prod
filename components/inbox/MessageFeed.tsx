@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { MessageBubble } from "./MessageBubble";
 import { DateSeparator } from "./DateSeparator";
 import { MessageLoader } from "./MessageLoader";
@@ -37,6 +38,7 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
     { messages, loading, isSfw, onDisableSfw, loadingOlder, hasMore, onLoadOlder, creatorId, jumpingToDate, jumpProgress, isJumped, onReturnToLatest },
     ref
 ) {
+    const { t } = useLanguage();
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const sentinelRef = useRef<HTMLDivElement>(null);
     // Scroll preservation: record scrollHeight/scrollTop before prepend, restore after
@@ -112,7 +114,7 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
                     {loadingOlder && (
                         <div className="flex items-center gap-2 text-xs text-white/40">
                             <div className="animate-spin w-4 h-4 rounded-full border-2 border-white/10 border-t-[#2d786e]" />
-                            Loading older messages...
+                            {t("loadingOlderMessages")}
                         </div>
                     )}
                 </div>
@@ -123,9 +125,9 @@ export const MessageFeed = forwardRef<HTMLDivElement, Props>(function MessageFee
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-10 flex items-center justify-center">
                     <div className="flex flex-col items-center gap-2">
                         <div className="animate-spin w-6 h-6 rounded-full border-2 border-white/10 border-t-[#2d786e]" />
-                        <span className="text-sm text-white/60">Jumping to date...</span>
+                        <span className="text-sm text-white/60">{t("jumpingToDate")}</span>
                         {(jumpProgress ?? 0) > 0 && (
-                            <span className="text-[11px] text-white/35">Scanned {jumpProgress?.toLocaleString()} messages</span>
+                            <span className="text-[11px] text-white/35">{t("scannedMessages", { count: jumpProgress?.toLocaleString() ?? "0" })}</span>
                         )}
                     </div>
                 </div>

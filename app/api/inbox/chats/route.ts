@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
     const apiKey = process.env.OFAPI_API_KEY;
     if (!apiKey) {
-        return NextResponse.json({ error: "Master API Key not configured" }, { status: 500 });
+        return NextResponse.json({ chats: [], hasMore: false });
     }
 
     try {
@@ -34,10 +34,19 @@ export async function GET(request: Request) {
                     ],
                 },
             });
+            // OFAPI requires ofapiCreatorId (acct_xxx) — skip creators without it
+            creatorsToFetch = creatorsToFetch.filter((c) => {
+                const id = c.ofapiCreatorId ?? c.telegramId;
+                return typeof id === "string" && id.length > 0;
+            });
         } else {
             const creator = await prisma.creator.findUnique({ where: { id: creatorId } });
             if (!creator || !creator.ofapiToken || creator.ofapiToken === "unlinked") {
                 return NextResponse.json({ error: "Creator not found or unlinked" }, { status: 404 });
+            }
+            const accountName = creator.ofapiCreatorId ?? creator.telegramId;
+            if (typeof accountName !== "string" || !accountName) {
+                return NextResponse.json({ chats: [], hasMore: false });
             }
             creatorsToFetch = [creator];
         }
@@ -50,7 +59,8 @@ export async function GET(request: Request) {
         let hasMorePages = false;
         const results = await Promise.allSettled(
             creatorsToFetch.map(async (creator) => {
-                const accountName = creator.ofapiCreatorId || creator.telegramId;
+                const accountName = String(creator.ofapiCreatorId ?? creator.telegramId ?? "");
+                if (!accountName) return [];
                 const res = await listChats(accountName, apiKey, limit, offset);
                 const chatList = Array.isArray(res?.data) ? res.data : [];
                 const nextPage = res?._pagination?.next_page ?? res?._meta?._pagination?.next_page ?? null;
@@ -145,6 +155,15 @@ export async function GET(request: Request) {
         });
     } catch (e: any) {
         console.error("Inbox chats error:", e.message);
+        const msg = String(e?.message || "").toLowerCase();
+        const code = String(e?.code || "");
+        const isDbError =
+            code.startsWith("P10") ||
+            msg.includes("connect") ||
+            msg.includes("econnrefused") ||
+            msg.includes("relation") ||
+            msg.includes("does not exist");
+        if (isDbError) return NextResponse.json({ chats: [], hasMore: false });
         return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }

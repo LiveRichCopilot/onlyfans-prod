@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { ChevronLeft, Eye, EyeOff, Phone, Video, CalendarSearch, PanelRightOpen } from "lucide-react";
 import { CalendarPicker } from "./CalendarPicker";
 import type { Chat } from "./types";
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jumpingToDate, onShowInsights }: Props) {
+    const { t } = useLanguage();
     const avatarUrl = chat.withUser.avatar
         ? `/api/proxy-media?url=${encodeURIComponent(chat.withUser.avatar)}`
         : null;
@@ -97,7 +99,7 @@ export function ChatTopBar({ chat, isSfw, onToggleSfw, onBack, onJumpToDate, jum
                     <button
                         onClick={onShowInsights}
                         className="xl:hidden p-2 rounded-full text-[#2d786e] hover:bg-[#2d786e]/10 transition-colors"
-                        title="Fan Insights"
+                        title={t("fanInsights")}
                     >
                         <PanelRightOpen size={18} />
                     </button>

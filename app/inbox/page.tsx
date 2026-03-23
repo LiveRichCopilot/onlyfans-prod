@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { MessageSquare } from "lucide-react";
 import type { Chat } from "@/components/inbox/types";
 import { NavBar } from "@/components/inbox/NavBar";
@@ -15,7 +16,21 @@ import { PanelSlider } from "@/components/inbox/PanelSlider";
 import { useChats } from "@/components/inbox/hooks/useChats";
 import { useMessages } from "@/components/inbox/hooks/useMessages";
 
+function EmptyChatPlaceholder() {
+    const { t } = useLanguage();
+    return (
+        <div className="flex-1 flex flex-col items-center justify-center text-white/40 px-4">
+            <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
+                <MessageSquare size={28} className="text-white/15" />
+            </div>
+            <h3 className="text-lg font-medium text-white/60">{t("selectConversation")}</h3>
+            <p className="text-sm mt-2 text-white/25 max-w-xs text-center">{t("pickFanFromList")}</p>
+        </div>
+    );
+}
+
 export default function InboxPage() {
+    const { t } = useLanguage();
     const {
         creators,
         selectedCreatorId,
@@ -100,7 +115,7 @@ export default function InboxPage() {
             <div
                 className={`${
                     mobileView === "list" ? "flex" : "hidden"
-                } md:flex w-full md:w-[340px] flex-col flex-shrink-0 border-r border-white/[0.06] min-h-0 overflow-hidden`}
+                } md:flex w-full md:w-[340px] md:max-w-[380px] flex-col flex-shrink-0 border-r border-white/[0.06] min-h-0 min-w-0 overflow-hidden`}
             >
                 <SpendBuckets
                     activeBucket={spendBucket}
@@ -178,15 +193,7 @@ export default function InboxPage() {
                         />
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-white/40">
-                        <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mb-4">
-                            <MessageSquare size={28} className="text-white/15" />
-                        </div>
-                        <h3 className="text-lg font-medium text-white/60">Select a conversation</h3>
-                        <p className="text-sm mt-2 text-white/25 max-w-xs text-center">
-                            Pick a fan from the list to view their chat thread
-                        </p>
-                    </div>
+                    <EmptyChatPlaceholder />
                 )}
             </div>
 
@@ -207,7 +214,7 @@ export default function InboxPage() {
                             <div className="w-[85vw] max-w-[380px] animate-in slide-in-from-right">
                                 <div className="h-full flex flex-col bg-[#1a1a1a] border-l border-white/[0.06]">
                                     <div className="flex items-center justify-between p-3 border-b border-white/[0.06]">
-                                        <span className="text-sm font-semibold text-white/80">Fan Insights</span>
+                                        <span className="text-sm font-semibold text-white/80">{t("fanInsights")}</span>
                                         <button
                                             onClick={() => setShowMobileSidebar(false)}
                                             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/40"

@@ -10,7 +10,8 @@ type RequestOptions = {
 };
 
 export async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOptions = {}) {
-    const url = endpoint.startsWith("http") ? endpoint : `${OFAPI_BASE}${endpoint}`;
+    const ep = typeof endpoint === "string" ? endpoint : "";
+    const url = ep.startsWith("http") ? ep : `${OFAPI_BASE}${ep}`;
 
     // Resolve abstract database placeholder tokens to actual environment keys
     let resolvedKey = apiKey;

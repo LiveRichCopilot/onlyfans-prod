@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback } from "react";
+import { useLanguage } from "@/lib/LanguageContext";
 import { FanRow } from "./FanRow";
 import type { Chat } from "./types";
 
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorId, loading, onLoadMore, hasMore, tempTick }: Props) {
+    const { t } = useLanguage();
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const handleScroll = useCallback(() => {
@@ -29,24 +31,24 @@ export function NameScroller({ chats, activeChat, onSelectChat, selectedCreatorI
     }, [onLoadMore, hasMore]);
 
     if (!selectedCreatorId) {
-        return <div className="p-6 text-center text-sm text-white/40">Please select a creator to view chats.</div>;
+        return <div className="p-6 text-center text-sm text-white/40">{t("selectCreatorToViewChats")}</div>;
     }
 
     if (loading && chats.length === 0) {
         return (
             <div className="p-6 text-center text-sm text-white/50 flex flex-col items-center">
                 <div className="animate-spin w-6 h-6 rounded-full border-t-2 border-[#2d786e] mb-3" />
-                Loading chats...
+                {t("loadingChats")}
             </div>
         );
     }
 
     if (chats.length === 0) {
-        return <div className="p-6 text-center text-sm text-white/40">No chats found.</div>;
+        return <div className="p-6 text-center text-sm text-white/40">{t("noChatsFound")}</div>;
     }
 
     return (
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto min-h-0 scrollbar-hide">
             {chats.map((chat) => (
                 <FanRow key={chat.id} chat={chat} isActive={activeChat?.id === chat.id} onClick={() => onSelectChat(chat)} showCreatorBadge={selectedCreatorId === "all"} _tick={tempTick} />
             ))}
