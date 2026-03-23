@@ -92,12 +92,12 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                     <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3 px-2">{t("management")}</div>
                     <ul className="space-y-1">
                         <Link href="/">{navLink("/", <><LayoutGrid size={16} /> {t("dashboard")}</>)}</Link>
-                        <Link href="/inbox">{navLink("/inbox", <><MessageSquare size={16} /> {t("liveInbox")}<span className="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-purple-500/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
+                        <Link href="/inbox">{navLink("/inbox", <><MessageSquare size={16} /> {t("liveInbox")}</>)}</Link>
                         <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer"><Activity size={16} /> {t("realtimeFeed")}</li>
                         <Link href="/team">{navLink("/team", <><Users size={16} /> {t("teamManagement")}</>)}</Link>
-                        <Link href="/team-analytics">{navLink("/team-analytics", <><BarChart2 size={16} /> {t("teamAnalytics")}<span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
-                        <Link href="/schedule">{navLink("/schedule", <><Calendar size={16} /> {t("shiftSchedule")}<span className="bg-[#5B9BD5]/20 text-[#5B9BD5] text-[10px] px-1.5 py-0.5 rounded ml-auto border border-[#5B9BD5]/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
-                        <Link href="/content-daily">{navLink("/content-daily", <><ImageIcon size={16} /> {t("contentDaily")}<span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">{t("new")}</span></>)}</Link>
+                        <Link href="/team-analytics">{navLink("/team-analytics", <><BarChart2 size={16} /> {t("teamAnalytics")}</>)}</Link>
+                        <Link href="/schedule">{navLink("/schedule", <><Calendar size={16} /> {t("shiftSchedule")}</>)}</Link>
+                        <Link href="/content-daily">{navLink("/content-daily", <><ImageIcon size={16} /> {t("contentDaily")}</>)}</Link>
                         <Link href="/content-feed">{navLink("/content-feed", <><BarChart2 size={16} /> {t("contentFeed")}</>)}</Link>
                         <Link href="/performance">{navLink("/performance", <><Zap size={16} /> {t("performance")}</>)}</Link>
                         <Link href="/team/hubstaff">{navLink("/team/hubstaff", <><Link2 size={16} /> {t("hubstaff")}</>)}</Link>
