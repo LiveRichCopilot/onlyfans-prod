@@ -219,7 +219,20 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
             </div>
           );
         })()}
-        {mediaSummary && <div className="text-xs text-white/50 mt-1">{mediaSummary}</div>}
+        {mediaSummary && (
+          <div className="text-xs text-white/50 mt-1 flex items-center gap-2">
+            <span>{mediaSummary}</span>
+            {isPaid && item.media.length < item.mediaCount && item.media.length > 0 && (
+              <span className="text-yellow-400">{item.media.length} previewed, {item.mediaCount - item.media.length} locked</span>
+            )}
+            {isPaid && item.media.length === 0 && item.mediaCount > 0 && (
+              <span className="text-red-400">all {item.mediaCount} locked — no preview</span>
+            )}
+            {isPaid && item.media.length >= item.mediaCount && item.mediaCount > 0 && (
+              <span className="text-emerald-400/60">all previewed</span>
+            )}
+          </div>
+        )}
         {item.insight && (
           <div className="mt-2 glass-inset rounded-lg p-2">
             <div className="flex items-center gap-2 mb-1">
