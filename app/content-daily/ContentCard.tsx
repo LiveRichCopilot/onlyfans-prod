@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import {
-  Eye, Send, Image as ImageIcon, Clock, DollarSign, XCircle,
+  Eye, Send, Image as ImageIcon, Clock, DollarSign, XCircle, Mic,
 } from "lucide-react";
 
 type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
@@ -40,14 +40,15 @@ export function KpiCard({ icon, label, value, accent }: { icon: React.ReactNode;
 }
 
 export default function ContentCard({ item, onMediaClick }: { item: ContentItem; onMediaClick?: (item: ContentItem) => void }) {
-  const permanentUrl = item.media[0]?.permanentUrl;
-  const cdnUrl = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
-  // Use Supabase Image Transforms for fast thumbnails (auto WebP, resized on the fly)
-  const imgSrc = permanentUrl
-    ? permanentUrl.replace("/object/", "/render/image/") + "?width=600&quality=75"
-    : cdnUrl
-      ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
-      : null;
+  // Pick the first PHOTO for thumbnail — skip audio/video which can't render as <img>
+  const photoMedia = item.media.find((m) => m.mediaType === "photo") || item.media.find((m) => m.mediaType === "video") || item.media[0];
+  const isAudioOnly = item.media.every((m) => m.mediaType === "audio");
+  const permanentUrl = photoMedia?.permanentUrl;
+  const cdnUrl = photoMedia?.previewUrl || photoMedia?.thumbUrl || photoMedia?.fullUrl;
+  const imgSrc = isAudioOnly ? null
+    : permanentUrl ? permanentUrl.replace("/object/", "/render/image/") + "?width=600&quality=75"
+    : cdnUrl ? `/api/proxy-media?url=${encodeURIComponent(cdnUrl)}`
+    : null;
   const isPaid = !item.isFree && item.priceCents && item.priceCents > 0;
   const mediaSummary = useMemo(() => {
     const c: Record<string, number> = {};
@@ -98,8 +99,8 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
       ) : (
         <div className="relative aspect-[4/3] bg-white/[0.04] flex items-center justify-center">
           <div className="text-center">
-            <ImageIcon size={32} className="text-white/20 mx-auto mb-1" />
-            <div className="text-xs text-white/30">{item.mediaCount} {item.mediaCount === 1 ? "file" : "files"} — tap to view</div>
+            {isAudioOnly ? <Mic size={32} className="text-purple-400/50 mx-auto mb-1" /> : <ImageIcon size={32} className="text-white/20 mx-auto mb-1" />}
+            <div className="text-xs text-white/30">{isAudioOnly ? "Audio message" : `${item.mediaCount} ${item.mediaCount === 1 ? "file" : "files"}`}</div>
           </div>
           <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-3">
             <div className="text-xl text-white font-bold">{timeOnly} UK</div>

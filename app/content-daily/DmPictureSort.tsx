@@ -16,14 +16,17 @@ function FanLabel({ label }: { label: string }) {
 }
 
 function Thumb({ item, onClick }: { item: ContentItem; onClick: () => void }) {
-  const perm = item.media[0]?.permanentUrl;
-  const cdn = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
-  const src = perm
-    ? perm.replace("/object/", "/render/image/") + "?width=300&quality=70"
+  // Pick first photo for thumbnail — skip audio which has no visual
+  const photoMedia = item.media.find((m) => m.mediaType === "photo") || item.media.find((m) => m.mediaType === "video") || item.media[0];
+  const perm = photoMedia?.permanentUrl;
+  const cdn = photoMedia?.previewUrl || photoMedia?.thumbUrl || photoMedia?.fullUrl;
+  const isAudioOnly = item.media.every((m) => m.mediaType === "audio");
+  const src = isAudioOnly ? null
+    : perm ? perm.replace("/object/", "/render/image/") + "?width=300&quality=70"
     : cdn ? `/api/proxy-media?url=${encodeURIComponent(cdn)}` : null;
 
   const isSold = item.status === "selling";
-  const isVideo = item.media[0]?.mediaType === "video";
+  const isVideo = photoMedia?.mediaType === "video";
 
   return (
     <div onClick={onClick}
