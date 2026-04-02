@@ -25,7 +25,8 @@ function Thumb({ item, onClick }: { item: ContentItem; onClick: () => void }) {
     : perm ? perm.replace("/object/", "/render/image/") + "?width=300&quality=70"
     : cdn ? `/api/proxy-media?url=${encodeURIComponent(cdn)}` : null;
 
-  const isSold = item.status === "selling";
+  const isPaid = !item.isFree && item.priceCents && item.priceCents > 0;
+  const isSold = isPaid && item.status === "selling";
   const isVideo = photoMedia?.mediaType === "video";
 
   return (

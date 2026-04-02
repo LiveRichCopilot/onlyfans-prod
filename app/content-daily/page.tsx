@@ -303,7 +303,7 @@ export default function ContentDailyPage() {
         )}
 
         {/* DM Picture Sort — visual gallery for sold/unsold/by chatter */}
-        {(sourceFilter === "direct_message" || sourceFilter === "all") && <DmPictureSort items={items} />}
+        {(sourceFilter === "direct_message" || sourceFilter === "all") && <DmPictureSort items={filtered} />}
 
         {/* Hour-by-Hour Breakdown */}
         <HourlyBreakdown hourly={hourly} expanded={expanded} onToggle={toggle} />
