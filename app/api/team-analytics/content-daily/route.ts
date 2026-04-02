@@ -184,6 +184,36 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ── Fan lookup for DMs — batch load fan data for all DM recipients ──
+    type FanInfo = { username: string | null; name: string | null; label: string | null; lifetimeSpend: number };
+    const fanDataMap = new Map<string, FanInfo>();
+    const fanIds = new Set<string>();
+    for (const c of creatives) {
+      if (c.source !== "direct_message") continue;
+      const r = c.raw as Record<string, any> | null;
+      const id = r?.toUser?.id ? String(r.toUser.id) : r?.toUserId ? String(r.toUserId) : null;
+      if (id) fanIds.add(id);
+    }
+    if (fanIds.size > 0) {
+      const fans = await prisma.fan.findMany({
+        where: { ofapiFanId: { in: [...fanIds] } },
+        select: { ofapiFanId: true, username: true, name: true, lifetimeSpend: true, priceRange: true, buyerType: true, stage: true },
+      });
+      for (const f of fans) {
+        const label = f.lifetimeSpend >= 5000 ? "SVIP" : f.lifetimeSpend >= 2000 ? "Diamond" : f.lifetimeSpend >= 500 ? "VIP"
+          : f.priceRange === "whale" ? "Whale" : f.stage === "at_risk" ? "At Risk" : null;
+        fanDataMap.set(f.ofapiFanId, { username: f.username, name: f.name, label, lifetimeSpend: f.lifetimeSpend });
+      }
+      // Fill in from raw OFAPI data for fans not yet in DB
+      for (const c of creatives) {
+        if (c.source !== "direct_message") continue;
+        const r = c.raw as Record<string, any> | null;
+        const id = r?.toUser?.id ? String(r.toUser.id) : r?.toUserId ? String(r.toUserId) : null;
+        if (id && !fanDataMap.has(id) && r?.toUser)
+          fanDataMap.set(id, { username: r.toUser.username || null, name: r.toUser.name || null, label: null, lifetimeSpend: 0 });
+      }
+    }
+
     // ── VALIDATION: Only include items with actual media ──
     // Text-only messages (mediaCount=0) were showing as blank cards.
     // Filter them out server-side so no blank image placeholder ever renders.
@@ -237,6 +267,13 @@ export async function GET(req: NextRequest) {
         type: (c.mediaCount > 0 ? "content" : "bump") as "content" | "bump",
         chatterName: c.source === "direct_message" ? resolveChatter(c.creatorId, new Date(c.sentAt)) : null,
         media: c.media, insight: c.insight,
+        ...(() => { // Fan data for DMs
+          if (c.source !== "direct_message") return {};
+          const r = c.raw as Record<string, any> | null;
+          const tid = r?.toUser?.id ? String(r.toUser.id) : r?.toUserId ? String(r.toUserId) : null;
+          const f = tid ? fanDataMap.get(tid) : null;
+          return { fanUsername: f?.username || r?.toUser?.username || null, fanName: f?.name || r?.toUser?.name || null, fanLabel: f?.label || null, fanSpend: f?.lifetimeSpend ?? null };
+        })(),
       };
     }).filter((item) => {
       // Final validation: every item MUST have at least one media record with a displayable URL
@@ -312,33 +349,15 @@ export async function GET(req: NextRequest) {
       .map(([tag, d]) => ({ tag, count: d.count, avgScore: Math.round(d.totalScore / d.count) }))
       .sort((a, b) => b.count - a.count);
 
-    // Silent models — active creators with no content in this window (ANY source)
-    const allCreators = await prisma.creator.findMany({
-      where: { active: true },
-      select: { id: true, name: true, ofUsername: true },
-    });
-    // Check ALL sources for activity, not just the currently filtered source
-    const anyActivity = await prisma.outboundCreative.groupBy({
-      by: ["creatorId"],
-      where: { sentAt: { gte: since }, mediaCount: { gt: 0 } },
-    });
+    // Silent models — active creators with no content in this window
+    const allCreators = await prisma.creator.findMany({ where: { active: true }, select: { id: true, name: true, ofUsername: true } });
+    const anyActivity = await prisma.outboundCreative.groupBy({ by: ["creatorId"], where: { sentAt: { gte: since }, mediaCount: { gt: 0 } } });
     const activeCreatorIds = new Set(anyActivity.map((a) => a.creatorId));
-    // For silent models, get their last mass message date
-    const silentCreators = allCreators.filter((c) => !activeCreatorIds.has(c.id));
     const silentModels = await Promise.all(
-      silentCreators.map(async (c) => {
-        const last = await prisma.outboundCreative.findFirst({
-          where: { creatorId: c.id, mediaCount: { gt: 0 } },
-          orderBy: { sentAt: "desc" },
-          select: { sentAt: true },
-        });
-        return {
-          id: c.id, name: c.name || c.ofUsername || "Unknown",
-          ofUsername: c.ofUsername,
-          lastContentAt: last?.sentAt || null,
-          hoursSilent: last ? Math.round((Date.now() - new Date(last.sentAt).getTime()) / 3600000) : null,
-          daysSilent: last ? Math.round((Date.now() - new Date(last.sentAt).getTime()) / 86400000) : null,
-        };
+      allCreators.filter((c) => !activeCreatorIds.has(c.id)).map(async (c) => {
+        const last = await prisma.outboundCreative.findFirst({ where: { creatorId: c.id, mediaCount: { gt: 0 } }, orderBy: { sentAt: "desc" }, select: { sentAt: true } });
+        const age = last ? Date.now() - new Date(last.sentAt).getTime() : null;
+        return { id: c.id, name: c.name || c.ofUsername || "Unknown", ofUsername: c.ofUsername, lastContentAt: last?.sentAt || null, hoursSilent: age ? Math.round(age / 3600000) : null, daysSilent: age ? Math.round(age / 86400000) : null };
       })
     );
 

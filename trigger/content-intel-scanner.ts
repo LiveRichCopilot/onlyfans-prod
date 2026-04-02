@@ -99,7 +99,7 @@ async function callKimi(apiKey: string, creatives: Creative[]): Promise<{ analyz
       model: "kimi-k2.5",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Analyze these ${creatives.length} mass messages:\n\n${messagesText}` },
+        { role: "user", content: `Analyze these ${creatives.length} messages:\n\n${messagesText}` },
       ],
       max_tokens: creatives.length > 1 ? 1200 : 400,
       thinking: { type: "disabled" },
@@ -180,9 +180,9 @@ export const contentIntelScanner = task({
 
     const where: any = {
       processed: false,
-      source: "mass_message",
+      source: { in: ["mass_message", "direct_message"] },
       mediaCount: { gt: 0 },
-      OR: [{ viewedCount: { gt: 0 } }, { sentCount: { gt: 10 } }],
+      OR: [{ viewedCount: { gt: 0 } }, { sentCount: { gt: 0 } }],
     };
     if (payload.creatorId) where.creatorId = payload.creatorId;
 

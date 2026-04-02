@@ -21,6 +21,7 @@ export type ContentItem = {
   reactivationBuckets: Record<string, number> | null;
   isCanceled: boolean; status: "selling" | "stagnant" | "awaiting" | "free" | "unsent";
   source: string; type: "content" | "bump"; chatterName: string | null; media: MediaItem[]; insight: InsightData;
+  fanUsername?: string | null; fanName?: string | null; fanLabel?: string | null; fanSpend?: number | null;
 };
 
 export function fN(n: number): string {
