@@ -63,9 +63,10 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
   if (!item.media || item.media.length === 0 || item.mediaCount === 0) return null;
 
   return (
-    <div className={`glass-card rounded-2xl overflow-hidden ${item.status === "stagnant" ? "border border-red-500/20" : ""}`}>
+    <div className={`glass-card rounded-2xl overflow-hidden ${item.status === "stagnant" ? "border border-red-500/20" : ""} ${onMediaClick ? "cursor-pointer" : ""}`}
+      onClick={() => onMediaClick?.(item)}>
       {imgSrc ? (
-        <div className={`relative aspect-[4/3] bg-black/40 ${onMediaClick ? "cursor-pointer" : ""}`} onClick={() => onMediaClick?.(item)}>
+        <div className="relative aspect-[4/3] bg-black/40">
           <img src={imgSrc} alt="" className="w-full h-full object-cover"
             onError={(e) => {
               // If image fails to load, replace with a styled fallback — never show broken img
@@ -94,7 +95,18 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
           </div>
           {item.isCanceled && <span className="absolute top-3 right-3 bg-red-500/90 text-white text-sm px-3 py-1 rounded-full font-bold">Unsent</span>}
         </div>
-      ) : null}
+      ) : (
+        <div className="relative aspect-[4/3] bg-white/[0.04] flex items-center justify-center">
+          <div className="text-center">
+            <ImageIcon size={32} className="text-white/20 mx-auto mb-1" />
+            <div className="text-xs text-white/30">{item.mediaCount} {item.mediaCount === 1 ? "file" : "files"} — tap to view</div>
+          </div>
+          <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-3">
+            <div className="text-xl text-white font-bold">{timeOnly} UK</div>
+            <div className="text-sm text-white/80">{dateOnly}</div>
+          </div>
+        </div>
+      )}
       <div className="p-4">
         <div className="mb-1.5">
           <div className="flex items-baseline gap-2 mb-0.5">
