@@ -5,7 +5,7 @@ import {
   Eye, Send, Image as ImageIcon, Clock, DollarSign, XCircle, Mic,
 } from "lucide-react";
 
-type MediaItem = { mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
+type MediaItem = { id?: string; mediaType: string; fullUrl: string | null; previewUrl: string | null; thumbUrl: string | null; permanentUrl: string | null };
 type InsightData = { tacticTag: string; hookScore: number; insight: string; viewRate: number } | null;
 export type ContentItem = {
   id: string; externalId: string;
