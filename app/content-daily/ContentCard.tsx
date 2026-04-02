@@ -134,13 +134,12 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
         <div className="flex items-center gap-4 text-sm text-white/80 mb-2">
           <span className="flex items-center gap-1"><Send size={13} /> {fN(item.sentCount)}</span>
           <span className="flex items-center gap-1"><Eye size={13} /> {fN(item.viewedCount)}</span>
-          {item.purchasedCount != null && item.purchasedCount > 0 && (
+          {isPaid && item.purchasedCount != null && item.purchasedCount > 0 && (
             <span className="flex items-center gap-1 text-emerald-400">
-              <DollarSign size={13} />
-              {isPaid && item.priceCents ? `$${(item.priceCents / 100).toFixed(0)}` : ""} {item.purchasedCount} bought
+              <DollarSign size={13} />${(item.priceCents! / 100).toFixed(0)} — {item.purchasedCount} bought
             </span>
           )}
-          {item.purchasedCount === 0 && isPaid && (
+          {isPaid && item.purchasedCount === 0 && (
             <span className="flex items-center gap-1 text-red-400"><XCircle size={13} /> 0 bought</span>
           )}
           <span className={`ml-auto text-base font-bold ${item.viewRate > 1 ? "text-teal-400" : item.viewRate > 0.3 ? "text-yellow-400" : "text-red-400"}`}>{item.viewRate}%</span>
