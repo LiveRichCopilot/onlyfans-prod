@@ -251,6 +251,7 @@ export async function GET(req: NextRequest) {
         sentAt: c.sentAt, sentAtUk, hoursLive,
         caption: c.textPlain || c.textHtml || "",
         isFree: c.isFree, priceCents: c.priceCents, mediaCount: c.mediaCount,
+        previewCount: Array.isArray((c.raw as any)?.previews) ? (c.raw as any).previews.length : null,
         sentCount: c.sentCount, viewedCount: c.viewedCount, viewRate,
         purchasedCount: purchased,
         // Wake-up data only valid for mass messages + wall posts, not DMs

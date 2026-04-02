@@ -11,7 +11,7 @@ export type ContentItem = {
   id: string; externalId: string;
   creator: { name: string; ofUsername: string };
   sentAt: string; sentAtUk: string; hoursLive: number; caption: string;
-  isFree: boolean; priceCents: number | null; mediaCount: number;
+  isFree: boolean; priceCents: number | null; mediaCount: number; previewCount?: number | null;
   sentCount: number; viewedCount: number; viewRate: number;
   purchasedCount: number | null;
   totalReplied: number | null;
@@ -135,7 +135,10 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
           <span className="flex items-center gap-1"><Send size={13} /> {fN(item.sentCount)}</span>
           <span className="flex items-center gap-1"><Eye size={13} /> {fN(item.viewedCount)}</span>
           {item.purchasedCount != null && item.purchasedCount > 0 && (
-            <span className="flex items-center gap-1 text-emerald-400"><DollarSign size={13} /> {item.purchasedCount} bought</span>
+            <span className="flex items-center gap-1 text-emerald-400">
+              <DollarSign size={13} />
+              {isPaid && item.priceCents ? `$${(item.priceCents / 100).toFixed(0)}` : ""} {item.purchasedCount} bought
+            </span>
           )}
           {item.purchasedCount === 0 && isPaid && (
             <span className="flex items-center gap-1 text-red-400"><XCircle size={13} /> 0 bought</span>
@@ -219,7 +222,21 @@ export default function ContentCard({ item, onMediaClick }: { item: ContentItem;
             </div>
           );
         })()}
-        {mediaSummary && <div className="text-xs text-white/50 mt-1">{mediaSummary}</div>}
+        {mediaSummary && (
+          <div className="text-xs text-white/50 mt-1">
+            {mediaSummary}
+            {isPaid && item.previewCount != null && (
+              <span className="ml-2">
+                {item.previewCount > 0
+                  ? <span className="text-teal-400">{item.previewCount} free preview</span>
+                  : <span className="text-red-400">no preview</span>}
+                {item.previewCount > 0 && item.mediaCount > item.previewCount && (
+                  <span className="text-white/40">, {item.mediaCount - item.previewCount} locked</span>
+                )}
+              </span>
+            )}
+          </div>
+        )}
         {item.insight && (
           <div className="mt-2 glass-inset rounded-lg p-2">
             <div className="flex items-center gap-2 mb-1">
