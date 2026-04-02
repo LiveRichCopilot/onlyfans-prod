@@ -105,6 +105,12 @@ export default function ContentCard({ item }: { item: ContentItem }) {
           </div>
           {item.chatterName && <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-medium">{item.chatterName}</span>}
           {item.status === "selling" && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">Sold</span>}
+          {item.fanUsername && (
+            <span className="text-xs text-white/70">to @{item.fanUsername}{item.fanName ? ` (${item.fanName})` : ""}</span>
+          )}
+          {item.fanLabel && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.fanLabel === "SVIP" ? "text-yellow-300 bg-yellow-500/20" : item.fanLabel === "Diamond" ? "text-cyan-300 bg-cyan-500/20" : item.fanLabel === "VIP" ? "text-purple-300 bg-purple-500/20" : item.fanLabel === "Whale" ? "text-emerald-300 bg-emerald-500/20" : "text-red-300 bg-red-500/20"}`}>{item.fanLabel}</span>
+          )}
           {item.status === "stagnant" && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium">Didn&apos;t Sell</span>}
           {item.status === "awaiting" && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">PPV</span>}
           {item.status === "free" && <span className="text-xs bg-white/[0.06] text-white/50 px-2 py-0.5 rounded-full">Free</span>}

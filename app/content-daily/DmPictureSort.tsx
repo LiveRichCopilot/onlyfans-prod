@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, DollarSign, CheckCircle, XCircle, Clock, User, Zap } from "lucide-react";
-import type { ContentItem } from "./ContentCard";
+import ContentCard, { type ContentItem } from "./ContentCard";
 import DmMediaLightbox from "./DmMediaLightbox";
 
 function FanLabel({ label }: { label: string }) {
@@ -126,6 +126,35 @@ function Section({
   );
 }
 
+function ChatterSection({ name, items, sold, revenue, isBot, defaultOpen }: {
+  name: string; items: ContentItem[]; sold: number; revenue: number; isBot: boolean; defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-4">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 py-2 text-left">
+        <User size={14} className={isBot ? "text-purple-400" : "text-white/40"} />
+        <span className={`text-sm font-semibold ${isBot ? "text-purple-400" : "text-white/40"}`}>
+          {name}{sold > 0 ? ` — ${sold} sold` : ""}
+        </span>
+        <span className="text-xs text-white/40">{items.length}</span>
+        {revenue > 0 && (
+          <span className="text-xs text-emerald-400 font-bold flex items-center gap-0.5 ml-1">
+            <DollarSign size={10} />{revenue.toFixed(0)}
+          </span>
+        )}
+        <ChevronDown size={14} className={`ml-auto text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {items.map((item) => <ContentCard key={item.id} item={item} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DmPictureSort({ items }: { items: ContentItem[] }) {
   const [view, setView] = useState<"status" | "chatter">("status");
   const [lightboxItem, setLightboxItem] = useState<ContentItem | null>(null);
@@ -190,17 +219,11 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
           <>
             {chatters.map(([name, chatterItems]) => {
               const chSold = chatterItems.filter((i) => i.status === "selling").length;
-              const chRevenue = chatterItems
-                .filter((i) => i.status === "selling")
-                .reduce((s, i) => s + ((i.priceCents || 0) / 100), 0);
+              const chRevenue = chatterItems.filter((i) => i.status === "selling").reduce((s, i) => s + ((i.priceCents || 0) / 100), 0);
               const isBot = name !== "Unassigned";
               return (
-                <Section key={name}
-                  title={`${name}${chSold > 0 ? ` — ${chSold} sold` : ""}`}
-                  icon={<User size={14} className={isBot ? "text-purple-400" : "text-white/40"} />}
-                  count={chatterItems.length} color={isBot ? "text-purple-400" : "text-white/40"}
-                  items={chatterItems} defaultOpen={chSold > 0} revenue={chRevenue} onThumbClick={openLightbox}
-                />
+                <ChatterSection key={name} name={name} items={chatterItems}
+                  sold={chSold} revenue={chRevenue} isBot={isBot} defaultOpen={chSold > 0} />
               );
             })}
           </>
