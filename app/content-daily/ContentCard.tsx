@@ -39,7 +39,7 @@ export function KpiCard({ icon, label, value, accent }: { icon: React.ReactNode;
   );
 }
 
-export default function ContentCard({ item }: { item: ContentItem }) {
+export default function ContentCard({ item, onMediaClick }: { item: ContentItem; onMediaClick?: (item: ContentItem) => void }) {
   const permanentUrl = item.media[0]?.permanentUrl;
   const cdnUrl = item.media[0]?.previewUrl || item.media[0]?.thumbUrl || item.media[0]?.fullUrl;
   // Use Supabase Image Transforms for fast thumbnails (auto WebP, resized on the fly)
@@ -65,7 +65,7 @@ export default function ContentCard({ item }: { item: ContentItem }) {
   return (
     <div className={`glass-card rounded-2xl overflow-hidden ${item.status === "stagnant" ? "border border-red-500/20" : ""}`}>
       {imgSrc ? (
-        <div className="relative aspect-[4/3] bg-black/40">
+        <div className={`relative aspect-[4/3] bg-black/40 ${onMediaClick ? "cursor-pointer" : ""}`} onClick={() => onMediaClick?.(item)}>
           <img src={imgSrc} alt="" className="w-full h-full object-cover"
             onError={(e) => {
               // If image fails to load, replace with a styled fallback — never show broken img
@@ -96,25 +96,26 @@ export default function ContentCard({ item }: { item: ContentItem }) {
         </div>
       ) : null}
       <div className="p-4">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
+        <div className="mb-1.5">
+          <div className="flex items-baseline gap-2 mb-0.5">
             <span className="text-sm text-teal-400 font-semibold">{item.creator.name}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.source === "direct_message" ? "bg-purple-500/20 text-purple-400" : item.source === "wall_post" ? "bg-blue-500/20 text-blue-400" : "bg-white/[0.08] text-white/50"}`}>
-              {item.source === "direct_message" ? "DM" : item.source === "wall_post" ? "Wall Post" : "Mass Msg"}
+            {item.chatterName && <span className="text-xs text-orange-400 font-medium">{item.chatterName}</span>}
+            <span className={`text-xs ${item.source === "direct_message" ? "text-purple-400" : item.source === "wall_post" ? "text-blue-400" : "text-white/40"}`}>
+              {item.source === "direct_message" ? "DM" : item.source === "wall_post" ? "Wall" : "Mass"}
             </span>
+            {item.status === "selling" && <span className="text-xs text-emerald-400 font-semibold">Sold</span>}
+            {item.status === "stagnant" && <span className="text-xs text-red-400">Didn&apos;t Sell</span>}
+            {item.status === "awaiting" && <span className="text-xs text-yellow-400">PPV</span>}
+            {item.status === "free" && <span className="text-xs text-white/40">Free</span>}
+            {item.status === "unsent" && <span className="text-xs text-red-400">Unsent</span>}
           </div>
-          {item.chatterName && <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-medium">{item.chatterName}</span>}
-          {item.status === "selling" && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">Sold</span>}
           {item.fanUsername && (
-            <span className="text-xs text-white/70">to @{item.fanUsername}{item.fanName ? ` (${item.fanName})` : ""}</span>
+            <div className="text-xs text-white/60">
+              to <span className="text-white/80 font-medium">@{item.fanUsername}</span>
+              {item.fanName ? ` (${item.fanName})` : ""}
+              {item.fanLabel && <span className={`ml-1.5 font-bold ${item.fanLabel === "SVIP" ? "text-yellow-300" : item.fanLabel === "Diamond" ? "text-cyan-300" : item.fanLabel === "VIP" ? "text-purple-300" : item.fanLabel === "Whale" ? "text-emerald-300" : "text-red-300"}`}>{item.fanLabel}</span>}
+            </div>
           )}
-          {item.fanLabel && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.fanLabel === "SVIP" ? "text-yellow-300 bg-yellow-500/20" : item.fanLabel === "Diamond" ? "text-cyan-300 bg-cyan-500/20" : item.fanLabel === "VIP" ? "text-purple-300 bg-purple-500/20" : item.fanLabel === "Whale" ? "text-emerald-300 bg-emerald-500/20" : "text-red-300 bg-red-500/20"}`}>{item.fanLabel}</span>
-          )}
-          {item.status === "stagnant" && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium">Didn&apos;t Sell</span>}
-          {item.status === "awaiting" && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">PPV</span>}
-          {item.status === "free" && <span className="text-xs bg-white/[0.06] text-white/50 px-2 py-0.5 rounded-full">Free</span>}
-          {item.status === "unsent" && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Unsent</span>}
         </div>
         <p className="text-sm text-white/80 mb-3 line-clamp-3">{item.caption || "(no caption)"}</p>
         <div className="flex items-center gap-4 text-sm text-white/80 mb-2">

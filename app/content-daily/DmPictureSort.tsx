@@ -126,8 +126,9 @@ function Section({
   );
 }
 
-function ChatterSection({ name, items, sold, revenue, isBot, defaultOpen }: {
+function ChatterSection({ name, items, sold, revenue, isBot, defaultOpen, onMediaClick }: {
   name: string; items: ContentItem[]; sold: number; revenue: number; isBot: boolean; defaultOpen: boolean;
+  onMediaClick: (item: ContentItem) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (items.length === 0) return null;
@@ -148,7 +149,7 @@ function ChatterSection({ name, items, sold, revenue, isBot, defaultOpen }: {
       </button>
       {open && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {items.map((item) => <ContentCard key={item.id} item={item} />)}
+          {items.map((item) => <ContentCard key={item.id} item={item} onMediaClick={onMediaClick} />)}
         </div>
       )}
     </div>
@@ -223,7 +224,7 @@ export default function DmPictureSort({ items }: { items: ContentItem[] }) {
               const isBot = name !== "Unassigned";
               return (
                 <ChatterSection key={name} name={name} items={chatterItems}
-                  sold={chSold} revenue={chRevenue} isBot={isBot} defaultOpen={chSold > 0} />
+                  sold={chSold} revenue={chRevenue} isBot={isBot} defaultOpen={chSold > 0} onMediaClick={openLightbox} />
               );
             })}
           </>
