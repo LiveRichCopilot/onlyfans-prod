@@ -1,96 +1,38 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth, type AuthContext } from "@/lib/auth-gateway";
 
 /**
  * Sora tab access — v1.
  *
- * Allow list (Jay confirmed 2026-04-06):
- *   - admins (role AGENCY or CFO)
- *   - sora@liverich.travel
- *   - jay@liverich.travel
- *   - david@liverich.travel
+ * Per Jay (2026-04-06): the whole app is managers-only, so every logged-in
+ * user gets full access to the Sora tab. No separate allow list. If you're
+ * in, you're in.
  *
- * Anyone in this list can see the Sora tab. To access a specific model
- * behind the tab, they must either be in this allow list OR have a
- * ManagerAccountResponsibility row for that model.
- *
- * Future slice: Sora-editable email allow list stored in DB.
+ * Uses Supabase Auth via auth-gateway.ts (not NextAuth — that's legacy).
  */
-const SORA_ALLOW_EMAILS = new Set([
-  "sora@liverich.travel",
-  "jay@liverich.travel",
-  "david@liverich.travel",
-]);
 
-const ADMIN_ROLES = new Set(["AGENCY", "CFO"]);
+const GLOBAL_SCOPE_ORG_ROLES = new Set(["OWNER", "ADMIN", "ACCOUNT_EXEC"]);
 
-export function isSoraAllowed(args: { email: string | null; role: string | null }): boolean {
-  const { email, role } = args;
-  if (role && ADMIN_ROLES.has(role)) return true;
-  if (email && SORA_ALLOW_EMAILS.has(email.toLowerCase())) return true;
+export function isAdmin(ctx: AuthContext): boolean {
+  if (ctx.orgRole && GLOBAL_SCOPE_ORG_ROLES.has(ctx.orgRole)) return true;
+  if (ctx.email === "jay@liverich.travel" || ctx.email === "david@liverich.travel") return true;
   return false;
 }
 
-export function isAdmin(args: { email: string | null; role: string | null }): boolean {
-  const { email, role } = args;
-  if (role && ADMIN_ROLES.has(role)) return true;
-  if (email && (email === "jay@liverich.travel" || email === "david@liverich.travel")) return true;
-  return false;
-}
+export type SoraModel = {
+  id: string;
+  name: string;
+  ofUsername: string | null;
+  avatarUrl: string | null;
+};
 
 /**
- * Can this user see data for the given model?
- * Admins + allow list can see all models. Others need a ManagerAccountResponsibility row.
+ * Everyone in the app sees every active model on the Sora tab.
+ * (The app itself is gated to managers by the middleware login.)
  */
-export async function canAccessModel(args: {
-  email: string | null;
-  role: string | null;
-  userId: string | null;
-  modelId: string;
-}): Promise<boolean> {
-  if (isSoraAllowed({ email: args.email, role: args.role })) return true;
-  if (!args.userId) return false;
-  const row = await prisma.managerAccountResponsibility.findFirst({
-    where: { managerId: args.userId, creatorId: args.modelId },
-    select: { id: true },
-  });
-  return !!row;
-}
-
-/**
- * List the models this user can see on the Sora tab.
- * - Admins + allow list → all active models
- * - Others → only models they manage via ManagerAccountResponsibility
- */
-export async function listModelsForUser(args: {
-  email: string | null;
-  role: string | null;
-  userId: string | null;
-}): Promise<Array<{ id: string; name: string; ofUsername: string | null; avatarUrl: string | null }>> {
-  if (isSoraAllowed({ email: args.email, role: args.role })) {
-    const creators = await prisma.creator.findMany({
-      where: { active: true },
-      select: { id: true, name: true, ofUsername: true, avatarUrl: true },
-      orderBy: { name: "asc" },
-    });
-    return creators.map((c) => ({
-      id: c.id,
-      name: c.name || c.ofUsername || "Unknown",
-      ofUsername: c.ofUsername,
-      avatarUrl: c.avatarUrl,
-    }));
-  }
-
-  if (!args.userId) return [];
-
-  const responsibilities = await prisma.managerAccountResponsibility.findMany({
-    where: { managerId: args.userId },
-    select: { creatorId: true },
-  });
-  const ids = responsibilities.map((r) => r.creatorId);
-  if (ids.length === 0) return [];
-
+export async function listAllModels(): Promise<SoraModel[]> {
   const creators = await prisma.creator.findMany({
-    where: { active: true, id: { in: ids } },
+    where: { active: true },
     select: { id: true, name: true, ofUsername: true, avatarUrl: true },
     orderBy: { name: "asc" },
   });
@@ -100,4 +42,16 @@ export async function listModelsForUser(args: {
     ofUsername: c.ofUsername,
     avatarUrl: c.avatarUrl,
   }));
+}
+
+/**
+ * Returns the current AuthContext, or null if not logged in.
+ * Never throws — pages/routes can branch on null.
+ */
+export async function getSoraAuthSafe(): Promise<AuthContext | null> {
+  try {
+    return await requireAuth();
+  } catch {
+    return null;
+  }
 }

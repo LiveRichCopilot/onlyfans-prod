@@ -1,27 +1,23 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { isAdmin } from "@/lib/sora-access";
+import { getSoraAuthSafe, isAdmin } from "@/lib/sora-access";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/sora/connect-to-models
  *
- * Idempotent one-time setup. Jay's exact phrase from 2026-04-06:
+ * Idempotent admin-only setup. Jay's exact phrase from 2026-04-06:
  * "connect her to those, her models, and we can connect it to those accounts as her manager"
  *
  * What it does:
  *   1. Ensures User rows exist for sora@, jay@, david@liverich.travel
- *   2. Ensures each is an OrgMember with role MANAGER in Jay's organization
+ *   2. Ensures each is an OrgMember with role MANAGER in the org
  *   3. Creates ManagerAccountResponsibility rows linking each to Sora's 6 models:
  *      Kaylie (2 pages), Anna Cherie (2 pages), Angie, Wendy
  *
  * Matching is fuzzy on Creator.name and Creator.ofUsername (case-insensitive).
  * Returns what it matched so you can visually confirm nothing is missed.
- *
- * Auth: admin only.
  *
  * Body (optional): { modelIds?: string[] }
  *   If passed, uses those exact Creator IDs instead of fuzzy name matching.
@@ -32,18 +28,18 @@ const TEAM_EMAILS = ["sora@liverich.travel", "jay@liverich.travel", "david@liver
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const email = session?.user?.email || null;
-    const role = (session?.user as any)?.role || null;
-
-    if (!isAdmin({ email, role })) {
+    const ctx = await getSoraAuthSafe();
+    if (!ctx) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    if (!isAdmin(ctx)) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
     const explicitModelIds: string[] | undefined = Array.isArray(body.modelIds) ? body.modelIds : undefined;
 
-    // 1. Find the organization (pick the first — this app is single-org per Jay's setup)
+    // 1. Find the organization (pick the first — single-org per Jay's setup)
     let org = await prisma.organization.findFirst({ orderBy: { createdAt: "asc" } });
     if (!org) {
       return NextResponse.json(
@@ -98,7 +94,7 @@ export async function POST(req: Request) {
         where: { active: true },
         select: { id: true, name: true, ofUsername: true },
       });
-      models = allCreators.filter((c) => {
+      models = allCreators.filter((c: typeof allCreators[number]) => {
         const n = (c.name || "").toLowerCase();
         const u = (c.ofUsername || "").toLowerCase();
         return SORA_MODEL_NAMES.some((target) => n.includes(target) || u.includes(target));

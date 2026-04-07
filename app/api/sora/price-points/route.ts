@@ -1,31 +1,27 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { isSoraAllowed, canAccessModel } from "@/lib/sora-access";
+import { getSoraAuthSafe } from "@/lib/sora-access";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/sora/price-points?modelId=xxx&days=14
  *
- * Reads Sora's mass messages from OutboundCreative (auto-populated by the
- * sync-outbound-content cron every 10 min) and returns, in her language:
- *   - pricePoints: her ACTUAL distinct prices from the window, ranked by earned-per-send
+ * Reads mass messages from OutboundCreative (auto-populated by the
+ * sync-outbound-content cron every 10 min) and returns, in Sora's language:
+ *   - pricePoints: her ACTUAL distinct prices, ranked by earned-per-send
  *   - captionsPerformedSuccessfully: top captions by earned-per-send
  *   - captionsPerformedPoorly: captions that sent but nobody bought
  *
  * No invented prices. No bucket ranges. Only what she actually did.
+ *
+ * Access: any logged-in user (the whole app is managers-only).
  */
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const email = session?.user?.email || null;
-    const role = (session?.user as any)?.role || "UNASSIGNED";
-    const userId = (session?.user as any)?.id || null;
-
-    if (!isSoraAllowed({ email, role })) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    const ctx = await getSoraAuthSafe();
+    if (!ctx) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -43,11 +39,6 @@ export async function GET(req: Request) {
     });
     if (!model) {
       return NextResponse.json({ error: "Model not found" }, { status: 404 });
-    }
-
-    const allowed = await canAccessModel({ email, role, userId, modelId });
-    if (!allowed) {
-      return NextResponse.json({ error: "Not authorized for this model" }, { status: 403 });
     }
 
     const endDate = new Date();
@@ -75,7 +66,7 @@ export async function GET(req: Request) {
 
     // Paid masses only — group by actual distinct price she used
     const paidRows = rows.filter(
-      (r) => !r.isFree && r.priceCents != null && r.priceCents > 0
+      (r: typeof rows[number]) => !r.isFree && r.priceCents != null && r.priceCents > 0
     );
 
     const priceMap = new Map<
@@ -115,7 +106,7 @@ export async function GET(req: Request) {
         sends: p.sends,
         purchases: p.purchases,
         earned: Math.round(p.earnedCents) / 100,
-        earnedPerSend: p.sends > 0 ? Math.round((p.earnedCents / p.sends)) / 100 : 0,
+        earnedPerSend: p.sends > 0 ? Math.round(p.earnedCents / p.sends) / 100 : 0,
         purchaseRate: p.sends > 0 ? p.purchases / p.sends : 0,
       }))
       .sort((a, b) => b.earnedPerSend - a.earnedPerSend);
@@ -182,11 +173,17 @@ export async function GET(req: Request) {
       .sort((a, b) => b.sends - a.sends)
       .slice(0, 3);
 
-    const totalSends = paidRows.reduce((s, r) => s + (r.sentCount || 0), 0);
-    const totalPurchases = paidRows.reduce((s, r) => s + (r.purchasedCount || 0), 0);
+    const totalSends = paidRows.reduce(
+      (s: number, r: typeof paidRows[number]) => s + (r.sentCount || 0),
+      0,
+    );
+    const totalPurchases = paidRows.reduce(
+      (s: number, r: typeof paidRows[number]) => s + (r.purchasedCount || 0),
+      0,
+    );
     const totalEarnedCents = paidRows.reduce(
-      (s, r) => s + (r.purchasedCount || 0) * (r.priceCents || 0),
-      0
+      (s: number, r: typeof paidRows[number]) => s + (r.purchasedCount || 0) * (r.priceCents || 0),
+      0,
     );
 
     return NextResponse.json({
