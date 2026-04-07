@@ -48,6 +48,18 @@ export type Pattern = {
   detail: string;
 };
 
+export type PaidMass = {
+  id: string;
+  externalId: string;
+  sentAt: string;
+  priceDollars: number;
+  sends: number;
+  purchases: number;
+  earned: number;
+  caption: string;
+  thumbnailUrl: string | null;
+};
+
 export type PricePointsResponse = {
   model: { id: string; name: string | null; ofUsername: string | null };
   windowDays: number;
@@ -58,6 +70,7 @@ export type PricePointsResponse = {
   totalSends: number;
   totalPurchases: number;
   totalEarned: number;
+  paidMasses: PaidMass[];
   pricePoints: PricePoint[];
   pricePointsNoEarnings: PricePoint[];
   suggestedPricePoints: Suggested[];

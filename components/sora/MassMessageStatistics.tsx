@@ -1,9 +1,9 @@
 "use client";
 
 import type { PricePointsResponse } from "./ContentPlan";
-import { PricePoints } from "./PricePoints";
-import { CaptionsPerformedSuccessfully } from "./CaptionsPerformedSuccessfully";
-import { CaptionsPerformedPoorly } from "./CaptionsPerformedPoorly";
+import { SuggestedPricePoints } from "./SuggestedPricePoints";
+import { PaidMasses } from "./PaidMasses";
+import { PatternsWereMissing } from "./PatternsWereMissing";
 
 function fmtMoney(n: number) {
   return `$${n.toFixed(2)}`;
@@ -55,7 +55,7 @@ export function MassMessageStatistics({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-3">
           Mass Message Statistics — last {data.windowDays} days
@@ -73,12 +73,11 @@ export function MassMessageStatistics({
         )}
       </div>
 
-      <PricePoints
-        pricePoints={data.pricePoints}
-        pricePointsNoEarnings={data.pricePointsNoEarnings}
-      />
-      <CaptionsPerformedSuccessfully captions={data.captionsPerformedSuccessfully} />
-      <CaptionsPerformedPoorly captions={data.captionsPerformedPoorly} />
+      <SuggestedPricePoints suggested={data.suggestedPricePoints} />
+
+      <PaidMasses masses={data.paidMasses} />
+
+      <PatternsWereMissing patterns={data.patterns} />
     </div>
   );
 }

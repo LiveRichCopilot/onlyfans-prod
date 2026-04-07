@@ -14,11 +14,17 @@ import { requireAuth, type AuthContext } from "@/lib/auth-gateway";
  * Uses Supabase Auth via auth-gateway.ts (not NextAuth — that's legacy).
  */
 
-const GLOBAL_SCOPE_ORG_ROLES = new Set(["OWNER", "ADMIN", "ACCOUNT_EXEC"]);
+/**
+ * Admin is EMAIL-ONLY for the Sora tab. We intentionally do NOT treat
+ * ACCOUNT_EXEC / OWNER / ADMIN orgRoles as admin here — those org-wide
+ * roles give visibility into every creator in the broader app, but on
+ * the Sora tab every manager (including Sora, whose OrgMember.role is
+ * ACCOUNT_EXEC) should see only her own models as pills. Other models
+ * only appear in the dropdown for Jay and David.
+ */
 const ADMIN_EMAILS = new Set(["jay@liverich.travel", "david@liverich.travel"]);
 
 export function isAdmin(ctx: AuthContext): boolean {
-  if (ctx.orgRole && GLOBAL_SCOPE_ORG_ROLES.has(ctx.orgRole)) return true;
   if (ctx.email && ADMIN_EMAILS.has(ctx.email.toLowerCase())) return true;
   return false;
 }

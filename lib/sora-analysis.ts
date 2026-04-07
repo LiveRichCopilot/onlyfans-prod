@@ -10,11 +10,13 @@
  */
 
 import { buildPatterns, type PatternOut } from "./sora-patterns";
+import { buildSuggestions, type SuggestedOut } from "./sora-suggestions";
 
-export type { PatternOut };
+export type { PatternOut, SuggestedOut };
 
 export type RawRow = {
   id: string;
+  externalId: string;
   sentAt: Date;
   textPlain: string | null;
   textHtml: string | null;
@@ -67,11 +69,16 @@ export type CaptionOut = {
   thumbnailUrl: string | null;
 };
 
-export type SuggestedOut = {
+export type PaidMassOut = {
+  id: string;
+  externalId: string;
+  sentAt: string;
   priceDollars: number;
-  reason: string;
-  stat: string;
-  lastUsedAt: string | null;
+  sends: number;
+  purchases: number;
+  earned: number;
+  caption: string;
+  thumbnailUrl: string | null;
 };
 
 export type AnalysisResult = {
@@ -80,6 +87,7 @@ export type AnalysisResult = {
   totalSends: number;
   totalPurchases: number;
   totalEarned: number;
+  paidMasses: PaidMassOut[];
   pricePoints: PricePointOut[];
   pricePointsNoEarnings: PricePointOut[];
   suggestedPricePoints: SuggestedOut[];
@@ -249,60 +257,33 @@ function buildCaptions(paidRows: EnrichedRow[]): {
   };
 }
 
-function buildSuggestions(pricePoints: PricePointOut[]): SuggestedOut[] {
-  const suggestions: SuggestedOut[] = [];
-  const earners = pricePoints.slice();
+// Suggestions live in lib/sora-suggestions.ts, patterns in lib/sora-patterns.ts.
 
-  if (earners.length > 0) {
-    const top = earners[0];
-    suggestions.push({
-      priceDollars: top.priceDollars,
-      reason: "Your top earner in the last 14 days",
-      stat: `$${top.earned.toFixed(2)} earned from ${top.massesSent} paid mass${top.massesSent === 1 ? "" : "es"}`,
-      lastUsedAt: top.lastUsedAt,
-    });
-  }
-  if (earners.length > 1) {
-    const second = earners[1];
-    suggestions.push({
-      priceDollars: second.priceDollars,
-      reason: "Variety — your second-best earner",
-      stat: `$${second.earned.toFixed(2)} earned from ${second.massesSent} paid mass${second.massesSent === 1 ? "" : "es"}`,
-      lastUsedAt: second.lastUsedAt,
-    });
-  }
-  if (earners.length > 2) {
-    const rest = earners
-      .slice(2)
-      .sort((a, b) => new Date(a.lastUsedAt).getTime() - new Date(b.lastUsedAt).getTime());
-    const fresh = rest[0];
-    const daysAgo = Math.round((Date.now() - new Date(fresh.lastUsedAt).getTime()) / 86400000);
-    suggestions.push({
-      priceDollars: fresh.priceDollars,
-      reason: "Bring back — earned before, haven't used it in a while",
-      stat: `$${fresh.earned.toFixed(2)} earned · last sent ${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`,
-      lastUsedAt: fresh.lastUsedAt,
-    });
-  } else if (earners.length === 2) {
-    const a = earners[0].priceDollars;
-    const b = earners[1].priceDollars;
-    const candidates = [Math.round((a + b) / 2), Math.min(a, b) - 1, Math.max(a, b) + 1].filter(
-      (v) => v > 0 && v !== a && v !== b,
-    );
-    if (candidates.length > 0) {
-      suggestions.push({
-        priceDollars: candidates[0],
-        reason: "Test — between your two earners to see what happens",
-        stat: "No history at this price yet",
-        lastUsedAt: null,
-      });
-    }
-  }
-
-  return suggestions;
+function buildPaidMasses(rows: RawRow[], enriched: EnrichedRow[]): PaidMassOut[] {
+  const byId = new Map<string, RawRow>();
+  for (const r of rows) byId.set(r.id, r);
+  return enriched
+    .map((r) => {
+      const raw = byId.get(r.id);
+      const caption = (r.textPlain || r.textHtml || "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const purchases = r.purchasedCount || 0;
+      return {
+        id: r.id,
+        externalId: raw?.externalId || r.id,
+        sentAt: r.sentAt.toISOString(),
+        priceDollars: r.priceCents / 100,
+        sends: r.sentCount || 0,
+        purchases,
+        earned: Math.round(purchases * r.priceCents) / 100,
+        caption,
+        thumbnailUrl: r.thumbnailUrl,
+      };
+    })
+    .sort((a, b) => b.earned - a.earned);
 }
-
-// Pattern detection lives in lib/sora-patterns.ts (kept small enough here).
 
 export function analyzeRows(rows: RawRow[]): AnalysisResult {
   const paidRows: EnrichedRow[] = [];
@@ -329,6 +310,7 @@ export function analyzeRows(rows: RawRow[]): AnalysisResult {
   const { pricePoints, pricePointsNoEarnings } = buildPricePoints(paidRows);
   const { captionMap, successful, poorly } = buildCaptions(paidRows);
   const suggestedPricePoints = buildSuggestions(pricePoints);
+  const paidMasses = buildPaidMasses(rows, paidRows);
   const captionSummaries = [...captionMap.values()].map((c) => ({
     text: c.text,
     timesUsed: c.timesUsed,
@@ -357,6 +339,7 @@ export function analyzeRows(rows: RawRow[]): AnalysisResult {
     totalSends,
     totalPurchases,
     totalEarned: Math.round(totalEarnedCents) / 100,
+    paidMasses,
     pricePoints,
     pricePointsNoEarnings,
     suggestedPricePoints,

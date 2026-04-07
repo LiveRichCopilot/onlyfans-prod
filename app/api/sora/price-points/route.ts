@@ -61,6 +61,7 @@ export async function GET(req: Request) {
       },
       select: {
         id: true,
+        externalId: true,
         sentAt: true,
         textPlain: true,
         textHtml: true,

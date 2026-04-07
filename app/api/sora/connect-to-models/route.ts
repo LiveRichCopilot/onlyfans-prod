@@ -23,7 +23,15 @@ export const dynamic = "force-dynamic";
  *   If passed, uses those exact Creator IDs instead of fuzzy name matching.
  */
 
-const SORA_MODEL_NAMES = ["kaylie", "anna cherie", "anna", "angie", "wendy"];
+// Exact OF usernames for Sora's 6 models. Verified from Supabase 2026-04-06.
+const SORA_MODEL_USERNAMES = [
+  "kylierae",
+  "kylieraeprivate",
+  "anacheri",
+  "anacherivip",
+  "angiyang",
+  "wendyfiore",
+];
 const TEAM_EMAILS = ["sora@liverich.travel", "jay@liverich.travel", "david@liverich.travel"];
 
 export async function POST(req: Request) {
@@ -90,20 +98,30 @@ export async function POST(req: Request) {
         select: { id: true, name: true, ofUsername: true },
       });
     } else {
-      const allCreators = await prisma.creator.findMany({
-        where: { active: true },
+      // Strict match on the exact OF usernames — never fuzzy.
+      models = await prisma.creator.findMany({
+        where: {
+          active: true,
+          ofUsername: { in: SORA_MODEL_USERNAMES },
+        },
         select: { id: true, name: true, ofUsername: true },
-      });
-      models = allCreators.filter((c: typeof allCreators[number]) => {
-        const n = (c.name || "").toLowerCase();
-        const u = (c.ofUsername || "").toLowerCase();
-        return SORA_MODEL_NAMES.some((target) => n.includes(target) || u.includes(target));
       });
     }
 
-    // 4. Create ManagerAccountResponsibility rows for each team member × each model
+    // Wipe each team member's existing responsibility rows that aren't in
+    // this set of 6, so re-running Setup always leaves exactly these links.
+    const keepIds = models.map((m) => m.id);
+
+    // 4. Clean out each team member's wrong rows, then create the right ones
     const links: Array<{ email: string; modelName: string; created: boolean }> = [];
     for (const tu of teamUsers) {
+      await prisma.managerAccountResponsibility.deleteMany({
+        where: {
+          organizationId: org.id,
+          managerId: tu.userId,
+          creatorId: { notIn: keepIds },
+        },
+      });
       for (const model of models) {
         const existing = await prisma.managerAccountResponsibility.findUnique({
           where: {
