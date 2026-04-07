@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2, Calendar, Image as ImageIcon } from "lucide-react";
+import { LayoutGrid, MessageSquare, Activity, Users, Database, Zap, BarChart2, Link2, Calendar, Image as ImageIcon, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 type Creator = {
@@ -100,6 +100,12 @@ export function Sidebar({ creators, loading, onAddAccount }: Props) {
                         <Link href="/content-feed">
                             <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
                                 <BarChart2 size={16} /> Content Feed
+                            </li>
+                        </Link>
+                        <Link href="/sora">
+                            <li className="flex items-center gap-3 px-3 py-2.5 text-white/60 hover:text-white transition rounded-xl hover:bg-white/5 cursor-pointer">
+                                <TrendingUp size={16} /> Sora
+                                <span className="bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded ml-auto border border-teal-500/30 font-bold tracking-wider">NEW</span>
                             </li>
                         </Link>
                         <Link href="/performance">
