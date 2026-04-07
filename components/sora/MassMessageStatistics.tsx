@@ -61,14 +61,22 @@ export function MassMessageStatistics({
           Mass Message Statistics — last {data.windowDays} days
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="Paid Masses" value={String(data.paidMassCount)} />
-          <StatCard label="Sends" value={data.totalSends.toLocaleString()} />
+          <StatCard label="Total Earned" value={fmtMoney(data.totalEarned)} />
           <StatCard label="Purchases" value={data.totalPurchases.toLocaleString()} />
-          <StatCard label="Earned" value={fmtMoney(data.totalEarned)} />
+          <StatCard label="Sends" value={data.totalSends.toLocaleString()} />
+          <StatCard label="Paid Masses" value={String(data.paidMassCount)} />
         </div>
+        {data.rowsMissingPrice > 0 && (
+          <div className="mt-3 text-[11px] text-yellow-300/80">
+            Note: {data.rowsMissingPrice} mass message{data.rowsMissingPrice === 1 ? "" : "s"} had no price data in the backfill. These aren't counted.
+          </div>
+        )}
       </div>
 
-      <PricePoints pricePoints={data.pricePoints} />
+      <PricePoints
+        pricePoints={data.pricePoints}
+        pricePointsNoEarnings={data.pricePointsNoEarnings}
+      />
       <CaptionsPerformedSuccessfully captions={data.captionsPerformedSuccessfully} />
       <CaptionsPerformedPoorly captions={data.captionsPerformedPoorly} />
     </div>

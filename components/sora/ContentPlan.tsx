@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Models } from "./Models";
 import { MassMessageStatistics } from "./MassMessageStatistics";
+import { SetupButton } from "./SetupButton";
 
 type Model = {
   id: string;
@@ -19,6 +20,8 @@ export type PricePoint = {
   earned: number;
   earnedPerSend: number;
   purchaseRate: number;
+  lastUsedAt: string;
+  firstUsedAt: string;
 };
 
 export type Caption = {
@@ -30,6 +33,7 @@ export type Caption = {
   earnedPerSend: number;
   lastUsed: string;
   lastPriceDollars: number | null;
+  thumbnailUrl: string | null;
 };
 
 export type PricePointsResponse = {
@@ -38,15 +42,17 @@ export type PricePointsResponse = {
   startDate: string;
   endDate: string;
   paidMassCount: number;
+  rowsMissingPrice: number;
   totalSends: number;
   totalPurchases: number;
   totalEarned: number;
   pricePoints: PricePoint[];
+  pricePointsNoEarnings: PricePoint[];
   captionsPerformedSuccessfully: Caption[];
   captionsPerformedPoorly: Caption[];
 };
 
-export function ContentPlan({ models }: { models: Model[] }) {
+export function ContentPlan({ models, isAdmin }: { models: Model[]; isAdmin: boolean }) {
   const [selectedId, setSelectedId] = useState<string | null>(models[0]?.id || null);
   const [data, setData] = useState<PricePointsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -80,14 +86,33 @@ export function ContentPlan({ models }: { models: Model[] }) {
 
   if (models.length === 0) {
     return (
-      <div className="glass-panel rounded-3xl p-10 text-center">
-        <p className="text-white/60">No models connected yet. Ask an admin to run the setup step.</p>
+      <div className="glass-panel rounded-3xl p-10 text-center space-y-4">
+        <p className="text-white/70">
+          Your models haven't been linked to your account yet.
+        </p>
+        {isAdmin ? (
+          <div className="space-y-3">
+            <p className="text-white/50 text-sm">
+              Click Setup to connect Sora, Jay, and David to the 6 models (Kaylie ×2, Anna Cherie ×2, Angie, Wendy).
+            </p>
+            <SetupButton />
+          </div>
+        ) : (
+          <p className="text-white/50 text-sm">
+            Ask Jay or David to run the Setup step for your account.
+          </p>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {isAdmin && (
+        <div className="flex justify-end">
+          <SetupButton compact />
+        </div>
+      )}
       <Models models={models} selectedId={selectedId} onSelect={setSelectedId} />
       <MassMessageStatistics data={data} loading={loading} error={error} />
     </div>
