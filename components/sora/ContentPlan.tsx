@@ -36,6 +36,18 @@ export type Caption = {
   thumbnailUrl: string | null;
 };
 
+export type Suggested = {
+  priceDollars: number;
+  reason: string;
+  stat: string;
+  lastUsedAt: string | null;
+};
+
+export type Pattern = {
+  title: string;
+  detail: string;
+};
+
 export type PricePointsResponse = {
   model: { id: string; name: string | null; ofUsername: string | null };
   windowDays: number;
@@ -48,12 +60,23 @@ export type PricePointsResponse = {
   totalEarned: number;
   pricePoints: PricePoint[];
   pricePointsNoEarnings: PricePoint[];
+  suggestedPricePoints: Suggested[];
   captionsPerformedSuccessfully: Caption[];
   captionsPerformedPoorly: Caption[];
+  patterns: Pattern[];
 };
 
-export function ContentPlan({ models, isAdmin }: { models: Model[]; isAdmin: boolean }) {
-  const [selectedId, setSelectedId] = useState<string | null>(models[0]?.id || null);
+export function ContentPlan({
+  myModels,
+  otherModels,
+  isAdmin,
+}: {
+  myModels: Model[];
+  otherModels: Model[];
+  isAdmin: boolean;
+}) {
+  const initialId = myModels[0]?.id || otherModels[0]?.id || null;
+  const [selectedId, setSelectedId] = useState<string | null>(initialId);
   const [data, setData] = useState<PricePointsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +107,7 @@ export function ContentPlan({ models, isAdmin }: { models: Model[]; isAdmin: boo
     };
   }, [selectedId]);
 
-  if (models.length === 0) {
+  if (myModels.length === 0 && otherModels.length === 0) {
     return (
       <div className="glass-panel rounded-3xl p-10 text-center space-y-4">
         <p className="text-white/70">
@@ -113,7 +136,12 @@ export function ContentPlan({ models, isAdmin }: { models: Model[]; isAdmin: boo
           <SetupButton compact />
         </div>
       )}
-      <Models models={models} selectedId={selectedId} onSelect={setSelectedId} />
+      <Models
+        myModels={myModels}
+        otherModels={otherModels}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+      />
       <MassMessageStatistics data={data} loading={loading} error={error} />
     </div>
   );

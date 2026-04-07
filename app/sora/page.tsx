@@ -10,7 +10,7 @@ export default async function SoraPage() {
     redirect("/login?next=/sora");
   }
 
-  const models = await listModelsForUser(ctx);
+  const { myModels, otherModels } = await listModelsForUser(ctx);
   const admin = isAdmin(ctx);
 
   return (
@@ -23,7 +23,7 @@ export default async function SoraPage() {
           </div>
           <div className="text-[11px] text-white/40">Signed in as {ctx.email}</div>
         </div>
-        <ContentPlan models={models} isAdmin={admin} />
+        <ContentPlan myModels={myModels} otherModels={otherModels} isAdmin={admin} />
       </div>
     </main>
   );

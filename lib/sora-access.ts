@@ -46,32 +46,54 @@ async function fetchModels(ids: string[]): Promise<SoraModel[]> {
 }
 
 /**
- * Models this user can see on the Sora tab.
- * - Admins → every active model
- * - Managers → models they own via ManagerAccountResponsibility
+ * Models this user can see on the Sora tab — split into "mine" and "others".
+ *
+ * - myModels = every user's own ManagerAccountResponsibility rows. These
+ *   render as pills at the top of the screen.
+ * - otherModels = everything else (admin only). These render in a
+ *   dropdown so admins can peek at a model they don't manage without
+ *   cluttering the pill row.
+ *
+ * Non-admins who have no responsibility rows yet get empty myModels and
+ * empty otherModels — the page shows "Ask an admin to run Setup".
  */
-export async function listModelsForUser(ctx: AuthContext): Promise<SoraModel[]> {
-  if (isAdmin(ctx)) {
-    const creators = await prisma.creator.findMany({
-      where: { active: true },
-      select: { id: true, name: true, ofUsername: true, avatarUrl: true },
-      orderBy: { name: "asc" },
+export async function listModelsForUser(
+  ctx: AuthContext,
+): Promise<{ myModels: SoraModel[]; otherModels: SoraModel[] }> {
+  const admin = isAdmin(ctx);
+
+  const myIds = new Set<string>();
+  if (ctx.orgId) {
+    const responsibilities = await prisma.managerAccountResponsibility.findMany({
+      where: { organizationId: ctx.orgId, managerId: ctx.userId },
+      select: { creatorId: true },
     });
-    return creators.map((c: typeof creators[number]) => ({
+    for (const r of responsibilities as Array<{ creatorId: string }>) {
+      myIds.add(r.creatorId);
+    }
+  }
+
+  const myModels = await fetchModels([...myIds]);
+
+  if (!admin) {
+    return { myModels, otherModels: [] };
+  }
+
+  const allCreators = await prisma.creator.findMany({
+    where: { active: true },
+    select: { id: true, name: true, ofUsername: true, avatarUrl: true },
+    orderBy: { name: "asc" },
+  });
+  const otherModels = allCreators
+    .filter((c: typeof allCreators[number]) => !myIds.has(c.id))
+    .map((c: typeof allCreators[number]) => ({
       id: c.id,
       name: c.name || c.ofUsername || "Unknown",
       ofUsername: c.ofUsername,
       avatarUrl: c.avatarUrl,
     }));
-  }
 
-  if (!ctx.orgId) return [];
-
-  const responsibilities = await prisma.managerAccountResponsibility.findMany({
-    where: { organizationId: ctx.orgId, managerId: ctx.userId },
-    select: { creatorId: true },
-  });
-  return fetchModels(responsibilities.map((r: { creatorId: string }) => r.creatorId));
+  return { myModels, otherModels };
 }
 
 /**
