@@ -2,23 +2,24 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSoraAuthSafe, canAccessModel } from "@/lib/sora-access";
 import { analyzeRows, type RawRow } from "@/lib/sora-analysis";
+import { refreshModelMassMessages } from "@/lib/sora-live-refresh";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
- * GET /api/sora/price-points?modelId=xxx&days=14
+ * GET /api/sora/price-points?modelId=xxx&days=14&skipLive=0
  *
- * Reads her mass messages from OutboundCreative (cron-populated every
- * 10 min) and runs the analysis in lib/sora-analysis.ts to return:
- *   - pricePoints: actual distinct prices, ranked by total $ earned
- *   - pricePointsNoEarnings: prices she tried but earned $0
- *   - suggestedPricePoints: what to try next week based on her data
- *   - captionsPerformedSuccessfully / captionsPerformedPoorly
- *   - patterns: observations she might be missing (time of day, day
- *     of week, reused captions, untried prices, dormant winners,
- *     price resistance)
+ * Each call LIVE-fetches the latest mass message data from OFAPI for
+ * the selected model, merges the authoritative /buyers purchase counts
+ * into OutboundCreative, then reads everything back and runs analysis.
  *
- * Access: any logged-in user who owns this model (admins see all).
+ * Why live every time: background crons lag (only 5 creators per 15
+ * min, and they previously limited to 7 days — stale for anything
+ * older). Sora needs the same numbers OF shows right now.
+ *
+ * Pass skipLive=1 to bypass the live fetch (useful for debugging or
+ * when you just want cached data).
  */
 export async function GET(req: Request) {
   try {
@@ -30,6 +31,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const modelId = searchParams.get("modelId");
     const daysRaw = searchParams.get("days");
+    const skipLive = searchParams.get("skipLive") === "1";
     const days = Math.min(60, Math.max(1, parseInt(daysRaw || "14", 10) || 14));
 
     if (!modelId) {
@@ -43,10 +45,20 @@ export async function GET(req: Request) {
 
     const model = await prisma.creator.findUnique({
       where: { id: modelId },
-      select: { id: true, name: true, ofUsername: true },
+      select: { id: true, name: true, ofUsername: true, ofapiCreatorId: true },
     });
     if (!model) {
       return NextResponse.json({ error: "Model not found" }, { status: 404 });
+    }
+
+    // Live-refresh before reading so the numbers match OF exactly.
+    let refreshResult: { refreshed: number; errors: number } | null = null;
+    if (!skipLive && model.ofapiCreatorId) {
+      refreshResult = await refreshModelMassMessages({
+        creatorId: model.id,
+        ofapiCreatorId: model.ofapiCreatorId,
+        days,
+      });
     }
 
     const endDate = new Date();
