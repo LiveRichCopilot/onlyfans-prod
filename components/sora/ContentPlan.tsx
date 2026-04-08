@@ -155,7 +155,12 @@ export function ContentPlan({
         selectedId={selectedId}
         onSelect={setSelectedId}
       />
-      <MassMessageStatistics data={data} loading={loading} error={error} />
+      <MassMessageStatistics
+        data={data}
+        loading={loading}
+        error={error}
+        modelId={selectedId}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { PricePointsResponse } from "./ContentPlan";
 import { SuggestedPricePoints } from "./SuggestedPricePoints";
 import { PaidMasses } from "./PaidMasses";
 import { PatternsWereMissing } from "./PatternsWereMissing";
+import { CrossCreatorWhales } from "./CrossCreatorWhales";
 
 function fmtMoney(n: number) {
   return `$${n.toFixed(2)}`;
@@ -22,10 +23,12 @@ export function MassMessageStatistics({
   data,
   loading,
   error,
+  modelId,
 }: {
   data: PricePointsResponse | null;
   loading: boolean;
   error: string | null;
+  modelId: string | null;
 }) {
   if (error) {
     return (
@@ -76,6 +79,8 @@ export function MassMessageStatistics({
       <SuggestedPricePoints suggested={data.suggestedPricePoints} />
 
       <PaidMasses masses={data.paidMasses} />
+
+      <CrossCreatorWhales modelId={modelId} />
 
       <PatternsWereMissing patterns={data.patterns} />
     </div>
