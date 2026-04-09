@@ -5,6 +5,10 @@ export const dynamic = "force-dynamic";
 
 const OFAPI_BASE = "https://app.onlyfansapi.com";
 
+// Cache fresh URLs by onlyfansMediaId — CDN URLs expire ~30min, so 20min TTL is safe
+const urlCache = new Map<string, { data: any; ts: number }>();
+const URL_CACHE_TTL = 20 * 60 * 1000; // 20 minutes
+
 /**
  * GET /api/media/fresh-url?mediaId=<OutboundMedia.id>
  * Fetches fresh CDN URLs from OFAPI vault for a specific media item.
@@ -32,8 +36,14 @@ export async function GET(req: NextRequest) {
     });
     if (!creator?.ofapiCreatorId) return NextResponse.json({ error: "Creator not linked" }, { status: 404 });
 
-    // Fetch fresh URLs from OFAPI vault
+    // Fetch fresh URLs from OFAPI vault (with TTL cache)
     if (media.onlyfansMediaId) {
+      const cacheKey = media.onlyfansMediaId.toString();
+      const cached = urlCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < URL_CACHE_TTL) {
+        return NextResponse.json(cached.data);
+      }
+
       const res = await fetch(`${OFAPI_BASE}/api/${creator.ofapiCreatorId}/media/vault/${media.onlyfansMediaId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
         signal: AbortSignal.timeout(10000),
@@ -43,13 +53,22 @@ export async function GET(req: NextRequest) {
         const files = data?.data?.files || data?.files;
         const videoSources = data?.data?.videoSources || data?.videoSources;
         if (files || videoSources) {
-          return NextResponse.json({
+          const result = {
             full: files?.full?.url || null,
             preview: files?.preview?.url || null,
             thumb: files?.thumb?.url || null,
             videoSources: videoSources || null,
             mediaType: media.mediaType,
-          });
+          };
+          urlCache.set(cacheKey, { data: result, ts: Date.now() });
+          // Evict stale entries if cache grows large
+          if (urlCache.size > 500) {
+            const now = Date.now();
+            for (const [k, v] of urlCache) {
+              if (now - v.ts > URL_CACHE_TTL) urlCache.delete(k);
+            }
+          }
+          return NextResponse.json(result);
         }
       }
     }

@@ -11,6 +11,9 @@ const MEDIA_BUCKET = "content-media";
 let cachedAccount: { name: string; ts: number } | null = null;
 const ACCOUNT_CACHE_TTL = 300_000; // 5 min
 
+// In-flight dedupe: concurrent requests for the same cacheKey share one OFAPI download
+const inflight = new Map<string, Promise<{ body: ArrayBuffer; contentType: string } | null>>();
+
 /** Extract a stable cache key from an OF CDN URL (path only, no signed tokens) */
 function getCacheKey(url: string): string {
     try {
@@ -111,33 +114,40 @@ export async function GET(request: NextRequest) {
         const cached = await serveCached(cacheKey);
         if (cached) return cached;
 
-        // 2. Not cached — download via OFAPI
+        // 2. Not cached — download via OFAPI (with in-flight dedupe)
         try {
-            const accountName = await resolveAccountName(creatorId);
-            if (accountName) {
-                const downloadUrl = `${OFAPI_BASE}/api/${accountName}/media/download/${targetUrl}`;
-                const response = await fetch(downloadUrl, {
-                    headers: { Authorization: `Bearer ${apiKey}`, Accept: "image/*, video/*, audio/*, */*" },
-                });
-
-                if (response.ok) {
-                    const contentType = response.headers.get("Content-Type") || "application/octet-stream";
-                    // Read body so we can both cache and respond
-                    const body = await response.arrayBuffer();
-
-                    // 3. Cache in Supabase Storage (fire-and-forget, won't block response)
-                    cacheInStorage(cacheKey, body, contentType);
-
-                    return new NextResponse(body, {
-                        status: 200,
-                        headers: {
-                            "Content-Type": contentType,
-                            "Cache-Control": "public, max-age=86400",
-                            "Access-Control-Allow-Origin": "*",
-                        },
+            let downloadPromise = inflight.get(cacheKey);
+            if (!downloadPromise) {
+                downloadPromise = (async () => {
+                    const accountName = await resolveAccountName(creatorId);
+                    if (!accountName) return null;
+                    const downloadUrl = `${OFAPI_BASE}/api/${accountName}/media/download/${targetUrl}`;
+                    const response = await fetch(downloadUrl, {
+                        headers: { Authorization: `Bearer ${apiKey}`, Accept: "image/*, video/*, audio/*, */*" },
                     });
-                }
-                console.warn(`[proxy] OFAPI download ${response.status} for ${targetUrl.substring(0, 60)}...`);
+                    if (!response.ok) {
+                        console.warn(`[proxy] OFAPI download ${response.status} for ${targetUrl.substring(0, 60)}...`);
+                        return null;
+                    }
+                    const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+                    const body = await response.arrayBuffer();
+                    cacheInStorage(cacheKey, body, contentType);
+                    return { body, contentType };
+                })();
+                inflight.set(cacheKey, downloadPromise);
+                downloadPromise.finally(() => inflight.delete(cacheKey));
+            }
+
+            const result = await downloadPromise;
+            if (result) {
+                return new NextResponse(result.body, {
+                    status: 200,
+                    headers: {
+                        "Content-Type": result.contentType,
+                        "Cache-Control": "public, max-age=86400",
+                        "Access-Control-Allow-Origin": "*",
+                    },
+                });
             }
         } catch (e: any) {
             console.warn("[proxy] OFAPI download error:", e.message);

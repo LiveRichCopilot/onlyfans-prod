@@ -85,17 +85,8 @@ export function useMessages(activeChat: Chat | null, selectedCreatorId: string) 
                 .catch(console.error);
         }, 5000);
 
-        // Refresh media URLs every 60s to prevent CDN expiry
-        const mediaRefreshInterval = setInterval(() => {
-            fetch(`/api/inbox/media?creatorId=${cId}&chatId=${activeChat.id}`)
-                .then((r) => r.json())
-                .then((d) => { if (d.media) setMediaMap(d.media); })
-                .catch(console.error);
-        }, 60000);
-
         return () => {
             clearInterval(pollInterval);
-            clearInterval(mediaRefreshInterval);
         };
     }, [activeChat]);
 

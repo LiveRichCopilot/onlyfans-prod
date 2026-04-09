@@ -4,6 +4,10 @@ import { getChatMedia } from "@/lib/ofapi";
 
 export const dynamic = "force-dynamic";
 
+// Cache getChatMedia results — media URLs valid for ~30min, 5min TTL is safe
+const mediaCache = new Map<string, { data: Record<string, any>; ts: number }>();
+const MEDIA_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Get fresh media URLs for a specific chat.
  * OF CDN URLs expire — this endpoint returns fresh signed URLs
@@ -30,6 +34,12 @@ export async function GET(request: Request) {
         }
 
         const accountName = creator.ofapiCreatorId || creator.telegramId;
+        const cacheKey = `${creatorId}:${chatId}`;
+        const cached = mediaCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < MEDIA_CACHE_TTL) {
+            return NextResponse.json({ media: cached.data });
+        }
+
         const rawMedia = await getChatMedia(accountName, chatId, apiKey);
 
         // Build a lookup map: mediaId -> fresh URLs
@@ -47,6 +57,15 @@ export async function GET(request: Request) {
                         || med.files?.preview?.url || "",
                     type: med.type || "photo",
                 };
+            }
+        }
+
+        mediaCache.set(cacheKey, { data: mediaMap, ts: Date.now() });
+        // Evict stale entries
+        if (mediaCache.size > 200) {
+            const now = Date.now();
+            for (const [k, v] of mediaCache) {
+                if (now - v.ts > MEDIA_CACHE_TTL) mediaCache.delete(k);
             }
         }
 
