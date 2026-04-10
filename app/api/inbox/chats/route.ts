@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchAllChats, listChats } from "@/lib/ofapi";
+import { syncIfStale } from "@/lib/sync-on-demand";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,11 @@ export async function GET(request: Request) {
 
         if (creatorsToFetch.length === 0) {
             return NextResponse.json({ chats: [], hasMore: false });
+        }
+
+        // Trigger background sync for analytics data (fire-and-forget)
+        for (const c of creatorsToFetch) {
+          syncIfStale(c.id, "chat_messages", "transactions", "online").catch(() => {});
         }
 
         // Single page fetch per creator — fast initial load

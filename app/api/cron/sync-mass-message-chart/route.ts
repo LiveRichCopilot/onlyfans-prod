@@ -22,10 +22,20 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const creators = await prisma.creator.findMany({
-      where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
-      select: { id: true, ofapiCreatorId: true, ofapiToken: true },
-    });
+    const forceCreatorId = req.nextUrl.searchParams.get("creatorId");
+    let creators: any[];
+    if (forceCreatorId) {
+      const c = await prisma.creator.findUnique({
+        where: { id: forceCreatorId },
+        select: { id: true, ofapiCreatorId: true, ofapiToken: true },
+      });
+      creators = c ? [c] : [];
+    } else {
+      creators = await prisma.creator.findMany({
+        where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
+        select: { id: true, ofapiCreatorId: true, ofapiToken: true },
+      });
+    }
 
     const apiKey = process.env.OFAPI_API_KEY || "";
     const now = new Date();

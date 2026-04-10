@@ -5,16 +5,8 @@
             "schedule": "0 * * * *"
         },
         {
-            "path": "/api/cron/sync-transactions",
-            "schedule": "*/5 * * * *"
-        },
-        {
             "path": "/api/cron/stage-decay",
             "schedule": "0 6 * * *"
-        },
-        {
-            "path": "/api/cron/online-poll",
-            "schedule": "*/2 * * * *"
         },
         {
             "path": "/api/cron/follow-ups",
@@ -35,30 +27,6 @@
         {
             "path": "/api/cron/creator-report",
             "schedule": "0 6 * * *"
-        },
-        {
-            "path": "/api/cron/sync-messages",
-            "schedule": "*/2 * * * *"
-        },
-        {
-            "path": "/api/cron/sync-dm-engagement",
-            "schedule": "*/15 * * * *"
-        },
-        {
-            "path": "/api/cron/sync-mass-message-chart",
-            "schedule": "*/15 * * * *"
-        },
-        {
-            "path": "/api/cron/sync-mass-message-stats",
-            "schedule": "*/15 * * * *"
-        },
-        {
-            "path": "/api/cron/sync-outbound-content",
-            "schedule": "*/10 * * * *"
-        },
-        {
-            "path": "/api/cron/sync-chargebacks",
-            "schedule": "*/30 * * * *"
         }
     ]
 }

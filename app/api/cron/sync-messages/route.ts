@@ -22,12 +22,22 @@ export async function GET(req: NextRequest) {
   }
 
   const forceAll = req.nextUrl.searchParams.get("forceAll") === "true";
+  const forceCreatorId = req.nextUrl.searchParams.get("creatorId");
 
   try {
-    const creators = await prisma.creator.findMany({
-      where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
-      select: { id: true, ofapiCreatorId: true, ofapiToken: true },
-    });
+    let creators: any[];
+    if (forceCreatorId) {
+      const c = await prisma.creator.findUnique({
+        where: { id: forceCreatorId },
+        select: { id: true, ofapiCreatorId: true, ofapiToken: true },
+      });
+      creators = c ? [c] : [];
+    } else {
+      creators = await prisma.creator.findMany({
+        where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
+        select: { id: true, ofapiCreatorId: true, ofapiToken: true },
+      });
+    }
 
     // Find the most recent lastSyncAt per creator from SyncCursor
     const latestSyncs = await prisma.syncCursor.groupBy({

@@ -30,9 +30,16 @@ export async function GET(request: Request) {
         const startTime = Date.now();
         const TIME_BUDGET_MS = 45_000; // Stop well before 55s Vercel limit
 
-        const creators = await prisma.creator.findMany({
-            where: { active: true, ofapiToken: { not: null } },
-        });
+        const forceCreatorId = new URL(request.url).searchParams.get("creatorId");
+        let creators: any[];
+        if (forceCreatorId) {
+            const c = await prisma.creator.findUnique({ where: { id: forceCreatorId } });
+            creators = c ? [c] : [];
+        } else {
+            creators = await prisma.creator.findMany({
+                where: { active: true, ofapiToken: { not: null } },
+            });
+        }
 
         const eligible = creators.filter(c => c.ofapiToken && c.ofapiCreatorId);
 

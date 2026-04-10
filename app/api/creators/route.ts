@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTransactionsSummary, getTransactions, calculateTopFans } from "@/lib/ofapi";
+import { syncIfStale } from "@/lib/sync-on-demand";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +131,11 @@ export async function GET(request: Request) {
             where: { active: true },
             orderBy: { createdAt: "desc" },
         });
+
+        // Trigger on-demand background sync for analytics data
+        for (const c of creators.slice(0, 5)) {
+          syncIfStale(c.id, "transactions", "content", "online").catch(() => {});
+        }
 
         // Auto-sync on every dashboard load — fire-and-forget, cap 5 unsynced
         const needsSync = creators.filter(
