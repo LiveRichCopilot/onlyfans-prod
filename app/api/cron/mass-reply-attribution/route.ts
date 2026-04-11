@@ -42,11 +42,21 @@ export async function GET(request: Request) {
   const cutoff48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
   try {
-    // Get creators with OFAPI access, ordered by least recently computed
-    const creators = await prisma.creator.findMany({
-      where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
-      select: { id: true, name: true, ofapiCreatorId: true, ofapiToken: true },
-    });
+    // Support single-creator mode for on-demand sync
+    const forceCreatorId = new URL(request.url).searchParams.get("creatorId");
+    let creators: any[];
+    if (forceCreatorId) {
+      const c = await prisma.creator.findUnique({
+        where: { id: forceCreatorId },
+        select: { id: true, name: true, ofapiCreatorId: true, ofapiToken: true },
+      });
+      creators = c ? [c] : [];
+    } else {
+      creators = await prisma.creator.findMany({
+        where: { active: true, ofapiToken: { not: null }, ofapiCreatorId: { not: null } },
+        select: { id: true, name: true, ofapiCreatorId: true, ofapiToken: true },
+      });
+    }
 
     if (creators.length === 0) {
       return NextResponse.json({ message: "No creators", processed: 0 });

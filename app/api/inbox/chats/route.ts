@@ -5,6 +5,10 @@ import { syncIfStale } from "@/lib/sync-on-demand";
 
 export const dynamic = "force-dynamic";
 
+// Cache chat lists per creator — avoids hitting OFAPI on every inbox load
+const chatCache = new Map<string, { data: any; ts: number }>();
+const CHAT_CACHE_TTL = 30_000; // 30 seconds
+
 /**
  * Fetch chats from OFAPI.
  * ?creatorId=xxx — single creator
@@ -52,12 +56,26 @@ export async function GET(request: Request) {
           syncIfStale(c.id, "chat_messages", "transactions", "online").catch(() => {});
         }
 
-        // Single page fetch per creator — fast initial load
+        // Single page fetch per creator — cache 30s to avoid repeat OFAPI calls
         let hasMorePages = false;
         const results = await Promise.allSettled(
             creatorsToFetch.map(async (creator) => {
                 const accountName = creator.ofapiCreatorId || creator.telegramId;
-                const res = await listChats(accountName, apiKey, limit, offset);
+                const cacheKey = `${accountName}:${limit}:${offset}`;
+                const cached = chatCache.get(cacheKey);
+                let res: any;
+                if (cached && Date.now() - cached.ts < CHAT_CACHE_TTL) {
+                    res = cached.data;
+                } else {
+                    res = await listChats(accountName, apiKey, limit, offset);
+                    chatCache.set(cacheKey, { data: res, ts: Date.now() });
+                    if (chatCache.size > 100) {
+                        const now = Date.now();
+                        for (const [k, v] of chatCache) {
+                            if (now - v.ts > CHAT_CACHE_TTL) chatCache.delete(k);
+                        }
+                    }
+                }
                 const chatList = Array.isArray(res?.data) ? res.data : [];
                 const nextPage = res?._pagination?.next_page ?? res?._meta?._pagination?.next_page ?? null;
                 if (nextPage) hasMorePages = true;

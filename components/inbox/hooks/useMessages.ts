@@ -73,7 +73,7 @@ export function useMessages(activeChat: Chat | null, selectedCreatorId: string) 
             }
         });
 
-        // Poll every 5s (skip when viewing historical)
+        // Poll every 15s — reads from DB now (webhooks deliver real-time), not live OFAPI
         const pollInterval = setInterval(() => {
             if (isJumpedRef.current) return;
             fetch(`/api/inbox/messages?creatorId=${cId}&chatId=${activeChat.id}&limit=50`)
@@ -83,7 +83,7 @@ export function useMessages(activeChat: Chat | null, selectedCreatorId: string) 
                     setMessages(mapRawMessages(raw, activeChat, mediaMapRef.current));
                 })
                 .catch(console.error);
-        }, 5000);
+        }, 15000);
 
         return () => {
             clearInterval(pollInterval);

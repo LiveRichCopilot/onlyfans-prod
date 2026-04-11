@@ -2,6 +2,27 @@
 
 const OFAPI_BASE = "https://app.onlyfansapi.com";
 
+// ─── Request metering ───────────────────────────────────────────────
+const meter: Record<string, number> = {};
+let meterFlushTimer: ReturnType<typeof setInterval> | null = null;
+
+function trackRequest(endpoint: string) {
+    // Extract the route pattern (e.g., /api/acct_xxx/chats → /chats)
+    const pattern = endpoint.replace(/\/api\/[^/]+/, "").split("?")[0] || endpoint;
+    meter[pattern] = (meter[pattern] || 0) + 1;
+    if (!meterFlushTimer) {
+        meterFlushTimer = setInterval(() => {
+            const entries = Object.entries(meter).filter(([, c]) => c > 0);
+            if (entries.length > 0) {
+                const total = entries.reduce((s, [, c]) => s + c, 0);
+                const top = entries.sort((a, b) => b[1] - a[1]).slice(0, 5).map(([e, c]) => `${e}:${c}`).join(", ");
+                console.log(`[OFAPI meter] ${total} calls/min — ${top}`);
+                for (const key of Object.keys(meter)) meter[key] = 0;
+            }
+        }, 60_000);
+    }
+}
+
 type RequestOptions = {
     method?: string;
     body?: any;
@@ -10,6 +31,7 @@ type RequestOptions = {
 };
 
 export async function ofapiRequest(endpoint: string, apiKey: string, options: RequestOptions = {}) {
+    trackRequest(endpoint);
     const url = endpoint.startsWith("http") ? endpoint : `${OFAPI_BASE}${endpoint}`;
 
     // Resolve abstract database placeholder tokens to actual environment keys

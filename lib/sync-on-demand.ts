@@ -15,6 +15,7 @@ const STALE_THRESHOLDS: Record<string, number> = {
   content: 15 * 60_000,         // 15 min
   engagement_dm: 30 * 60_000,   // 30 min
   engagement_mass: 30 * 60_000, // 30 min
+  mass_reply: 30 * 60_000,      // 30 min
   chargebacks: 60 * 60_000,     // 1 hour
   online: 5 * 60_000,           // 5 min
 };
@@ -25,6 +26,7 @@ const CRON_PATHS: Record<string, string> = {
   content: "/api/cron/sync-outbound-content",
   engagement_dm: "/api/cron/sync-dm-engagement",
   engagement_mass: "/api/cron/sync-mass-message-stats",
+  mass_reply: "/api/cron/mass-reply-attribution",
   chargebacks: "/api/cron/sync-chargebacks",
   online: "/api/cron/online-poll",
 };
