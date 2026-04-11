@@ -7,9 +7,8 @@ import { InlineKeyboard } from 'grammy';
  * Hourly Report Cron — Automated Brief
  *
  * IMPORTANT: Uses local DB (Transaction table) as source of truth.
- * NOT OFAPI analytics — getTransactionsSummary does NOT support sub-daily granularity
- * and returns full-day totals regardless of time window passed.
- * The sync-transactions cron syncs OFAPI → DB every 5 minutes.
+ * Triggers sync-transactions on-demand before generating the report
+ * so the DB has fresh data without needing a separate 24/7 cron.
  */
 export async function GET(req: Request) {
     if (req.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -19,6 +18,22 @@ export async function GET(req: Request) {
     }
 
     try {
+        // Sync transactions before generating report so DB has fresh data
+        const baseUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+            ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+            : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+        const secret = process.env.CRON_SECRET || '';
+        if (baseUrl) {
+            try {
+                await fetch(`${baseUrl}/api/cron/sync-transactions`, {
+                    headers: { Authorization: `Bearer ${secret}` },
+                    signal: AbortSignal.timeout(50_000),
+                });
+            } catch (e: any) {
+                console.warn('[hourly-report] tx sync failed, using cached data:', e.message);
+            }
+        }
+
         const creators = await prisma.creator.findMany({
             where: { ofapiToken: { not: null }, active: true }
         });
