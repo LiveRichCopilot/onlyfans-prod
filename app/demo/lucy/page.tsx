@@ -5,6 +5,7 @@ import { VoiceFingerprint } from "./VoiceFingerprint";
 import { PhraseList } from "./PhraseList";
 import { SaleBreakdown } from "./SaleBreakdown";
 import { WinCard } from "./WinCard";
+import { MeetingBrief } from "./MeetingBrief";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -50,7 +51,19 @@ export default async function LucyDemoPage({
           </p>
         </header>
 
-        <StatsGrid stats={stats} />
+        <MeetingBrief />
+
+        <section className="mt-8">
+          <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
+            What&rsquo;s already in the data
+          </h2>
+          <p className="mt-1 text-sm text-white/50">
+            Pulled live from her messages and sales. Everything below is real — no sample data.
+          </p>
+          <div className="mt-4">
+            <StatsGrid stats={stats} />
+          </div>
+        </section>
 
         <VoiceFingerprint voice={voice} />
 
