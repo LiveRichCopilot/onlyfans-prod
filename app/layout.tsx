@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description: 'Manage your creator modules and notifications',
 }
 
-const SKIP_ONBOARDING_CHECK = ['/login', '/onboarding', '/auth/callback', '/api/']
+const SKIP_ONBOARDING_CHECK = ['/login', '/onboarding', '/auth/callback', '/api/', '/demo']
 
 export default async function RootLayout({
   children,

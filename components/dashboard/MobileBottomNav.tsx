@@ -25,6 +25,8 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
 
+  if (pathname?.startsWith("/demo")) return null;
+
   return (
     <>
       {/* More menu overlay */}

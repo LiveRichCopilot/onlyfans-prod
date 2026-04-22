@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   "/api/reports/creator-map",
   "/api/reports/import-csv",
   "/api/debug",
+  "/demo",
 ];
 
 function isPublicPath(pathname: string): boolean {
