@@ -291,10 +291,15 @@ export function MeetingBrief() {
       </div>
 
       <div style={{ marginTop: "3rem" }}>
-        <h3>How the vault should be organized</h3>
+        <div className="eyebrow">Example &middot; not final</div>
+        <h3 style={{ marginTop: "0.4rem" }}>
+          An example of how you said you&rsquo;d organize the vault
+        </h3>
         <p className="body" style={{ marginTop: "0.5rem", maxWidth: "62ch" }}>
-          The structure you described &mdash; every individual video is its own script,
-          and every themed bundle is its own script too.
+          This is an <strong style={{ color: "var(--ink)" }}>example</strong> from what
+          you described in the meeting &mdash; not the final structure. You&rsquo;ll
+          finalize the real names and layout. Every individual video becomes its own
+          script. Every themed bundle becomes its own script too.
         </p>
         <div
           style={{
