@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
@@ -37,21 +37,30 @@ async function serveCached(cacheKey: string): Promise<Response | null> {
     return null;
 }
 
-/** Upload to Supabase Storage cache (fire-and-forget) */
-function cacheInStorage(cacheKey: string, body: ArrayBuffer, contentType: string) {
+/** Upload to Supabase Storage cache. Awaited inside `after()` so the upload
+ * survives function termination on Vercel Fluid Compute. */
+async function cacheInStorage(cacheKey: string, body: ArrayBuffer, contentType: string) {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !serviceKey) return;
     const path = `proxy-cache/${cacheKey}`;
-    fetch(`${supabaseUrl}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${serviceKey}`,
-            "Content-Type": contentType,
-            "x-upsert": "true",
-        },
-        body: body,
-    }).catch(() => {});
+    try {
+        const res = await fetch(`${supabaseUrl}/storage/v1/object/${MEDIA_BUCKET}/${path}`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${serviceKey}`,
+                "Content-Type": contentType,
+                "x-upsert": "true",
+            },
+            body: body,
+        });
+        if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            console.warn(`[proxy] cache write ${res.status} key=${cacheKey.slice(0, 8)} ${text.slice(0, 120)}`);
+        }
+    } catch (e: any) {
+        console.warn(`[proxy] cache write error key=${cacheKey.slice(0, 8)} ${e.message}`);
+    }
 }
 
 async function resolveAccountName(creatorId: string | null): Promise<string | null> {
@@ -131,7 +140,9 @@ export async function GET(request: NextRequest) {
                     }
                     const contentType = response.headers.get("Content-Type") || "application/octet-stream";
                     const body = await response.arrayBuffer();
-                    cacheInStorage(cacheKey, body, contentType);
+                    // Persist cache write after response is sent — Vercel keeps the
+                    // worker alive for `after()` callbacks even after the client gets bytes.
+                    after(() => cacheInStorage(cacheKey, body, contentType));
                     return { body, contentType };
                 })();
                 inflight.set(cacheKey, downloadPromise);
