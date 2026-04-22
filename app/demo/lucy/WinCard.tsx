@@ -1,4 +1,4 @@
-import type { Win } from "@/lib/lucy-insights";
+import type { Win, WinMessage } from "@/lib/lucy-insights";
 
 function fmtUSD(n: number) {
   return new Intl.NumberFormat("en-US", {
@@ -14,8 +14,57 @@ const SOURCE_LABEL: Record<string, string> = {
   Creator: "Creator message",
 };
 
+function Bubble({ m, fanNumber }: { m: WinMessage; fanNumber: number }) {
+  const isLucy = m.fromCreator;
+  const hasPrice = (m.price ?? 0) > 0;
+  const isSold = m.soldHere === true;
+  const isAfter = m.stage === "after";
+  const bubbleClass = isLucy
+    ? `bubble-creator${isSold ? " sold" : ""}${isAfter && !isSold ? " bubble-after" : ""}`
+    : `bubble-fan${isAfter ? " bubble-after" : ""}`;
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: isLucy ? "flex-end" : "flex-start",
+      }}
+    >
+      <div style={{ maxWidth: "82%" }}>
+        <div className={bubbleClass}>
+          {m.text || (
+            <span style={{ fontStyle: "italic", color: "var(--ink-mute)" }}>
+              [media attachment]
+            </span>
+          )}
+          {hasPrice && (
+            <div style={{ marginTop: "0.5rem" }}>
+              <span className="chip">
+                {isSold ? "Sold · " : "PPV "}
+                {fmtUSD(m.price!)}
+              </span>
+            </div>
+          )}
+        </div>
+        <div
+          className="meta"
+          style={{ textAlign: isLucy ? "right" : "left" }}
+        >
+          {isLucy ? "Lucy" : `Fan #${fanNumber}`} &middot; {m.time}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WinCard({ win }: { win: Win }) {
   const sourceLabel = SOURCE_LABEL[win.source] || win.source;
+  const multiBuy = (win.additionalBuys ?? 0) > 0;
+  const windowRev = win.windowRevenue ?? win.amount;
+
+  const before = win.messages.filter((m) => m.stage === "before");
+  const sale = win.messages.filter((m) => m.stage === "sale");
+  const after = win.messages.filter((m) => m.stage === "after");
+  const legacy = win.messages.filter((m) => !m.stage);
 
   return (
     <details style={{ padding: "0.5rem 0" }}>
@@ -58,6 +107,20 @@ export function WinCard({ win }: { win: Win }) {
             >
               {sourceLabel}
             </span>
+            {multiBuy && (
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "0.15rem 0.6rem",
+                  borderRadius: 999,
+                  border: "1px solid rgba(74, 222, 128, 0.4)",
+                  color: "#bbf7d0",
+                  background: "rgba(74, 222, 128, 0.1)",
+                }}
+              >
+                +{win.additionalBuys} more buys &middot; {fmtUSD(windowRev)} total
+              </span>
+            )}
           </div>
           <div
             style={{
@@ -66,7 +129,7 @@ export function WinCard({ win }: { win: Win }) {
               fontSize: "0.82rem",
             }}
           >
-            Fan #{win.fanNumber} · {win.date}
+            Fan #{win.fanNumber} &middot; {win.date}
           </div>
         </div>
         <span
@@ -90,50 +153,29 @@ export function WinCard({ win }: { win: Win }) {
           gap: "0.75rem",
         }}
       >
-        {win.messages.length === 0 && (
-          <div
-            className="body"
-            style={{ color: "var(--ink-mute)", fontSize: "0.85rem" }}
-          >
-            No preceding messages captured.
+        {multiBuy && (
+          <div className="multi-buy-banner">
+            This fan bought <strong>{fmtUSD(windowRev)}</strong> across{" "}
+            <strong>{(win.additionalBuys ?? 0) + 1}</strong> purchases in this conversation
+            window &mdash; the bot learns the warm-up that unlocked the first buy and what
+            kept them spending.
           </div>
         )}
-        {win.messages.map((m, i) => {
-          const isLucy = m.fromCreator;
-          const hasPrice = (m.price ?? 0) > 0;
-          return (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                justifyContent: isLucy ? "flex-end" : "flex-start",
-              }}
-            >
-              <div style={{ maxWidth: "82%" }}>
-                <div className={isLucy ? "bubble-creator" : "bubble-fan"}>
-                  {m.text || (
-                    <span style={{ fontStyle: "italic", color: "var(--ink-mute)" }}>
-                      [media attachment]
-                    </span>
-                  )}
-                  {hasPrice && (
-                    <div style={{ marginTop: "0.5rem" }}>
-                      <span className="chip">PPV {fmtUSD(m.price!)}</span>
-                    </div>
-                  )}
-                </div>
-                <div
-                  className="meta"
-                  style={{
-                    textAlign: isLucy ? "right" : "left",
-                  }}
-                >
-                  {isLucy ? "Lucy" : `Fan #${win.fanNumber}`} · {m.time}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+
+        {legacy.map((m, i) => (
+          <Bubble key={`l-${i}`} m={m} fanNumber={win.fanNumber} />
+        ))}
+
+        {before.length > 0 && (
+          <div className="stage-divider">Lead-up &mdash; what got them warm</div>
+        )}
+        {before.map((m, i) => (
+          <Bubble key={`b-${i}`} m={m} fanNumber={win.fanNumber} />
+        ))}
+
+        {sale.map((m, i) => (
+          <Bubble key={`s-${i}`} m={m} fanNumber={win.fanNumber} />
+        ))}
 
         <div className="sale-marker" role="status" aria-label="Purchase">
           <span className="sale-dot" />
@@ -142,6 +184,15 @@ export function WinCard({ win }: { win: Win }) {
           <span>{sourceLabel}</span>
           <span className="sale-dot" />
         </div>
+
+        {after.length > 0 && (
+          <div className="stage-divider">
+            What happened next &mdash; fan reaction &amp; any follow-up buys
+          </div>
+        )}
+        {after.map((m, i) => (
+          <Bubble key={`a-${i}`} m={m} fanNumber={win.fanNumber} />
+        ))}
       </div>
     </details>
   );

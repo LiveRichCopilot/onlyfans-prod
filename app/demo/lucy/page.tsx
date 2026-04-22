@@ -174,11 +174,12 @@ export default async function LucyDemoPage() {
         <section className="section">
           <hr className="rule" />
           <div style={{ marginTop: "2rem" }}>
-            <div className="eyebrow">Roadmap</div>
-            <h2 style={{ marginTop: "0.5rem" }}>How your chatbot keeps improving</h2>
+            <div className="eyebrow">What you can feed the bot</div>
+            <h2 style={{ marginTop: "0.5rem" }}>To make it actually sound like you</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Everything above is the v1 training set. Here&rsquo;s what we add as you
-              keep shipping content and your managers clean up the vault.
+              Chatters and managers run the day-to-day. These are the specific things{" "}
+              <em>you</em> can give us that nobody else can &mdash; and that turn a generic
+              bot into a chatbot that texts like Lucy Mochi.
             </p>
           </div>
 
@@ -186,42 +187,34 @@ export default async function LucyDemoPage() {
             style={{
               marginTop: "2rem",
               display: "grid",
-              gap: "1.5rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: "2rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             }}
           >
             {[
               {
-                h: "Learn every new winning conversation",
-                b: "When a chatter closes a good sale, that exact lead-up gets added to the bot's script library automatically — not hand-written theory.",
+                h: "Voice memos, transcribed",
+                b: "Talk into your phone like you&rsquo;re texting a fan. 2–5 minute riffs on whatever &mdash; how you flirt, how you tease, how you react to compliments, how you say &ldquo;babe&rdquo; vs &ldquo;hun&rdquo;. We transcribe, the bot learns the cadence nobody else has.",
               },
               {
-                h: "Know which set every fan has seen",
-                b: "The bot tracks drip-set exposure per fan, so it never sends a repeat mid-set and breaks the live illusion.",
+                h: "Your personality sheet",
+                b: "What you like, what you don&rsquo;t, what makes you laugh, what turns you off, your backstory, your humor style. One voice memo answering a list of questions is all we need. The bot stops defaulting to generic chatter energy.",
               },
               {
-                h: "Match fan archetypes to content themes",
-                b: "Anal fans, squirt fans, custom-seekers — the bot learns which theme each fan responds to and steers toward that.",
+                h: "Story-worthy memories",
+                b: "Anecdotes about your trips, your shoots, your wild nights, the weird fan interactions. Fans spend more on creators who feel real &mdash; these are the personal details the bot works into dry conversations to warm them back up.",
               },
               {
-                h: "Follow your rules, not generic scripts",
-                b: "Never sell from All Media. Start from oldest content. Obvious tag names. The bot enforces these before suggesting a send.",
+                h: "Rules of engagement",
+                b: "What you&rsquo;ll never say, never promise, never sell. What words you hate (&ldquo;gift&rdquo;? &ldquo;honey&rdquo;?). Hard no&rsquo;s on content. We bake these in so the bot never embarrasses you.",
               },
               {
-                h: "Stay in your voice",
-                b: "Your cadence (lowercase, trailing dots, emotion markers) stays locked. The bot never sounds like a generic chatter.",
+                h: "A weekly 5-minute vibe check",
+                b: "Listen to 3 bot-drafted messages, tell us which one sounds like you and which one doesn&rsquo;t. That correction loop is what keeps the bot aligned over time &mdash; takes you 5 min a week.",
               },
               {
-                h: "Raise custom floor pricing",
-                b: "The bot refuses to quote customs under your minimum. No more $5–10 customs for a porn star.",
-              },
-              {
-                h: "Escalate whales, not spam them",
-                b: "When a fan shows whale signal, the bot flags for a human closer and varies pricing instead of spamming $100 three times.",
-              },
-              {
-                h: "Flag chatter misbehavior",
-                b: "Every response is scored against your rules. If someone&rsquo;s going off-brand or selling from the wrong folder, you see it in the dashboard.",
+                h: "Your backstage context",
+                b: "When you&rsquo;re traveling, doing a shoot, sick, offline &mdash; a quick voice note so the bot can tell fans &ldquo;she&rsquo;s in Berlin this week&rdquo; instead of sounding scripted.",
               },
             ].map((item, i) => (
               <div key={i}>
@@ -231,6 +224,70 @@ export default async function LucyDemoPage() {
                 </p>
               </div>
             ))}
+          </div>
+
+          <div style={{ marginTop: "3.5rem" }}>
+            <div className="eyebrow">On our side</div>
+            <h3 style={{ marginTop: "0.4rem", fontSize: "1.5rem" }}>
+              What the bot + managers handle
+            </h3>
+            <p className="body" style={{ marginTop: "0.5rem", maxWidth: "62ch" }}>
+              Nothing in this list needs your time &mdash; your managers and the bot own
+              these.
+            </p>
+            <div
+              style={{
+                marginTop: "1.5rem",
+                display: "grid",
+                gap: "1.25rem",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              }}
+            >
+              {[
+                {
+                  h: "Learns every new winning conversation",
+                  b: "When a chatter closes a good sale, that exact lead-up gets added to the script library automatically.",
+                },
+                {
+                  h: "Knows which set every fan has seen",
+                  b: "Tracks drip-set exposure per fan so no fan ever sees a repeat mid-set.",
+                },
+                {
+                  h: "Matches fan archetypes to themes",
+                  b: "Anal fans, squirt fans, custom-seekers &mdash; learns what each fan responds to and steers toward it.",
+                },
+                {
+                  h: "Enforces your rules",
+                  b: "Never sells from All Media. Obvious tag names. Starts fans from oldest content first.",
+                },
+                {
+                  h: "Guards custom floor pricing",
+                  b: "Refuses to quote customs under your minimum. No more $5&ndash;10 customs.",
+                },
+                {
+                  h: "Escalates whales, doesn&rsquo;t spam them",
+                  b: "Flags whale signal for a human closer. Varies pricing instead of $100 / $100 / $100.",
+                },
+                {
+                  h: "Flags chatter misbehavior",
+                  b: "Every response is scored against your rules. Off-brand activity shows up in the manager dashboard.",
+                },
+                {
+                  h: "Stays in your voice",
+                  b: "Cadence (lowercase, trailing dots, emotion markers) stays locked &mdash; never sounds generic.",
+                },
+              ].map((item, i) => (
+                <div key={i}>
+                  <h3 style={{ fontSize: "1.05rem" }}>{item.h}</h3>
+                  <p
+                    className="body"
+                    style={{ marginTop: "0.4rem", fontSize: "0.9rem" }}
+                  >
+                    {item.b}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

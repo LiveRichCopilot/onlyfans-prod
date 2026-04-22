@@ -13,6 +13,8 @@ export type WinMessage = {
   fromCreator: boolean;
   time: string;
   price?: number;
+  soldHere?: boolean;
+  stage?: "before" | "sale" | "after";
 };
 export type Win = {
   fanNumber: number;
@@ -22,6 +24,8 @@ export type Win = {
   source: string;
   chatter: string;
   messages: WinMessage[];
+  additionalBuys?: number;
+  windowRevenue?: number;
 };
 export type VoiceFingerprint = {
   totalMessages: number;
