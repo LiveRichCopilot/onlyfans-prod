@@ -139,6 +139,14 @@ export function WinCard({ win }: { win: Win }) {
             </div>
           );
         })}
+
+        <div className="sale-marker" role="status" aria-label="Purchase">
+          <span className="sale-dot" />
+          <span>Fan purchased</span>
+          <span className="sale-amount">{fmtUSD(win.amount)}</span>
+          <span>{TYPE_LABELS[win.type] || win.type}</span>
+          <span className="sale-dot" />
+        </div>
       </div>
     </details>
   );

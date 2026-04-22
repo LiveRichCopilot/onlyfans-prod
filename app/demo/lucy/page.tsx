@@ -18,33 +18,18 @@ function fmtDate(d: Date | null) {
   }).format(d);
 }
 
-function fmtUSD(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
-const SALE_TYPE_LABEL: Record<string, string> = {
-  tip: "Tips",
-  message: "PPV messages",
-  post: "Post purchases",
-  stream: "Stream",
-  subscription: "Subscriptions",
-  referral: "Referral",
-  unknown: "Other",
-};
-
 export default async function LucyDemoPage() {
   const report = await buildLucyReport();
   if (!report) notFound();
 
-  const { creator, stats, saleTypes, themes, wins, voice } = report;
-  const firstName = (creator.name || creator.username || "Lucy")
-    .split(" ")[0]
-    .replace(/\p{Extended_Pictographic}/gu, "")
-    .trim() || "Lucy";
+  const { creator, stats, themes, wins, voice } = report;
+  const topWins = [...wins].sort((a, b) => b.amount - a.amount).slice(0, 10);
+  const firstName =
+    (creator.name || creator.username || "Lucy")
+      .split(" ")[0]
+      .replace(/\p{Extended_Pictographic}/gu, "")
+      .trim() || "Lucy";
+  const windowLabel = `${fmtDate(stats.dateStart)} – ${fmtDate(stats.dateEnd)}`;
 
   return (
     <main
@@ -61,7 +46,7 @@ export default async function LucyDemoPage() {
           headerUrl={creator.headerUrl}
           messageCount={voice.totalMessages}
           saleCount={stats.saleCount}
-          dateRangeLabel={`${fmtDate(stats.dateStart)} – ${fmtDate(stats.dateEnd)}`}
+          dateRangeLabel={windowLabel}
         />
 
         <MeetingBrief />
@@ -72,10 +57,9 @@ export default async function LucyDemoPage() {
             <div className="eyebrow">The chatbot</div>
             <h2 style={{ marginTop: "0.5rem" }}>What it&rsquo;s learning from</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Every section below is evidence. We read your real messages, your real sales,
-              and the conversations fans had with you right before they bought. The bot
-              learns from patterns that already worked on your page — no generic scripts,
-              no guesses.
+              Every section below is evidence from your real account. The bot learns from
+              patterns that already worked on your page &mdash; no generic scripts, no
+              guesses.
             </p>
           </div>
         </section>
@@ -86,63 +70,22 @@ export default async function LucyDemoPage() {
             <div className="eyebrow">What your fans talk about</div>
             <h2 style={{ marginTop: "0.5rem" }}>Before they buy</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Content themes fans mentioned in your chats. Ranked by revenue that
-              followed — so you see what actually moves money, not just what gets talked
-              about.
+              Content themes fans mentioned in your chats. Ranked by how often a sale
+              followed &mdash; so you see which topics actually move the needle.
+            </p>
+            <p
+              className="body"
+              style={{
+                marginTop: "0.5rem",
+                fontSize: "0.82rem",
+                color: "var(--ink-mute)",
+              }}
+            >
+              Current window: {windowLabel}. Once we pull your December history, the
+              pattern will reflect a full strong month.
             </p>
           </div>
           <ThemeGrid themes={themes} />
-        </section>
-
-        <section className="section">
-          <hr className="rule" />
-          <div style={{ marginTop: "2rem" }}>
-            <div className="eyebrow">How the money comes in</div>
-            <h2 style={{ marginTop: "0.5rem" }}>Your revenue split</h2>
-            <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Broken out like your OnlyFans statements page, so it matches what you see
-              on your side.
-            </p>
-          </div>
-          <div
-            style={{
-              marginTop: "2rem",
-              display: "grid",
-              gap: "0.25rem",
-            }}
-          >
-            {saleTypes.map((r, i) => (
-              <div
-                key={r.type}
-                style={{
-                  padding: "1.1rem 0",
-                  borderTop: i > 0 ? "1px solid var(--line)" : "none",
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  alignItems: "baseline",
-                  gap: "1rem",
-                }}
-              >
-                <div>
-                  <h3 style={{ fontSize: "1.2rem" }}>
-                    {SALE_TYPE_LABEL[r.type] || r.type}
-                  </h3>
-                  <div
-                    style={{
-                      marginTop: "0.4rem",
-                      color: "var(--ink-mute)",
-                      fontSize: "0.85rem",
-                    }}
-                  >
-                    {r.count.toLocaleString()} sales · {r.pctOfRevenue.toFixed(0)}% of revenue
-                  </div>
-                </div>
-                <span className="num-small" style={{ color: "var(--accent)" }}>
-                  {fmtUSD(r.revenue)}
-                </span>
-              </div>
-            ))}
-          </div>
         </section>
 
         <VoiceFingerprint voice={voice} />
@@ -153,16 +96,16 @@ export default async function LucyDemoPage() {
             <div className="eyebrow">Winning conversations</div>
             <h2 style={{ marginTop: "0.5rem" }}>How {firstName} closes</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              The last {wins.length} sales, each with the 15 messages that led into it. This
-              is the script library — real sequences the bot learns from. Tap any row to
-              see the conversation.
+              Top {topWins.length} sales in the current window, each with the 15 messages
+              that led into it. Tap any row to see the conversation &mdash; the green bar
+              marks the moment the fan paid.
             </p>
           </div>
           <div style={{ marginTop: "1.5rem" }}>
-            {wins.map((w, i) => (
+            {topWins.map((w, i) => (
               <WinCard key={i} win={w} />
             ))}
-            {wins.length === 0 && (
+            {topWins.length === 0 && (
               <p className="body" style={{ marginTop: "1rem" }}>
                 No sales captured in the current data window.
               </p>
@@ -180,8 +123,8 @@ export default async function LucyDemoPage() {
             lineHeight: 1.6,
           }}
         >
-          Private document · reads live from our database · fans shown anonymously as
-          &ldquo;Fan #N&rdquo; · no contact info, no OF user IDs.
+          Private document &middot; reads live from our database &middot; fans shown
+          anonymously as &ldquo;Fan #N&rdquo; &middot; no contact info, no OF user IDs.
         </footer>
       </div>
     </main>

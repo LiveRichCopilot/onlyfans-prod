@@ -1,13 +1,5 @@
 import type { ThemeRow } from "@/lib/lucy-insights";
 
-function fmtUSD(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
 export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
   if (themes.length === 0) {
     return (
@@ -17,16 +9,22 @@ export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
     );
   }
 
+  const ranked = [...themes].sort(
+    (a, b) =>
+      b.salesLeadUps - a.salesLeadUps ||
+      b.fanMentions - a.fanMentions,
+  );
+
   return (
     <div
       style={{
         marginTop: "1.5rem",
         display: "grid",
         gap: "0.25rem",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
       }}
     >
-      {themes.map((t, i) => (
+      {ranked.map((t, i) => (
         <div
           key={t.key}
           style={{
@@ -34,19 +32,7 @@ export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
             borderTop: i > 0 ? "1px solid var(--line)" : "none",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              gap: "0.75rem",
-            }}
-          >
-            <h3 style={{ fontSize: "1.125rem" }}>{t.label}</h3>
-            <span className="num-small" style={{ color: "var(--accent)" }}>
-              {fmtUSD(t.revenue)}
-            </span>
-          </div>
+          <h3 style={{ fontSize: "1.125rem" }}>{t.label}</h3>
           <div
             style={{
               marginTop: "0.4rem",
@@ -55,7 +41,7 @@ export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
             }}
           >
             {t.fanMentions.toLocaleString()} fan mentions ·{" "}
-            {t.salesLeadUps.toLocaleString()} sales after mention
+            {t.salesLeadUps.toLocaleString()} sales followed
           </div>
           <div className="body" style={{ fontSize: "0.88rem", marginTop: "0.25rem" }}>
             {t.description}

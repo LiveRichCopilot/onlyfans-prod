@@ -25,6 +25,8 @@
 .demo-root .serif {
   font-family: var(--font-serif), ui-serif, Georgia, serif;
   font-weight: 400;
+  font-stretch: normal;
+  font-variation-settings: "opsz" 36, "SOFT" 0, "WONK" 0;
 }
 
 .demo-root h1 {
@@ -152,6 +154,47 @@
   font-size: 0.72rem;
   margin-top: 0.25rem;
   letter-spacing: 0.02em;
+}
+
+.demo-root .sale-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(
+    90deg,
+    rgba(74, 222, 128, 0.14),
+    rgba(34, 197, 94, 0.22),
+    rgba(74, 222, 128, 0.14)
+  );
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 0 24px rgba(74, 222, 128, 0.18);
+  color: #bbf7d0;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.demo-root .sale-marker .sale-amount {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: #dcfce7;
+  font-weight: 500;
+}
+
+.demo-root .sale-dot {
+  width: 10px;
+  height: 10px;
+  background: #4ade80;
+  border-radius: 50%;
+  box-shadow: 0 0 12px #4ade80, 0 0 4px #86efac;
+  flex-shrink: 0;
 }
 
 .demo-root details summary {
