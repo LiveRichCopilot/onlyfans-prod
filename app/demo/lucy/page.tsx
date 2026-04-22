@@ -12,21 +12,12 @@ import { BarChart3, Trophy } from "lucide-react";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const ACCESS_TOKEN = "lucy-dna-x7k92q";
-
 function fmtDate(d: Date | null) {
   if (!d) return "—";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(d);
 }
 
-export default async function LucyDemoPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ k?: string }>;
-}) {
-  const { k } = await searchParams;
-  if (k !== ACCESS_TOKEN) notFound();
-
+export default async function LucyDemoPage() {
   const report = await buildLucyReport();
   if (!report) notFound();
 
