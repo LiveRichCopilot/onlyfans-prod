@@ -9,12 +9,6 @@ export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
     );
   }
 
-  const ranked = [...themes].sort(
-    (a, b) =>
-      b.salesLeadUps - a.salesLeadUps ||
-      b.fanMentions - a.fanMentions,
-  );
-
   return (
     <div
       style={{
@@ -24,7 +18,7 @@ export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
         gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
       }}
     >
-      {ranked.map((t, i) => (
+      {themes.map((t, i) => (
         <div
           key={t.key}
           style={{
@@ -40,11 +34,8 @@ export function ThemeGrid({ themes }: { themes: ThemeRow[] }) {
               color: "var(--ink-mute)",
             }}
           >
-            {t.fanMentions.toLocaleString()} fan mentions ·{" "}
-            {t.salesLeadUps.toLocaleString()} sales followed
-          </div>
-          <div className="body" style={{ fontSize: "0.88rem", marginTop: "0.25rem" }}>
-            {t.description}
+            {t.fanMentions.toLocaleString()} fans mentioned this ·{" "}
+            {t.salesAfter.toLocaleString()} bought after bringing it up
           </div>
         </div>
       ))}

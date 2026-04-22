@@ -1,13 +1,5 @@
 import type { VoiceFingerprint as VoiceData } from "@/lib/lucy-insights";
 
-function fmtDuration(sec: number | null) {
-  if (sec === null) return "—";
-  if (sec < 60) return `${Math.round(sec)}s`;
-  const m = sec / 60;
-  if (m < 60) return `${m.toFixed(1)} min`;
-  return `${(m / 60).toFixed(1)} hr`;
-}
-
 function StatBlock({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div>
@@ -38,8 +30,9 @@ export function VoiceFingerprint({ voice }: { voice: VoiceData }) {
         <div className="eyebrow">Your voice</div>
         <h2 style={{ marginTop: "0.5rem" }}>How you actually write</h2>
         <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-          This is the fingerprint the chatbot copies so it sounds like you, not a stock script.
-          Pulled from {voice.totalMessages.toLocaleString()} of your messages.
+          This is the fingerprint the chatbot copies so it sounds like you, not a stock
+          script. Pulled from {voice.totalMessages.toLocaleString()} of your December
+          messages.
         </p>
       </div>
 
@@ -52,20 +45,24 @@ export function VoiceFingerprint({ voice }: { voice: VoiceData }) {
         }}
       >
         <StatBlock
-          label="Avg message length"
+          label="Avg length"
           value={`${Math.round(voice.avgCharLength)}`}
           sub={`characters · ${voice.avgWordLength.toFixed(1)} words`}
         />
-        <StatBlock label="Median reply time" value={fmtDuration(voice.medianReplySec)} />
         <StatBlock
           label="Lowercase-only"
           value={`${voice.lowercaseOnlyPct.toFixed(0)}%`}
           sub="of your messages"
         />
         <StatBlock
-          label="Trailing dots ..."
+          label="Trailing dots..."
           value={`${voice.trailingDotsPct.toFixed(0)}%`}
           sub="your rhythm tick"
+        />
+        <StatBlock
+          label="Emotion markers"
+          value={`${voice.emojiMessagesPct.toFixed(0)}%`}
+          sub="of messages"
         />
       </div>
 

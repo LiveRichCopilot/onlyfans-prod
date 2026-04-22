@@ -9,27 +9,32 @@ import { WinCard } from "./WinCard";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function fmtDate(d: Date | null) {
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(d);
+function fmtUSD(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
+
+const REVENUE_LABEL: Record<string, string> = {
+  tip: "Tips",
+  message: "PPV messages",
+  post: "Post purchases",
+  subscription: "Subscriptions",
+  other: "Other",
+};
 
 export default async function LucyDemoPage() {
   const report = await buildLucyReport();
   if (!report) notFound();
 
-  const { creator, stats, themes, wins, voice } = report;
-  const topWins = [...wins].sort((a, b) => b.amount - a.amount).slice(0, 10);
+  const { creator, window: winLabel, revenue, themes, wins, voice } = report;
   const firstName =
     (creator.name || creator.username || "Lucy")
       .split(" ")[0]
       .replace(/\p{Extended_Pictographic}/gu, "")
       .trim() || "Lucy";
-  const windowLabel = `${fmtDate(stats.dateStart)} – ${fmtDate(stats.dateEnd)}`;
 
   return (
     <main
@@ -45,8 +50,8 @@ export default async function LucyDemoPage() {
           avatarUrl={creator.avatarUrl}
           headerUrl={creator.headerUrl}
           messageCount={voice.totalMessages}
-          saleCount={stats.saleCount}
-          dateRangeLabel={windowLabel}
+          saleCount={revenue.count}
+          dateRangeLabel={winLabel}
         />
 
         <MeetingBrief />
@@ -54,13 +59,77 @@ export default async function LucyDemoPage() {
         <section className="section">
           <hr className="rule" />
           <div style={{ marginTop: "2rem" }}>
-            <div className="eyebrow">The chatbot</div>
-            <h2 style={{ marginTop: "0.5rem" }}>What it&rsquo;s learning from</h2>
+            <div className="eyebrow">December 2025 &middot; your strongest recent month</div>
+            <h2 style={{ marginTop: "0.5rem" }}>How the money came in</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Every section below is evidence from your real account. The bot learns from
-              patterns that already worked on your page &mdash; no generic scripts, no
-              guesses.
+              Real December numbers from your OnlyFans statement. This is the baseline we
+              want back.
             </p>
+          </div>
+
+          <div
+            style={{
+              marginTop: "2rem",
+              padding: "1.5rem 0 1rem",
+              borderTop: "1px solid var(--line-strong)",
+              borderBottom: "1px solid var(--line-strong)",
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: "1rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div className="eyebrow">December total (gross)</div>
+              <div className="num-display" style={{ marginTop: "0.4rem" }}>
+                {fmtUSD(revenue.total)}
+              </div>
+            </div>
+            <div
+              style={{
+                color: "var(--ink-mute)",
+                fontSize: "0.85rem",
+                textAlign: "right",
+              }}
+            >
+              {revenue.count.toLocaleString()} paid transactions
+            </div>
+          </div>
+
+          <div style={{ marginTop: "1rem" }}>
+            {revenue.byType.map((r, i) => (
+              <div
+                key={r.type}
+                style={{
+                  padding: "1rem 0",
+                  borderTop: i > 0 ? "1px solid var(--line)" : "none",
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  alignItems: "baseline",
+                  gap: "1rem",
+                }}
+              >
+                <div>
+                  <h3 style={{ fontSize: "1.15rem" }}>
+                    {REVENUE_LABEL[r.type] || r.type}
+                  </h3>
+                  <div
+                    style={{
+                      marginTop: "0.35rem",
+                      color: "var(--ink-mute)",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    {r.count.toLocaleString()} transactions ·{" "}
+                    {((r.revenue / revenue.total) * 100).toFixed(0)}% of revenue
+                  </div>
+                </div>
+                <span className="num-small" style={{ color: "var(--accent)" }}>
+                  {fmtUSD(r.revenue)}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -70,19 +139,8 @@ export default async function LucyDemoPage() {
             <div className="eyebrow">What your fans talk about</div>
             <h2 style={{ marginTop: "0.5rem" }}>Before they buy</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Content themes fans mentioned in your chats. Ranked by how often a sale
-              followed &mdash; so you see which topics actually move the needle.
-            </p>
-            <p
-              className="body"
-              style={{
-                marginTop: "0.5rem",
-                fontSize: "0.82rem",
-                color: "var(--ink-mute)",
-              }}
-            >
-              Current window: {windowLabel}. Once we pull your December history, the
-              pattern will reflect a full strong month.
+              Content themes fans brought up in your December chats. Ranked by how often
+              a purchase followed &mdash; so you see which topics move the needle.
             </p>
           </div>
           <ThemeGrid themes={themes} />
@@ -96,20 +154,83 @@ export default async function LucyDemoPage() {
             <div className="eyebrow">Winning conversations</div>
             <h2 style={{ marginTop: "0.5rem" }}>How {firstName} closes</h2>
             <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-              Top {topWins.length} sales in the current window, each with the 15 messages
-              that led into it. Tap any row to see the conversation &mdash; the green bar
-              marks the moment the fan paid.
+              Your top {wins.length} December PPV unlocks, each with the messages that led
+              into it. Tagged as mass-message vs chatter-driven. The green bar marks the
+              moment the fan paid.
             </p>
           </div>
           <div style={{ marginTop: "1.5rem" }}>
-            {topWins.map((w, i) => (
+            {wins.map((w, i) => (
               <WinCard key={i} win={w} />
             ))}
-            {topWins.length === 0 && (
+            {wins.length === 0 && (
               <p className="body" style={{ marginTop: "1rem" }}>
-                No sales captured in the current data window.
+                No sales captured in this window.
               </p>
             )}
+          </div>
+        </section>
+
+        <section className="section">
+          <hr className="rule" />
+          <div style={{ marginTop: "2rem" }}>
+            <div className="eyebrow">Roadmap</div>
+            <h2 style={{ marginTop: "0.5rem" }}>How your chatbot keeps improving</h2>
+            <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
+              Everything above is the v1 training set. Here&rsquo;s what we add as you
+              keep shipping content and your managers clean up the vault.
+            </p>
+          </div>
+
+          <div
+            style={{
+              marginTop: "2rem",
+              display: "grid",
+              gap: "1.5rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            }}
+          >
+            {[
+              {
+                h: "Learn every new winning conversation",
+                b: "When a chatter closes a good sale, that exact lead-up gets added to the bot's script library automatically — not hand-written theory.",
+              },
+              {
+                h: "Know which set every fan has seen",
+                b: "The bot tracks drip-set exposure per fan, so it never sends a repeat mid-set and breaks the live illusion.",
+              },
+              {
+                h: "Match fan archetypes to content themes",
+                b: "Anal fans, squirt fans, custom-seekers — the bot learns which theme each fan responds to and steers toward that.",
+              },
+              {
+                h: "Follow your rules, not generic scripts",
+                b: "Never sell from All Media. Start from oldest content. Obvious tag names. The bot enforces these before suggesting a send.",
+              },
+              {
+                h: "Stay in your voice",
+                b: "Your cadence (lowercase, trailing dots, emotion markers) stays locked. The bot never sounds like a generic chatter.",
+              },
+              {
+                h: "Raise custom floor pricing",
+                b: "The bot refuses to quote customs under your minimum. No more $5–10 customs for a porn star.",
+              },
+              {
+                h: "Escalate whales, not spam them",
+                b: "When a fan shows whale signal, the bot flags for a human closer and varies pricing instead of spamming $100 three times.",
+              },
+              {
+                h: "Flag chatter misbehavior",
+                b: "Every response is scored against your rules. If someone&rsquo;s going off-brand or selling from the wrong folder, you see it in the dashboard.",
+              },
+            ].map((item, i) => (
+              <div key={i}>
+                <h3 style={{ fontSize: "1.125rem" }}>{item.h}</h3>
+                <p className="body" style={{ marginTop: "0.5rem" }}>
+                  {item.b}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -123,8 +244,9 @@ export default async function LucyDemoPage() {
             lineHeight: 1.6,
           }}
         >
-          Private document &middot; reads live from our database &middot; fans shown
-          anonymously as &ldquo;Fan #N&rdquo; &middot; no contact info, no OF user IDs.
+          Private document &middot; revenue from your December OnlyFans statement &middot;
+          message patterns from 39,761 of your December messages &middot; fans shown
+          anonymously as &ldquo;Fan #N&rdquo;.
         </footer>
       </div>
     </main>

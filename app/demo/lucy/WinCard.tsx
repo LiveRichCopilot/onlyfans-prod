@@ -8,33 +8,15 @@ function fmtUSD(n: number) {
   }).format(n);
 }
 
-function fmtDateTime(d: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(d);
-}
-
-function fmtTime(d: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(d);
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  tip: "Tip",
-  message: "PPV message",
-  post: "Post purchase",
-  stream: "Stream",
-  subscription: "Subscription",
-  referral: "Referral",
-  unknown: "Sale",
+const SOURCE_LABEL: Record<string, string> = {
+  Employee: "Chatter-driven",
+  System: "Mass message",
+  Creator: "Creator message",
 };
 
 export function WinCard({ win }: { win: Win }) {
+  const sourceLabel = SOURCE_LABEL[win.source] || win.source;
+
   return (
     <details style={{ padding: "0.5rem 0" }}>
       <summary
@@ -48,7 +30,14 @@ export function WinCard({ win }: { win: Win }) {
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+            }}
+          >
             <span
               className="num-small"
               style={{ color: "var(--accent)", fontSize: "1.75rem" }}
@@ -56,7 +45,18 @@ export function WinCard({ win }: { win: Win }) {
               {fmtUSD(win.amount)}
             </span>
             <span style={{ color: "var(--ink-mute)", fontSize: "0.85rem" }}>
-              {TYPE_LABELS[win.type] || win.type}
+              PPV unlock
+            </span>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                padding: "0.15rem 0.6rem",
+                borderRadius: 999,
+                border: "1px solid var(--line-strong)",
+                color: "var(--ink-dim)",
+              }}
+            >
+              {sourceLabel}
             </span>
           </div>
           <div
@@ -66,7 +66,7 @@ export function WinCard({ win }: { win: Win }) {
               fontSize: "0.82rem",
             }}
           >
-            Fan #{win.fanNumber} · {fmtDateTime(win.date)}
+            Fan #{win.fanNumber} · {win.date}
           </div>
         </div>
         <span
@@ -99,8 +99,8 @@ export function WinCard({ win }: { win: Win }) {
           </div>
         )}
         {win.messages.map((m, i) => {
-          const isLucy = m.isFromCreator;
-          const hasPPV = m.price > 0;
+          const isLucy = m.fromCreator;
+          const hasPrice = (m.price ?? 0) > 0;
           return (
             <div
               key={i}
@@ -116,14 +116,9 @@ export function WinCard({ win }: { win: Win }) {
                       [media attachment]
                     </span>
                   )}
-                  {hasPPV && (
+                  {hasPrice && (
                     <div style={{ marginTop: "0.5rem" }}>
-                      <span className="chip">PPV {fmtUSD(m.price)}</span>
-                    </div>
-                  )}
-                  {m.isTip && m.tipAmount > 0 && (
-                    <div style={{ marginTop: "0.5rem" }}>
-                      <span className="chip">Tip {fmtUSD(m.tipAmount)}</span>
+                      <span className="chip">PPV {fmtUSD(m.price!)}</span>
                     </div>
                   )}
                 </div>
@@ -133,7 +128,7 @@ export function WinCard({ win }: { win: Win }) {
                     textAlign: isLucy ? "right" : "left",
                   }}
                 >
-                  {isLucy ? "Lucy" : `Fan #${win.fanNumber}`} · {fmtTime(m.sentAt)}
+                  {isLucy ? "Lucy" : `Fan #${win.fanNumber}`} · {m.time}
                 </div>
               </div>
             </div>
@@ -144,7 +139,7 @@ export function WinCard({ win }: { win: Win }) {
           <span className="sale-dot" />
           <span>Fan purchased</span>
           <span className="sale-amount">{fmtUSD(win.amount)}</span>
-          <span>{TYPE_LABELS[win.type] || win.type}</span>
+          <span>{sourceLabel}</span>
           <span className="sale-dot" />
         </div>
       </div>
