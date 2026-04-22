@@ -34,10 +34,8 @@ export function MeetingBrief() {
           hasn&rsquo;t bought since. That pattern is what we&rsquo;re fixing first.
         </p>
         <p className="body" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
-          Your statements tell the same story &mdash; December was your peak at{" "}
-          <strong style={{ color: "var(--ink)" }}>$227K</strong> net. January through March
-          slid to $175K&ndash;$220K. April is a partial rebuild month. We&rsquo;re
-          rebuilding your real fan base, not milking the top of it.
+          There&rsquo;s been a slide since your peak. We&rsquo;re focused on rebuilding
+          your real fan base &mdash; not milking the top of it.
         </p>
       </div>
 
@@ -208,13 +206,15 @@ export function MeetingBrief() {
           </ol>
 
           <div style={{ marginTop: "2rem" }}>
-            <h3>Your revenue floor</h3>
-            <div className="body" style={{ marginTop: "0.5rem" }}>
-              <span className="num-small">$9,000</span>
-              <span style={{ color: "var(--ink-mute)", marginLeft: "0.5rem" }}>
-                per day minimum
-              </span>
-              <div style={{ marginTop: "0.25rem" }}>
+            <h3>Your daily numbers</h3>
+            <div className="body" style={{ marginTop: "0.75rem", display: "grid", gap: "0.4rem" }}>
+              <div>
+                <span className="num-small">$7,000</span>
+                <span style={{ color: "var(--ink-mute)", marginLeft: "0.5rem" }}>
+                  per day average &mdash; this is the floor we stay above
+                </span>
+              </div>
+              <div>
                 <span
                   style={{
                     color: "var(--accent)",
@@ -225,7 +225,21 @@ export function MeetingBrief() {
                   $14,000
                 </span>
                 <span style={{ color: "var(--ink-mute)", marginLeft: "0.5rem" }}>
-                  per day target
+                  per day peak &mdash; where we&rsquo;re headed
+                </span>
+              </div>
+              <div>
+                <span
+                  style={{
+                    fontFamily: "var(--font-serif)",
+                    fontSize: "1.2rem",
+                    color: "var(--ink-mute)",
+                  }}
+                >
+                  $4,000
+                </span>
+                <span style={{ color: "var(--ink-mute)", marginLeft: "0.5rem" }}>
+                  low days &mdash; the ones we don&rsquo;t repeat
                 </span>
               </div>
             </div>
