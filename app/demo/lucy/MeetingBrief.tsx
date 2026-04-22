@@ -63,6 +63,13 @@ export function MeetingBrief() {
             insight and your chatbot, obviously.
             <span className="quote-attr">On why you&rsquo;re back</span>
           </blockquote>
+          <blockquote>
+            I&rsquo;m not super picky about how you guys use all of this that I&rsquo;m
+            gonna put in there. I&rsquo;m just gonna organize everything and put
+            everything in there, and your chatters can just go to town with however
+            they&rsquo;re used to chatting.
+            <span className="quote-attr">On giving chatters room inside your structure</span>
+          </blockquote>
         </div>
       </div>
 
@@ -124,9 +131,15 @@ export function MeetingBrief() {
                 Script definition &mdash; every individual video and every bundle becomes
                 its own script the way you structured it
               </li>
-              <li>
+              <li style={{ marginBottom: "0.45rem" }}>
                 Long-term: your own in-person managers who know your content, reporting
                 into you
+              </li>
+              <li>
+                Everything you build &mdash; your vault organization, your scripts, your
+                assistant&rsquo;s knowledge &mdash; stays tied to your account and your
+                email. If you ever move on, it comes with you. You&rsquo;re not building
+                inside someone else&rsquo;s tool.
               </li>
             </ul>
           </div>
@@ -171,8 +184,9 @@ export function MeetingBrief() {
             </li>
             <li style={{ marginBottom: "0.6rem" }}>
               <strong style={{ color: "var(--ink)" }}>Customs backlog.</strong> One live
-              marathon to clear what&rsquo;s owed, then custom pricing goes up. No more
-              $5&ndash;10 customs for a porn star.
+              marathon to clear what&rsquo;s owed. Then custom pricing floor goes up to{" "}
+              <strong style={{ color: "var(--ink)" }}>$5,000&ndash;$10,000 per custom</strong>
+              {" "}minimum &mdash; you&rsquo;re a porn star, not a $10 creator.
             </li>
             <li>
               <strong style={{ color: "var(--ink)" }}>Chatter training.</strong> Quality
@@ -263,8 +277,9 @@ export function MeetingBrief() {
           </li>
           <li style={{ marginBottom: "0.6rem" }}>
             <strong style={{ color: "var(--ink)" }}>Clear every outstanding custom in
-            one live marathon.</strong> Then lock in higher custom pricing as the new
-            floor. No more under-$10 customs.
+            one live marathon.</strong> Then lock in a real custom floor:{" "}
+            <strong style={{ color: "var(--ink)" }}>$5,000&ndash;$10,000 minimum per
+            custom</strong>, no exceptions.
           </li>
           <li style={{ marginBottom: "0.6rem" }}>
             <strong style={{ color: "var(--ink)" }}>Upload the content that&rsquo;s
@@ -319,6 +334,8 @@ export function MeetingBrief() {
             <div className="eyebrow">Sub-categories</div>
             <div className="body" style={{ marginTop: "0.5rem" }}>
               breeding &middot; bondage &middot; anal &middot; anal creampie &middot; BBC
+              &middot; DP by partner (so each partner has their own folder, not lumped
+              together)
             </div>
           </div>
           <div>
