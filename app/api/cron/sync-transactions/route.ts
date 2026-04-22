@@ -32,8 +32,18 @@ export async function GET(req: NextRequest) {
     const startTime = Date.now();
     const backfill = req.nextUrl.searchParams.get("backfill") === "true";
     const forceCreatorId = req.nextUrl.searchParams.get("creatorId");
-    const hoursBack = backfill ? 30 * 24 : 24;
-    const maxTx = backfill ? 5000 : 500; // Lower per-creator limit when syncing all
+    const daysBackParam = req.nextUrl.searchParams.get("daysBack");
+    const maxTxParam = req.nextUrl.searchParams.get("maxTx");
+    const hoursBack = daysBackParam
+        ? parseInt(daysBackParam, 10) * 24
+        : backfill
+            ? 30 * 24
+            : 24;
+    const maxTx = maxTxParam
+        ? parseInt(maxTxParam, 10)
+        : backfill
+            ? 5000
+            : 500;
 
     try {
         let creators: any[];

@@ -174,7 +174,8 @@ const TOP_WINS = 50;
 const TOP_PHRASES = 15;
 const MIN_PHRASE_OCCURRENCES = 2;
 const MIN_PHRASE_CHARS = 2;
-const START_DATE = new Date("2025-11-01T00:00:00Z");
+const START_DATE = new Date("2025-12-01T00:00:00Z");
+const END_DATE = new Date("2026-01-01T00:00:00Z");
 
 // Extended pictographic + some common emoji-related codepoints
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
@@ -218,7 +219,7 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
     where: {
       creatorId: lucy.id,
       amount: { gte: SALE_MIN },
-      date: { gte: START_DATE },
+      date: { gte: START_DATE, lt: END_DATE },
     },
     orderBy: { date: "desc" },
     select: {
@@ -232,7 +233,7 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
   });
 
   const allMessages = await prisma.rawChatMessage.findMany({
-    where: { creatorId: lucy.id, sentAt: { gte: START_DATE } },
+    where: { creatorId: lucy.id, sentAt: { gte: START_DATE, lt: END_DATE } },
     orderBy: { sentAt: "asc" },
     select: {
       chatId: true,
