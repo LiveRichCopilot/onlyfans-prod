@@ -42,6 +42,15 @@ export type Win = {
 
 export type EmojiRow = { emoji: string; count: number; pctOfMessages: number };
 
+export type ThemeRow = {
+  key: string;
+  label: string;
+  description: string;
+  fanMentions: number;
+  salesLeadUps: number;
+  revenue: number;
+};
+
 export type VoiceFingerprint = {
   totalMessages: number;
   avgCharLength: number;
@@ -67,9 +76,97 @@ export type LucyReport = {
   fanPhrases: PhraseRow[];
   lucyPhrases: PhraseRow[];
   saleTypes: SaleTypeRow[];
+  themes: ThemeRow[];
   wins: Win[];
   voice: VoiceFingerprint;
 };
+
+const THEMES: Array<{ key: string; label: string; description: string; patterns: RegExp[] }> = [
+  {
+    key: "anal",
+    label: "Anal",
+    description: "Anal content and anal creampies",
+    patterns: [/\banal\b/i, /\bass(fuck|play|fucking)\b/i],
+  },
+  {
+    key: "dp",
+    label: "DP",
+    description: "Double penetration",
+    patterns: [/\bdp\b/i, /double.?pen/i],
+  },
+  {
+    key: "squirt",
+    label: "Squirting",
+    description: "Squirting scenes",
+    patterns: [/squirt/i],
+  },
+  {
+    key: "bbc",
+    label: "BBC",
+    description: "BBC scenes",
+    patterns: [/\bbbc\b/i],
+  },
+  {
+    key: "breeding",
+    label: "Breeding / creampie",
+    description: "Breeding and creampie",
+    patterns: [/breed/i, /creampie/i, /cream.?pie/i],
+  },
+  {
+    key: "bondage",
+    label: "Bondage / BDSM",
+    description: "Bondage, rope, BDSM",
+    patterns: [/bondage/i, /\btied\b/i, /\brope\b/i, /\bbdsm\b/i],
+  },
+  {
+    key: "custom",
+    label: "Customs",
+    description: "Custom video requests",
+    patterns: [/\bcustom\b/i],
+  },
+  {
+    key: "solo",
+    label: "Solo / masturbation",
+    description: "Solo play",
+    patterns: [/\bsolo\b/i, /masturbat/i, /fingering/i, /fingered/i],
+  },
+  {
+    key: "gg",
+    label: "Girl / girl",
+    description: "Girl on girl",
+    patterns: [/\bg.?g\b/i, /girl.{0,4}girl/i, /lesbian/i],
+  },
+  {
+    key: "feet",
+    label: "Feet",
+    description: "Feet content",
+    patterns: [/\bfeet\b/i, /\bfoot\b/i, /\btoes\b/i],
+  },
+  {
+    key: "cumshot",
+    label: "Cumshot / facial",
+    description: "Cumshots and facials",
+    patterns: [/cumshot/i, /facial/i, /\bcum on\b/i],
+  },
+  {
+    key: "dom",
+    label: "Dom / daddy",
+    description: "Dom and daddy dynamic",
+    patterns: [/\bdaddy\b/i, /\bdom\b/i, /\bsir\b/i],
+  },
+  {
+    key: "live",
+    label: "Live / sext",
+    description: "Live sexting",
+    patterns: [/\blive\b/i, /\bsext/i],
+  },
+  {
+    key: "renew",
+    label: "Sub renewal",
+    description: "Subscription renewals",
+    patterns: [/renew/i, /rebill/i, /resub/i],
+  },
+];
 
 const SALE_MIN = 25;
 const CONTEXT_MESSAGES = 15;
@@ -82,9 +179,23 @@ const START_DATE = new Date("2025-11-01T00:00:00Z");
 // Extended pictographic + some common emoji-related codepoints
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
 
+function htmlToText(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalize(text: string | null | undefined): string {
-  if (!text) return "";
-  return text.trim().toLowerCase().replace(/\s+/g, " ");
+  return htmlToText(text).toLowerCase();
 }
 
 function wordCount(text: string): number {
@@ -191,7 +302,7 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
         type,
         date: sale.date,
         messages: contextSlice.map((m) => ({
-          text: m.text ?? "",
+          text: htmlToText(m.text ?? ""),
           isFromCreator: m.isFromCreator,
           sentAt: m.sentAt,
           price: m.price,
@@ -237,6 +348,7 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
   };
 
   const voice = buildVoiceFingerprint(allMessages);
+  const themes = buildThemes(allMessages, sales, byChat);
 
   return {
     creator: {
@@ -250,9 +362,60 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
     fanPhrases,
     lucyPhrases,
     saleTypes,
+    themes,
     wins,
     voice,
   };
+}
+
+function buildThemes(
+  allMessages: Msg[],
+  sales: Array<{ amount: number; date: Date; fan: { ofapiFanId: string } }>,
+  byChat: Map<string, Array<{ sentAt: Date; text: string | null; isFromCreator: boolean }>>,
+): ThemeRow[] {
+  const fanMsgTexts = allMessages
+    .filter((m) => !m.isFromCreator && m.text)
+    .map((m) => htmlToText(m.text ?? ""));
+
+  const fanMentionCount = new Map<string, number>();
+  for (const text of fanMsgTexts) {
+    for (const theme of THEMES) {
+      if (theme.patterns.some((r) => r.test(text))) {
+        fanMentionCount.set(theme.key, (fanMentionCount.get(theme.key) ?? 0) + 1);
+      }
+    }
+  }
+
+  const salesAttr = new Map<string, { count: number; revenue: number }>();
+  for (const sale of sales) {
+    const chatMessages = byChat.get(sale.fan.ofapiFanId);
+    if (!chatMessages) continue;
+    const cutoffIdx = chatMessages.findIndex((m) => m.sentAt > sale.date);
+    const endIdx = cutoffIdx === -1 ? chatMessages.length : cutoffIdx;
+    const leadUp = chatMessages
+      .slice(Math.max(0, endIdx - CONTEXT_MESSAGES), endIdx)
+      .filter((m) => !m.isFromCreator);
+    const combined = leadUp.map((m) => htmlToText(m.text ?? "")).join(" ");
+    for (const theme of THEMES) {
+      if (theme.patterns.some((r) => r.test(combined))) {
+        const entry = salesAttr.get(theme.key) ?? { count: 0, revenue: 0 };
+        entry.count += 1;
+        entry.revenue += sale.amount;
+        salesAttr.set(theme.key, entry);
+      }
+    }
+  }
+
+  return THEMES.map((t) => ({
+    key: t.key,
+    label: t.label,
+    description: t.description,
+    fanMentions: fanMentionCount.get(t.key) ?? 0,
+    salesLeadUps: salesAttr.get(t.key)?.count ?? 0,
+    revenue: salesAttr.get(t.key)?.revenue ?? 0,
+  }))
+    .filter((t) => t.fanMentions > 0 || t.salesLeadUps > 0)
+    .sort((a, b) => b.revenue - a.revenue || b.fanMentions - a.fanMentions);
 }
 
 type Msg = {

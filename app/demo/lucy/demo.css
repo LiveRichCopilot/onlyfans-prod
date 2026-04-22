@@ -1,0 +1,202 @@
+.demo-root {
+  --bg: #111110;
+  --paper: #1a1917;
+  --ink: #f5f2ea;
+  --ink-dim: #c8c2b4;
+  --ink-mute: #8a8578;
+  --line: rgba(245, 242, 234, 0.08);
+  --line-strong: rgba(245, 242, 234, 0.14);
+  --accent: #d97757;
+  --accent-soft: rgba(217, 119, 87, 0.14);
+  --fan: #2b2926;
+  --creator: #d97757;
+
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+.demo-root h1,
+.demo-root h2,
+.demo-root h3,
+.demo-root .serif {
+  font-family: var(--font-serif), ui-serif, Georgia, serif;
+  font-weight: 400;
+}
+
+.demo-root h1 {
+  font-size: 2.75rem;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+.demo-root h2 {
+  font-size: 2rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.demo-root h3 {
+  font-size: 1.375rem;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+@media (min-width: 768px) {
+  .demo-root h1 {
+    font-size: 3.5rem;
+  }
+  .demo-root h2 {
+    font-size: 2.5rem;
+  }
+}
+
+.demo-root .eyebrow {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-mute);
+  font-weight: 500;
+}
+
+.demo-root .lead {
+  font-size: 1.125rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
+.demo-root .body {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.demo-root .rule {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+}
+
+.demo-root .rule-strong {
+  border: 0;
+  border-top: 1px solid var(--line-strong);
+  margin: 0;
+}
+
+.demo-root .section {
+  padding-top: 3.5rem;
+  padding-bottom: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .demo-root .section {
+    padding-top: 5rem;
+  }
+}
+
+.demo-root blockquote {
+  font-family: var(--font-serif);
+  font-size: 1.375rem;
+  line-height: 1.35;
+  color: var(--ink);
+  border-left: 2px solid var(--accent);
+  padding-left: 1.25rem;
+  margin: 1.25rem 0;
+  font-style: italic;
+}
+
+@media (min-width: 768px) {
+  .demo-root blockquote {
+    font-size: 1.625rem;
+  }
+}
+
+.demo-root .quote-attr {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  font-style: normal;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+  display: block;
+}
+
+.demo-root .bubble-fan {
+  background: var(--fan);
+  color: var(--ink);
+  border-radius: 14px 14px 14px 4px;
+  padding: 0.75rem 1rem;
+  max-width: 82%;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.demo-root .bubble-creator {
+  background: var(--accent-soft);
+  color: var(--ink);
+  border: 1px solid rgba(217, 119, 87, 0.3);
+  border-radius: 14px 14px 4px 14px;
+  padding: 0.75rem 1rem;
+  max-width: 82%;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.demo-root .meta {
+  color: var(--ink-mute);
+  font-size: 0.72rem;
+  margin-top: 0.25rem;
+  letter-spacing: 0.02em;
+}
+
+.demo-root details summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.demo-root details summary::-webkit-details-marker {
+  display: none;
+}
+
+.demo-root .num-display {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  line-height: 1;
+  color: var(--ink);
+  font-weight: 400;
+}
+
+@media (min-width: 768px) {
+  .demo-root .num-display {
+    font-size: 3rem;
+  }
+}
+
+.demo-root .num-small {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.demo-root a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.demo-root .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--accent);
+  border: 1px solid rgba(217, 119, 87, 0.4);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0.02em;
+}

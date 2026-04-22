@@ -1,4 +1,3 @@
-import { Clock, Type, CaseLower, MoreHorizontal, MessageCircle, Smile } from "lucide-react";
 import type { VoiceFingerprint as VoiceData } from "@/lib/lucy-insights";
 
 function fmtDuration(sec: number | null) {
@@ -9,127 +8,135 @@ function fmtDuration(sec: number | null) {
   return `${(m / 60).toFixed(1)} hr`;
 }
 
-function StatCell({
-  icon: Icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+function StatBlock({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="glass-inset rounded-xl p-3 sm:p-4">
-      <div className="flex items-center gap-1.5 text-white/40">
-        <Icon size={12} className="shrink-0" />
-        <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
+    <div>
+      <div className="eyebrow">{label}</div>
+      <div className="num-display" style={{ marginTop: "0.35rem" }}>
+        {value}
       </div>
-      <div className="mt-1 text-lg sm:text-xl font-semibold text-white tracking-tight">{value}</div>
-      {sub && <div className="text-[10px] text-white/40 mt-0.5">{sub}</div>}
+      {sub && (
+        <div
+          style={{
+            marginTop: "0.25rem",
+            color: "var(--ink-mute)",
+            fontSize: "0.85rem",
+          }}
+        >
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
 
 export function VoiceFingerprint({ voice }: { voice: VoiceData }) {
-  const emojiUsagePct =
-    voice.totalMessages > 0
-      ? ((voice.topEmojis.reduce((s, e) => s + e.count, 0) / voice.totalMessages) * 100).toFixed(0)
-      : "0";
-
   return (
-    <section className="mt-8">
-      <div className="flex items-center gap-2">
-        <MessageCircle size={18} className="text-teal-300/80" />
-        <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-          Voice fingerprint
-        </h2>
+    <section className="section">
+      <hr className="rule" />
+      <div style={{ marginTop: "2rem" }}>
+        <div className="eyebrow">Your voice</div>
+        <h2 style={{ marginTop: "0.5rem" }}>How you actually write</h2>
+        <p className="lead" style={{ marginTop: "0.75rem", maxWidth: "62ch" }}>
+          This is the fingerprint the chatbot copies so it sounds like you, not a stock script.
+          Pulled from {voice.totalMessages.toLocaleString()} of your messages.
+        </p>
       </div>
-      <p className="mt-1 text-sm text-white/50">
-        How Lucy actually types &mdash; the DNA a chatbot needs to copy
-      </p>
 
-      <div className="mt-4 glass-card rounded-2xl p-4 sm:p-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <StatCell
-            icon={Type}
-            label="Avg length"
-            value={`${Math.round(voice.avgCharLength)} chars`}
-            sub={`${voice.avgWordLength.toFixed(1)} words`}
-          />
-          <StatCell
-            icon={Clock}
-            label="Median reply"
-            value={fmtDuration(voice.medianReplySec)}
-          />
-          <StatCell
-            icon={CaseLower}
-            label="Lowercase-only"
-            value={`${voice.lowercaseOnlyPct.toFixed(0)}%`}
-            sub="of messages"
-          />
-          <StatCell
-            icon={MoreHorizontal}
-            label="Trailing dots"
-            value={`${voice.trailingDotsPct.toFixed(0)}%`}
-            sub={`${voice.emojiMidSentencePct.toFixed(0)}% mid-line`}
-          />
-        </div>
+      <div
+        style={{
+          marginTop: "2rem",
+          display: "grid",
+          gap: "2rem",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        }}
+      >
+        <StatBlock
+          label="Avg message length"
+          value={`${Math.round(voice.avgCharLength)}`}
+          sub={`characters · ${voice.avgWordLength.toFixed(1)} words`}
+        />
+        <StatBlock label="Median reply time" value={fmtDuration(voice.medianReplySec)} />
+        <StatBlock
+          label="Lowercase-only"
+          value={`${voice.lowercaseOnlyPct.toFixed(0)}%`}
+          sub="of your messages"
+        />
+        <StatBlock
+          label="Trailing dots ..."
+          value={`${voice.trailingDotsPct.toFixed(0)}%`}
+          sub="your rhythm tick"
+        />
+      </div>
 
-        <div className="mt-5 glass-inset rounded-xl p-4">
-          <div className="flex items-center gap-1.5 text-white/40">
-            <Smile size={12} className="shrink-0" />
-            <span className="text-[10px] uppercase tracking-wider font-medium">
-              Punctuation &amp; emotion usage
-            </span>
-          </div>
-          <p className="mt-1.5 text-[14px] text-white/90 leading-relaxed">
-            She uses <span className="text-white font-semibold">{emojiUsagePct}%</span> rate of
-            emotion markers across her messages. Lowercase-only writing dominates, trailing{" "}
-            <span className="text-white font-mono">..</span> is her rhythm, and reactions tend to
-            land mid-sentence rather than at the end.
-          </p>
-        </div>
-
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-              How she opens
-            </div>
-            <div className="mt-2 space-y-1.5">
-              {voice.openers.slice(0, 8).map((o, i) => (
-                <div key={i} className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="text-white/85 break-words flex-1">&ldquo;{o.text}&rdquo;</span>
-                  <span className="shrink-0 text-[11px] text-white/40">&times;{o.count}</span>
-                </div>
-              ))}
-              {voice.openers.length === 0 && (
-                <div className="text-xs text-white/40">No repeating openers.</div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-              How she signs off
-            </div>
-            <div className="mt-2 space-y-1.5">
-              {voice.signOffs.slice(0, 8).map((o, i) => (
-                <div key={i} className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="text-white/85 break-words flex-1">&ldquo;{o.text}&rdquo;</span>
-                  <span className="shrink-0 text-[11px] text-white/40">&times;{o.count}</span>
-                </div>
-              ))}
-              {voice.signOffs.length === 0 && (
-                <div className="text-xs text-white/40">No repeating sign-offs.</div>
-              )}
-            </div>
+      <div
+        style={{
+          marginTop: "3rem",
+          display: "grid",
+          gap: "2.5rem",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        }}
+      >
+        <div>
+          <h3 style={{ fontSize: "1.25rem" }}>How you open</h3>
+          <div style={{ marginTop: "1rem" }}>
+            {voice.openers.slice(0, 8).map((o, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: "0.6rem 0",
+                  borderTop: i > 0 ? "1px solid var(--line)" : "none",
+                  display: "flex",
+                  gap: "0.75rem",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span className="body" style={{ flex: 1 }}>
+                  &ldquo;{o.text}&rdquo;
+                </span>
+                <span style={{ color: "var(--ink-mute)", fontSize: "0.78rem" }}>
+                  &times;{o.count}
+                </span>
+              </div>
+            ))}
+            {voice.openers.length === 0 && (
+              <div className="body" style={{ color: "var(--ink-mute)" }}>
+                No repeating openers yet.
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-5 text-xs text-white/40">
-          Based on {voice.totalMessages.toLocaleString()} of Lucy&rsquo;s messages.
+        <div>
+          <h3 style={{ fontSize: "1.25rem" }}>How you sign off</h3>
+          <div style={{ marginTop: "1rem" }}>
+            {voice.signOffs.slice(0, 8).map((o, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: "0.6rem 0",
+                  borderTop: i > 0 ? "1px solid var(--line)" : "none",
+                  display: "flex",
+                  gap: "0.75rem",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span className="body" style={{ flex: 1 }}>
+                  &ldquo;{o.text}&rdquo;
+                </span>
+                <span style={{ color: "var(--ink-mute)", fontSize: "0.78rem" }}>
+                  &times;{o.count}
+                </span>
+              </div>
+            ))}
+            {voice.signOffs.length === 0 && (
+              <div className="body" style={{ color: "var(--ink-mute)" }}>
+                No repeating sign-offs yet.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>
