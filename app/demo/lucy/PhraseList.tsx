@@ -1,3 +1,4 @@
+import { Quote } from "lucide-react";
 import type { PhraseRow } from "@/lib/lucy-insights";
 
 function fmtUSD(n: number) {
@@ -21,7 +22,10 @@ export function PhraseList({
 }) {
   return (
     <section className="mt-8">
-      <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">{title}</h2>
+      <div className="flex items-center gap-2">
+        <Quote size={18} className="text-teal-300/80" />
+        <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">{title}</h2>
+      </div>
       <p className="mt-1 text-sm text-white/50">{subtitle}</p>
 
       {rows.length === 0 ? (

@@ -56,7 +56,13 @@ export type VoiceFingerprint = {
 };
 
 export type LucyReport = {
-  creator: { id: string; name: string | null; username: string | null };
+  creator: {
+    id: string;
+    name: string | null;
+    username: string | null;
+    avatarUrl: string | null;
+    headerUrl: string | null;
+  };
   stats: Stats;
   fanPhrases: PhraseRow[];
   lucyPhrases: PhraseRow[];
@@ -71,6 +77,7 @@ const TOP_WINS = 50;
 const TOP_PHRASES = 15;
 const MIN_PHRASE_OCCURRENCES = 2;
 const MIN_PHRASE_CHARS = 2;
+const START_DATE = new Date("2025-11-01T00:00:00Z");
 
 // Extended pictographic + some common emoji-related codepoints
 const EMOJI_RE = /\p{Extended_Pictographic}/gu;
@@ -86,13 +93,9 @@ function wordCount(text: string): number {
 
 export async function findLucy() {
   return prisma.creator.findFirst({
-    where: {
-      OR: [
-        { ofUsername: { contains: "lucy", mode: "insensitive" } },
-        { name: { contains: "lucy", mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, name: true, ofUsername: true },
+    where: { ofUsername: { contains: "lucy", mode: "insensitive" } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, name: true, ofUsername: true, avatarUrl: true, headerUrl: true },
   });
 }
 
@@ -100,9 +103,12 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
   const lucy = await findLucy();
   if (!lucy) return null;
 
-  // Pull sales ≥ $25
   const sales = await prisma.transaction.findMany({
-    where: { creatorId: lucy.id, amount: { gte: SALE_MIN } },
+    where: {
+      creatorId: lucy.id,
+      amount: { gte: SALE_MIN },
+      date: { gte: START_DATE },
+    },
     orderBy: { date: "desc" },
     select: {
       id: true,
@@ -114,9 +120,8 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
     },
   });
 
-  // Pull all of Lucy's messages once, index by chatId
   const allMessages = await prisma.rawChatMessage.findMany({
-    where: { creatorId: lucy.id },
+    where: { creatorId: lucy.id, sentAt: { gte: START_DATE } },
     orderBy: { sentAt: "asc" },
     select: {
       chatId: true,
@@ -234,7 +239,13 @@ export async function buildLucyReport(): Promise<LucyReport | null> {
   const voice = buildVoiceFingerprint(allMessages);
 
   return {
-    creator: { id: lucy.id, name: lucy.name, username: lucy.ofUsername },
+    creator: {
+      id: lucy.id,
+      name: lucy.name,
+      username: lucy.ofUsername,
+      avatarUrl: lucy.avatarUrl,
+      headerUrl: lucy.headerUrl,
+    },
     stats,
     fanPhrases,
     lucyPhrases,

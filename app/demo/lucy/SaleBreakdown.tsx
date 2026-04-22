@@ -1,3 +1,4 @@
+import { DollarSign } from "lucide-react";
 import type { SaleTypeRow } from "@/lib/lucy-insights";
 
 function fmtUSD(n: number) {
@@ -21,8 +22,11 @@ const TYPE_LABELS: Record<string, string> = {
 export function SaleBreakdown({ rows }: { rows: SaleTypeRow[] }) {
   return (
     <section className="mt-8">
-      <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">How the money came in</h2>
-      <p className="mt-1 text-sm text-white/50">Revenue by sale type (≥ $25 only)</p>
+      <div className="flex items-center gap-2">
+        <DollarSign size={18} className="text-teal-300/80" />
+        <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">How the money came in</h2>
+      </div>
+      <p className="mt-1 text-sm text-white/50">Revenue by sale type (&ge; $25 only)</p>
 
       <div className="mt-4 glass-card rounded-2xl p-4 sm:p-5 space-y-4">
         {rows.map((r) => (

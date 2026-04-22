@@ -1,11 +1,16 @@
+import { ClipboardList, FolderTree, Check, Ban, Megaphone, Target } from "lucide-react";
+
 export function MeetingBrief() {
   return (
     <section className="mt-8">
-      <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-        The brief from Lucy
-      </h2>
+      <div className="flex items-center gap-2">
+        <ClipboardList size={18} className="text-teal-300/80" />
+        <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
+          The brief from Lucy
+        </h2>
+      </div>
       <p className="mt-1 text-sm text-white/50">
-        Straight from the meeting — her words, her plan, her to-do list
+        Straight from the meeting &mdash; her words, her plan, her to-do list
       </p>
 
       <div className="mt-4 glass-prominent rounded-2xl p-5 sm:p-6">
@@ -24,8 +29,11 @@ export function MeetingBrief() {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="glass-card rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-            Her to-do list (next few days)
+          <div className="flex items-center gap-1.5 text-white/50">
+            <Check size={12} className="shrink-0" />
+            <span className="text-[11px] uppercase tracking-wider font-medium">
+              Her to-do list (next few days)
+            </span>
           </div>
           <ol className="mt-3 space-y-2 text-[15px] text-white/90">
             {[
@@ -46,8 +54,11 @@ export function MeetingBrief() {
         </div>
 
         <div className="glass-card rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-            How her vault gets organized
+          <div className="flex items-center gap-1.5 text-white/50">
+            <FolderTree size={12} className="shrink-0" />
+            <span className="text-[11px] uppercase tracking-wider font-medium">
+              How her vault gets organized
+            </span>
           </div>
           <ul className="mt-3 space-y-2 text-[15px] text-white/90 leading-snug">
             <li>
@@ -75,83 +86,102 @@ export function MeetingBrief() {
       </div>
 
       <div className="mt-3 glass-card rounded-2xl p-5">
-        <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-          Rules chatters must follow
+        <div className="flex items-center gap-1.5 text-white/50">
+          <Check size={12} className="shrink-0" />
+          <span className="text-[11px] uppercase tracking-wider font-medium">
+            Rules chatters must follow
+          </span>
         </div>
         <ul className="mt-3 space-y-2.5 text-[15px] text-white/90 leading-snug">
-          <li className="flex gap-2.5">
-            <span className="text-teal-400 shrink-0 mt-1">→</span>
-            <span>
-              <span className="text-white">Never</span> sell from &ldquo;All media&rdquo;. Only from
-              curated folders — anything else could be a custom, a drip set, or content she
-              doesn&rsquo;t want going out.
-            </span>
-          </li>
-          <li className="flex gap-2.5">
-            <span className="text-teal-400 shrink-0 mt-1">→</span>
-            <span>
+          {[
+            <>
+              <span className="text-white">Never</span> sell from &ldquo;All media&rdquo;. Only
+              from curated folders &mdash; anything else could be a custom, a drip set, or content
+              she doesn&rsquo;t want going out.
+            </>,
+            <>
               Every drip set gets its <span className="text-white">own list</span>. As soon as a
               fan sees <em>any</em> part, tick the list. If they see a repeat photo they
               &ldquo;saw her send live,&rdquo; the whole illusion breaks.
-            </span>
-          </li>
-          <li className="flex gap-2.5">
-            <span className="text-teal-400 shrink-0 mt-1">→</span>
-            <span>
-              Tags must be <span className="text-white">obvious</span> (&ldquo;Gigi&rdquo; — not
-              &ldquo;GGvids&rdquo;). Chatters only check one place; they won&rsquo;t dig.
-            </span>
-          </li>
-          <li className="flex gap-2.5">
-            <span className="text-teal-400 shrink-0 mt-1">→</span>
-            <span>
+            </>,
+            <>
+              Tags must be <span className="text-white">obvious</span> (&ldquo;Gigi&rdquo;
+              &mdash; not &ldquo;GGvids&rdquo;). Chatters only check one place; they won&rsquo;t
+              dig.
+            </>,
+            <>
               Start fans from the <span className="text-white">oldest content first</span>.
-              &ldquo;Let me take you on my journey&rdquo; — then walk forward. Don&rsquo;t always
-              open with the newest.
-            </span>
-          </li>
-          <li className="flex gap-2.5">
-            <span className="text-teal-400 shrink-0 mt-1">→</span>
-            <span>
+              &ldquo;Let me take you on my journey&rdquo; &mdash; then walk forward. Don&rsquo;t
+              always open with the newest.
+            </>,
+            <>
               When a sale happens from a great lead-up, that conversation{" "}
               <span className="text-white">gets added to the script library</span>. Real winning
               sequences, not theory.
-            </span>
-          </li>
+            </>,
+          ].map((content, i) => (
+            <li key={i} className="flex gap-2.5">
+              <Check size={14} className="text-teal-400 shrink-0 mt-1" />
+              <span>{content}</span>
+            </li>
+          ))}
         </ul>
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="glass-card rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-wider text-rose-300/70 font-medium">
-            Kill these anti-patterns
+          <div className="flex items-center gap-1.5 text-rose-300/70">
+            <Ban size={12} className="shrink-0" />
+            <span className="text-[11px] uppercase tracking-wider font-medium">
+              Kill these anti-patterns
+            </span>
           </div>
           <ul className="mt-3 space-y-2 text-[14px] text-white/85 leading-snug">
-            <li>Spamming a whale with $100, $100, $100 — no price variation, no personalization</li>
-            <li>Hitting a cold fan with flat pricing after a natural wave — it ends the wave</li>
-            <li>Sending a fan a photo they&rsquo;ve already seen mid-drip-set</li>
-            <li>Unlabeled audio clips the chatters can&rsquo;t find</li>
-            <li>Old tier-1-to-tier-5 clutter nobody can make sense of</li>
+            {[
+              "Spamming a whale with $100, $100, $100 — no price variation, no personalization",
+              "Hitting a cold fan with flat pricing after a natural wave — it ends the wave",
+              "Sending a fan a photo they’ve already seen mid-drip-set",
+              "Unlabeled audio clips the chatters can’t find",
+              "Old tier-1-to-tier-5 clutter nobody can make sense of",
+            ].map((t, i) => (
+              <li key={i} className="flex gap-2">
+                <Ban size={12} className="text-rose-300/60 shrink-0 mt-1.5" />
+                <span>{t}</span>
+              </li>
+            ))}
           </ul>
         </div>
 
         <div className="glass-card rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-            What Jay&rsquo;s running on the growth side
+          <div className="flex items-center gap-1.5 text-white/50">
+            <Megaphone size={12} className="shrink-0" />
+            <span className="text-[11px] uppercase tracking-wider font-medium">
+              What Jay&rsquo;s running on the growth side
+            </span>
           </div>
           <ul className="mt-3 space-y-2 text-[14px] text-white/85 leading-snug">
-            <li>Instagram + TikTok ads (walking / reaction clips while Lucy&rsquo;s in town)</li>
-            <li>Podcast booking support — PR girl handles adult podcast list</li>
-            <li>Photo shoots + BTS lives during her May stay</li>
-            <li>Possible Asia-side AI video channel using Lucy&rsquo;s China bank account</li>
-            <li>AI chatbot training — the goal is replacing most chatters over time</li>
+            {[
+              "Instagram + TikTok ads (walking / reaction clips while Lucy’s in town)",
+              "Podcast booking support — PR girl handles adult podcast list",
+              "Photo shoots + BTS lives during her May stay",
+              "Possible Asia-side AI video channel using Lucy’s China bank account",
+              "AI chatbot training — the goal is replacing most chatters over time",
+            ].map((t, i) => (
+              <li key={i} className="flex gap-2">
+                <Check size={12} className="text-teal-400/70 shrink-0 mt-1.5" />
+                <span>{t}</span>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
 
       <div className="mt-3 glass-inset rounded-2xl p-5">
-        <div className="text-[11px] uppercase tracking-wider text-white/50 font-medium">
-          Revenue target set in the meeting
+        <div className="flex items-center gap-1.5 text-white/50">
+          <Target size={12} className="shrink-0" />
+          <span className="text-[11px] uppercase tracking-wider font-medium">
+            Revenue target set in the meeting
+          </span>
         </div>
         <p className="mt-2 text-[15px] text-white/90 leading-relaxed">
           Floor:{" "}
