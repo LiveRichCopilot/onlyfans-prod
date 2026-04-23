@@ -58,8 +58,9 @@ export async function GET(req: NextRequest) {
     let totalIngested = 0;
     let totalChats = 0;
 
-    // Process 8 creators per run (rotation), or ALL if forceAll
-    const batch = forceAll ? sorted : sorted.slice(0, 8);
+    // Process 3 creators per run (rotation), or ALL if forceAll.
+    // Webhooks handle real-time ingestion; this cron is a gap-filler.
+    const batch = forceAll ? sorted : sorted.slice(0, 3);
 
     if (forceAll) {
       console.log(`[sync-messages] forceAll=true — processing all ${batch.length} creators (maxDuration=${maxDuration}s)`);

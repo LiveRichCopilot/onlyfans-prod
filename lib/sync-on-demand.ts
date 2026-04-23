@@ -9,7 +9,9 @@ import { prisma } from "@/lib/prisma";
  */
 
 const STALE_THRESHOLDS: Record<string, number> = {
-  chat_messages: 5 * 60_000,    // 5 min — webhooks fill most gaps
+  // Webhooks deliver real-time messages; cron is a safety net only.
+  // Raised from 5→60 min to cut ~12x OFAPI load from inbox loads.
+  chat_messages: 60 * 60_000,   // 60 min
   transactions: 15 * 60_000,    // 15 min
   fans: 15 * 60_000,            // 15 min
   content: 15 * 60_000,         // 15 min
